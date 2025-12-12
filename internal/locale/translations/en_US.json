@@ -380,6 +380,7 @@
     "form.prefs.select.older_first": "Older entries first",
     "form.prefs.select.publish_time": "Entry published time",
     "form.prefs.select.recent_first": "Recent entries first",
+    "form.prefs.select.score": "Score",
     "form.prefs.select.standalone": "Standalone",
     "form.prefs.select.swipe": "Swipe",
     "form.prefs.select.tap": "Double tap",

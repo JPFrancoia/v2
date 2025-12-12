@@ -1,0 +1,7 @@
+- set user's EntryOrder
+- add score column to feed_entries table
+- modify database query to return scores
+- modify feed_entries_all.go to use EntryOrder to return scores
+- modify feed_entries.html to display scores
+- modify setting page (which file?) to allow user to set EntryOrder
+- translation?

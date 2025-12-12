@@ -187,6 +187,7 @@
         <select id="form-entry-order" name="entry_order">
             <option value="published_at" {{ if eq "published_at" $.form.EntryOrder }}selected="selected"{{ end }}>{{ t "form.prefs.select.publish_time" }}</option>
             <option value="created_at" {{ if eq "created_at" $.form.EntryOrder }}selected="selected"{{ end }}>{{ t "form.prefs.select.created_time" }}</option>
+            <option value="score" {{ if eq "score" $.form.EntryOrder }}selected="selected"{{ end }}>{{ t "form.prefs.select.score" }}</option>
         </select>
 
         <label for="form-categories-sorting-order">{{ t "form.prefs.label.categories_sorting_order" }}</label>
