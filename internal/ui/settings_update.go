@@ -81,8 +81,6 @@ func (h *handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 		ExternalFontHosts:      model.OptionalString(settingsForm.ExternalFontHosts),
 	}
 
-	// TODO: intercept new entryorder, and check if it is valid
-
 	if validationErr := validator.ValidateUserModification(h.store, user.ID, userModificationRequest); validationErr != nil {
 		view.Set("errorMessage", validationErr.Translate(user.Language))
 		html.OK(w, r, view.Render("settings"))

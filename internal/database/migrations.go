@@ -1403,4 +1403,12 @@ var migrations = [...]func(tx *sql.Tx) error{
 		_, err = tx.Exec(sql)
 		return err
 	},
+	func(tx *sql.Tx) (err error) {
+		sql := `
+			ALTER TABLE entries ADD COLUMN score int NOT NULL DEFAULT 0;
+			ALTER TYPE entry_sorting_order ADD VALUE 'score';
+		`
+		_, err = tx.Exec(sql)
+		return err
+	},
 }
