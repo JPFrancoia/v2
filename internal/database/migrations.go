@@ -1407,7 +1407,7 @@ var migrations = [...]func(tx *sql.Tx) error{
 		sql := `
 			ALTER TABLE entries ADD COLUMN score int NOT NULL DEFAULT 0;
 			ALTER TYPE entry_sorting_order ADD VALUE 'score';
-			ALTER TABLE users ADD COLUMN show_score boolean default 't';
+			ALTER TABLE users ADD COLUMN show_score boolean default 'f';
 		`
 		_, err = tx.Exec(sql)
 		return err
