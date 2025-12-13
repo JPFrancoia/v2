@@ -7,6 +7,11 @@
         <li class="item-meta-info-timestamp">
             <time datetime="{{ isodate .entry.Date }}" title="{{ isodate .entry.Date }}">{{ elapsed .user.Timezone .entry.Date }}</time>
         </li>
+        {{ if .user.ShowScore -}}
+        <li class="item-meta-info-score">
+            <span title="{{ t "entry.score.title" }}">{{ t "entry.score.label" }}: {{ .entry.Score }}</span>
+        </li>
+        {{ end -}}
         {{ if and .user.ShowReadingTime (gt .entry.ReadingTime 0) -}}
         <li class="item-meta-info-reading-time">
             <span>{{ plural "entry.estimated_reading_time" .entry.ReadingTime .entry.ReadingTime }}</span>
