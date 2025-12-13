@@ -38,6 +38,7 @@ type Entry struct {
 	Feed        *Feed         `json:"feed,omitempty"`
 	Tags        []string      `json:"tags"`
 	Score       int64         `json:"score"`
+	Vote        int           `json:"vote"`
 }
 
 func NewEntry() *Entry {
