@@ -28,6 +28,7 @@ type User struct {
 	EntriesPerPage                  int        `json:"entries_per_page"`
 	KeyboardShortcuts               bool       `json:"keyboard_shortcuts"`
 	ShowReadingTime                 bool       `json:"show_reading_time"`
+	ShowScore                       bool       `json:"show_score"`
 	EntrySwipe                      bool       `json:"entry_swipe"`
 	GestureNav                      string     `json:"gesture_nav"`
 	LastLoginAt                     *time.Time `json:"last_login_at"`
@@ -72,6 +73,7 @@ type UserModificationRequest struct {
 	IsAdmin                         *bool    `json:"is_admin"`
 	KeyboardShortcuts               *bool    `json:"keyboard_shortcuts"`
 	ShowReadingTime                 *bool    `json:"show_reading_time"`
+	ShowScore                       *bool    `json:"show_score"`
 	EntrySwipe                      *bool    `json:"entry_swipe"`
 	GestureNav                      *string  `json:"gesture_nav"`
 	DisplayMode                     *string  `json:"display_mode"`
@@ -152,6 +154,10 @@ func (u *UserModificationRequest) Patch(user *User) {
 
 	if u.ShowReadingTime != nil {
 		user.ShowReadingTime = *u.ShowReadingTime
+	}
+
+	if u.ShowScore != nil {
+		user.ShowScore = *u.ShowScore
 	}
 
 	if u.EntrySwipe != nil {
