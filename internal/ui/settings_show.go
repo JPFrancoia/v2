@@ -33,6 +33,7 @@ func (h *handler) showSettingsPage(w http.ResponseWriter, r *http.Request) {
 		EntriesPerPage:            user.EntriesPerPage,
 		KeyboardShortcuts:         user.KeyboardShortcuts,
 		ShowReadingTime:           user.ShowReadingTime,
+		ShowScore:                 user.ShowScore,
 		CustomCSS:                 user.Stylesheet,
 		CustomJS:                  user.CustomJS,
 		ExternalFontHosts:         user.ExternalFontHosts,

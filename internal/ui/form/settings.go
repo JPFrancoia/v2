@@ -36,6 +36,7 @@ type SettingsForm struct {
 	EntriesPerPage         int
 	KeyboardShortcuts      bool
 	ShowReadingTime        bool
+	ShowScore              bool
 	CustomCSS              string
 	CustomJS               string
 	ExternalFontHosts      string
@@ -103,6 +104,7 @@ func (s *SettingsForm) Merge(user *model.User) *model.User {
 	user.EntriesPerPage = s.EntriesPerPage
 	user.KeyboardShortcuts = s.KeyboardShortcuts
 	user.ShowReadingTime = s.ShowReadingTime
+	user.ShowScore = s.ShowScore
 	user.Stylesheet = s.CustomCSS
 	user.CustomJS = s.CustomJS
 	user.ExternalFontHosts = s.ExternalFontHosts
@@ -194,6 +196,7 @@ func NewSettingsForm(r *http.Request) *SettingsForm {
 		EntriesPerPage:            int(entriesPerPage),
 		KeyboardShortcuts:         r.FormValue("keyboard_shortcuts") == "1",
 		ShowReadingTime:           r.FormValue("show_reading_time") == "1",
+		ShowScore:                 r.FormValue("show_score") == "1",
 		CustomCSS:                 r.FormValue("custom_css"),
 		CustomJS:                  r.FormValue("custom_js"),
 		ExternalFontHosts:         r.FormValue("external_font_hosts"),
