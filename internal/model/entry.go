@@ -37,6 +37,7 @@ type Entry struct {
 	Enclosures  EnclosureList `json:"enclosures"`
 	Feed        *Feed         `json:"feed,omitempty"`
 	Tags        []string      `json:"tags"`
+	Score       int64         `json:"score"`
 }
 
 func NewEntry() *Entry {
