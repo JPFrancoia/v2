@@ -708,6 +708,7 @@ func (s *Storage) Users() (model.Users, error) {
 			&user.EntriesPerPage,
 			&user.KeyboardShortcuts,
 			&user.ShowReadingTime,
+			&user.ShowScore,
 			&user.EntrySwipe,
 			&user.GestureNav,
 			&user.LastLoginAt,
