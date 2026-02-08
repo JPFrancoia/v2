@@ -1,0 +1,16 @@
+BUILD_HOST=192.168.0.13:32000
+NAME=miniflux
+TAG=$(shell git log -1 --pretty=%h)
+
+
+pkg:
+	echo "Tag: " ${TAG}
+	echo ${NAME}:${TAG}
+	docker build -t ${NAME}:${TAG} -f packaging/docker/alpine/Dockerfile .
+	-docker inspect "${NAME}:latest" > /dev/null 2>&1 || docker rmi ${NAME}:latest
+	docker tag ${NAME}:${TAG} ${NAME}:latest
+	docker tag ${NAME}:${TAG} ${BUILD_HOST}/${NAME}:${TAG}
+	docker tag ${NAME}:${TAG} ${BUILD_HOST}/${NAME}:latest
+	docker push ${BUILD_HOST}/${NAME}:${TAG}
+	docker push ${BUILD_HOST}/${NAME}:latest
+	# trivy image ${NAME}:${TAG}

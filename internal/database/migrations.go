@@ -1405,17 +1405,21 @@ var migrations = [...]func(tx *sql.Tx) error{
 	},
 	func(tx *sql.Tx) (err error) {
 		sql := `
-			ALTER TABLE entries ADD COLUMN score int NOT NULL DEFAULT 0;
-			ALTER TYPE entry_sorting_order ADD VALUE 'score';
-			ALTER TABLE users ADD COLUMN show_score boolean default 'f';
+			ALTER TABLE entries ADD COLUMN IF NOT EXISTS score int NOT NULL DEFAULT 0;
+			ALTER TABLE users ADD COLUMN IF NOT EXISTS show_score boolean default 'f';
 		`
 		_, err = tx.Exec(sql)
+		if err != nil {
+			return err
+		}
+		// ADD VALUE for enums is idempotent in PG 9.3+ only with IF NOT EXISTS
+		_, err = tx.Exec(`ALTER TYPE entry_sorting_order ADD VALUE IF NOT EXISTS 'score'`)
 		return err
 	},
 	func(tx *sql.Tx) (err error) {
 		sql := `
-			ALTER TABLE entries ADD COLUMN vote int DEFAULT 0 CHECK (vote IN (-1, 0, 1));
-			ALTER TABLE users ADD COLUMN show_voting_buttons bool DEFAULT 'f';
+			ALTER TABLE entries ADD COLUMN IF NOT EXISTS vote int DEFAULT 0 CHECK (vote IN (-1, 0, 1));
+			ALTER TABLE users ADD COLUMN IF NOT EXISTS show_voting_buttons bool DEFAULT 'f';
 		`
 		_, err = tx.Exec(sql)
 		return err
