@@ -95,9 +95,20 @@ func Serve(router *mux.Router, store *storage.Storage, pool *worker.Pool) {
 	uiRouter.HandleFunc("/category/{categoryID}/remove", handler.removeCategory).Name("removeCategory").Methods(http.MethodPost)
 	uiRouter.HandleFunc("/category/{categoryID}/mark-all-as-read", handler.markCategoryAsRead).Name("markCategoryAsRead").Methods(http.MethodPost)
 
-	// Tag pages.
+	// Tag pages (feed-sourced tags).
 	uiRouter.HandleFunc("/tags/{tagName}/entries/all", handler.showTagEntriesAllPage).Name("tagEntriesAll").Methods(http.MethodGet)
 	uiRouter.HandleFunc("/tags/{tagName}/entry/{entryID}", handler.showTagEntryPage).Name("tagEntry").Methods(http.MethodGet)
+
+	// User tag pages.
+	uiRouter.HandleFunc("/user-tags", handler.showUserTagsPage).Name("userTags").Methods(http.MethodGet)
+	uiRouter.HandleFunc("/user-tags/create", handler.showCreateUserTagPage).Name("createUserTag").Methods(http.MethodGet)
+	uiRouter.HandleFunc("/user-tags/save", handler.saveUserTag).Name("saveUserTag").Methods(http.MethodPost)
+	uiRouter.HandleFunc("/user-tag/{userTagID}/entries", handler.showUserTagEntriesPage).Name("userTagEntries").Methods(http.MethodGet)
+	uiRouter.HandleFunc("/user-tag/{userTagID}/entry/{entryID}", handler.showUserTagEntryPage).Name("userTagEntry").Methods(http.MethodGet)
+	uiRouter.HandleFunc("/user-tag/{userTagID}/edit", handler.showEditUserTagPage).Name("editUserTag").Methods(http.MethodGet)
+	uiRouter.HandleFunc("/user-tag/{userTagID}/update", handler.updateUserTag).Name("updateUserTag").Methods(http.MethodPost)
+	uiRouter.HandleFunc("/user-tag/{userTagID}/remove", handler.removeUserTag).Name("removeUserTag").Methods(http.MethodPost)
+	uiRouter.HandleFunc("/entry/{entryID}/user-tags", handler.updateEntryUserTags).Name("updateEntryUserTags").Methods(http.MethodPost)
 
 	// Entry pages.
 	uiRouter.HandleFunc("/entry/status", handler.updateEntriesStatus).Name("updateEntriesStatus").Methods(http.MethodPost)

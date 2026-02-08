@@ -1,0 +1,71 @@
+{{ define "title"}}{{ t "page.tags.title" }} ({{ .total }}){{ end }}
+
+{{ define "page_header"}}
+<section class="page-header" aria-labelledby="page-header-title page-header-title-count">
+    <h1 id="page-header-title" dir="auto">
+        {{ t "page.tags.title" }}
+        <span aria-hidden="true"> ({{ .total }})</span>
+    </h1>
+    <span id="page-header-title-count" class="sr-only">{{ plural "page.tags_count" .total .total }}</span>
+    <nav aria-label="{{ t "page.tags.title" }} {{ t "menu.title" }}">
+        <ul>
+            <li>
+                <a href="{{ route "createUserTag" }}">{{ icon "tag" }}{{ t "menu.create_tag" }}</a>
+            </li>
+        </ul>
+    </nav>
+</section>
+{{ end }}
+
+{{ define "content"}}
+{{ if not .tags }}
+    <p role="alert" class="alert alert-error">{{ t "alert.no_user_tag" }}</p>
+{{ else }}
+    <div class="items">
+        {{ range .tags }}
+        <article
+            class="item"
+            aria-labelledby="tag-title-{{ .ID }}"
+            tabindex="-1"
+        >
+            <header id="tag-title-{{ .ID }}" class="item-header" dir="auto">
+                <h2 class="item-title">
+                    <a href="{{ route "userTagEntries" "userTagID" .ID }}">
+                        {{ .Title }}
+                        {{ if .EntryCount }}
+                        <span class="category-item-total" aria-hidden="true">({{ deRef .EntryCount }})</span>
+                        <span class="sr-only">{{ plural "page.tag_entry_count" (deRef .EntryCount) (deRef .EntryCount) }}</span>
+                        {{ end }}
+                    </a>
+                </h2>
+            </header>
+            <div class="item-meta">
+                <ul class="item-meta-icons">
+                    <li class="item-meta-icons-entries">
+                        <a href="{{ route "userTagEntries" "userTagID" .ID }}">{{ icon "entries" }}<span class="icon-label">{{ t "page.tags.entries" }}</span></a>
+                    </li>
+                    <li class="item-meta-icons-edit">
+                        <a href="{{ route "editUserTag" "userTagID" .ID }}">{{ icon "edit" }}<span class="icon-label">{{ t "menu.edit_tag" }}</span></a>
+                    </li>
+                    <li class="item-meta-icons-delete">
+                        <button
+                            aria-describedby="tag-title-{{ .ID }}"
+                            data-confirm="true"
+                            data-label-question="{{ t "confirm.question" }}"
+                            data-label-yes="{{ t "confirm.yes" }}"
+                            data-label-no="{{ t "confirm.no" }}"
+                            data-label-loading="{{ t "confirm.loading" }}"
+                            data-url="{{ route "removeUserTag" "userTagID" .ID }}">{{ icon "delete" }}<span class="icon-label">{{ t "action.remove" }}</span></button>
+                    </li>
+                </ul>
+            </div>
+        </article>
+        {{ end }}
+    </div>
+
+    <footer>
+        <a href="#" class="elevator">{{ icon "up" }}{{ t "page.footer.elevator" }}</a>
+    </footer>
+{{ end }}
+
+{{ end }}

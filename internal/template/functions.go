@@ -105,6 +105,7 @@ func (f *funcMap) Map() template.FuncMap {
 		"subtract": func(a, b int) int {
 			return a - b
 		},
+		"hasInt64": slices.Contains[[]int64, int64],
 
 		// These functions are overridden at runtime after parsing.
 		"elapsed": func(timezone string, t time.Time) string {

@@ -1424,4 +1424,25 @@ var migrations = [...]func(tx *sql.Tx) error{
 		_, err = tx.Exec(sql)
 		return err
 	},
+	func(tx *sql.Tx) (err error) {
+		sql := `
+			CREATE TABLE user_tags (
+				id bigserial PRIMARY KEY,
+				user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+				title text NOT NULL,
+				UNIQUE(user_id, title)
+			);
+			CREATE TABLE entry_user_tags (
+				entry_id bigint NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+				user_tag_id bigint NOT NULL REFERENCES user_tags(id) ON DELETE CASCADE,
+				PRIMARY KEY (entry_id, user_tag_id)
+			);
+		`
+		_, err = tx.Exec(sql)
+		return err
+	},
+	func(tx *sql.Tx) (err error) {
+		_, err = tx.Exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS show_feed_tags boolean DEFAULT 't'`)
+		return err
+	},
 }

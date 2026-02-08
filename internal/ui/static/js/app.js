@@ -1266,6 +1266,78 @@ function initializeTouchHandler() {
 }
 
 /**
+ * Handle saving user tags on an entry via AJAX.
+ *
+ * @param {Element} buttonElement - The save button that was clicked.
+ */
+function handleSaveUserTags(buttonElement) {
+    const panel = buttonElement.closest(".entry-user-tags-panel");
+    if (!panel) return;
+
+    const dropdown = buttonElement.closest(".entry-user-tags-dropdown");
+    const container = buttonElement.closest(".entry-user-tags");
+    const url = buttonElement.dataset.saveTagsUrl;
+
+    // Collect checked tag IDs and labels.
+    const checkedTags = [];
+    panel.querySelectorAll("input[name='user_tag_ids']:checked").forEach((cb) => {
+        checkedTags.push({
+            id: cb.value,
+            label: cb.closest("label").textContent.trim(),
+        });
+    });
+
+    // Build form data.
+    const formData = new URLSearchParams();
+    formData.append("csrf", document.body.dataset.csrfToken || "");
+    checkedTags.forEach((tag) => formData.append("user_tag_ids", tag.id));
+
+    // Show loading state.
+    const originalText = buttonElement.textContent;
+    if (buttonElement.dataset.labelLoading) {
+        buttonElement.textContent = buttonElement.dataset.labelLoading;
+    }
+    buttonElement.disabled = true;
+
+    fetch(url, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-Csrf-Token": document.body.dataset.csrfToken || "",
+            "Accept": "application/json",
+        },
+        body: formData.toString(),
+    }).then((response) => {
+        if (response.ok) {
+            // Update the inline tag labels.
+            const assignedSpan = container.querySelector(".entry-user-tags-assigned");
+            if (assignedSpan) {
+                assignedSpan.innerHTML = "";
+                checkedTags.forEach((tag) => {
+                    const span = document.createElement("span");
+                    span.className = "entry-user-tag-label";
+                    span.dataset.userTagId = tag.id;
+                    span.textContent = tag.label;
+                    assignedSpan.appendChild(span);
+                });
+            }
+
+            // Close the dropdown.
+            if (dropdown) {
+                dropdown.removeAttribute("open");
+            }
+        }
+
+        // Restore button state.
+        buttonElement.textContent = buttonElement.dataset.labelDone || originalText;
+        buttonElement.disabled = false;
+    }).catch(() => {
+        buttonElement.textContent = originalText;
+        buttonElement.disabled = false;
+    });
+}
+
+/**
  * Initialize click handlers for various UI elements.
  */
 function initializeClickHandlers() {
@@ -1276,6 +1348,7 @@ function initializeClickHandlers() {
     onClick(":is(a, button)[data-fetch-content-entry]", handleFetchOriginalContentAction);
     onClick(":is(a, button)[data-share-status]", handleEntryShareAction);
     onClick(":is(a, button)[data-vote-entry]", (event) => handleVoteAction(event.target));
+    onClick("button[data-save-tags-url]", (event) => handleSaveUserTags(event.target));
 
     // Page actions with confirmation
     onClick(":is(a, button)[data-action=markPageAsRead]", (event) => handleConfirmationMessage(event.target, markPageAsReadAction));
@@ -1306,6 +1379,28 @@ function initializeClickHandlers() {
     }, true);
 }
 
+/**
+ * Initialize user tags dropdown behavior (Escape to close, click outside to close).
+ */
+function initializeUserTagsDropdown() {
+    const dropdown = document.querySelector(".entry-user-tags-dropdown");
+    if (!dropdown) return;
+
+    // Close on Escape key.
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && dropdown.hasAttribute("open")) {
+            dropdown.removeAttribute("open");
+        }
+    });
+
+    // Close when clicking outside the dropdown.
+    document.addEventListener("click", (event) => {
+        if (dropdown.hasAttribute("open") && !dropdown.contains(event.target)) {
+            dropdown.removeAttribute("open");
+        }
+    });
+}
+
 // Initialize application handlers
 initializeMainMenuHandlers();
 initializeFormHandlers();
@@ -1314,6 +1409,7 @@ initializeWebAuthn();
 initializeKeyboardShortcuts();
 initializeTouchHandler();
 initializeClickHandlers();
+initializeUserTagsDropdown();
 initializeServiceWorker();
 
 // Reload the page if it was restored from the back-forward cache and mark entries as read is enabled.

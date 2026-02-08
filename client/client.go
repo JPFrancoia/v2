@@ -585,6 +585,131 @@ func (c *Client) RefreshCategoryContext(ctx context.Context, categoryID int64) e
 	return err
 }
 
+// UserTags gets all user tags.
+func (c *Client) UserTags() (UserTags, error) {
+	ctx, cancel := withDefaultTimeout()
+	defer cancel()
+	return c.UserTagsContext(ctx)
+}
+
+// UserTagsContext gets all user tags.
+func (c *Client) UserTagsContext(ctx context.Context) (UserTags, error) {
+	body, err := c.request.Get(ctx, "/v1/user-tags")
+	if err != nil {
+		return nil, err
+	}
+	defer body.Close()
+
+	var tags UserTags
+	if err := json.NewDecoder(body).Decode(&tags); err != nil {
+		return nil, fmt.Errorf("miniflux: response error (%v)", err)
+	}
+
+	return tags, nil
+}
+
+// CreateUserTag creates a new user tag.
+func (c *Client) CreateUserTag(title string) (*UserTag, error) {
+	ctx, cancel := withDefaultTimeout()
+	defer cancel()
+	return c.CreateUserTagContext(ctx, title)
+}
+
+// CreateUserTagContext creates a new user tag.
+func (c *Client) CreateUserTagContext(ctx context.Context, title string) (*UserTag, error) {
+	body, err := c.request.Post(ctx, "/v1/user-tags", &UserTagCreationRequest{
+		Title: title,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer body.Close()
+
+	var tag *UserTag
+	if err := json.NewDecoder(body).Decode(&tag); err != nil {
+		return nil, fmt.Errorf("miniflux: response error (%v)", err)
+	}
+
+	return tag, nil
+}
+
+// UpdateUserTag updates a user tag.
+func (c *Client) UpdateUserTag(tagID int64, title string) (*UserTag, error) {
+	ctx, cancel := withDefaultTimeout()
+	defer cancel()
+	return c.UpdateUserTagContext(ctx, tagID, title)
+}
+
+// UpdateUserTagContext updates a user tag.
+func (c *Client) UpdateUserTagContext(ctx context.Context, tagID int64, title string) (*UserTag, error) {
+	body, err := c.request.Put(ctx, fmt.Sprintf("/v1/user-tags/%d", tagID), &UserTagModificationRequest{
+		Title: SetOptionalField(title),
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer body.Close()
+
+	var tag *UserTag
+	if err := json.NewDecoder(body).Decode(&tag); err != nil {
+		return nil, fmt.Errorf("miniflux: response error (%v)", err)
+	}
+
+	return tag, nil
+}
+
+// DeleteUserTag removes a user tag.
+func (c *Client) DeleteUserTag(tagID int64) error {
+	ctx, cancel := withDefaultTimeout()
+	defer cancel()
+	return c.DeleteUserTagContext(ctx, tagID)
+}
+
+// DeleteUserTagContext removes a user tag.
+func (c *Client) DeleteUserTagContext(ctx context.Context, tagID int64) error {
+	return c.request.Delete(ctx, fmt.Sprintf("/v1/user-tags/%d", tagID))
+}
+
+// UserTagEntries fetches entries for a user tag.
+func (c *Client) UserTagEntries(tagID int64, filter *Filter) (*EntryResultSet, error) {
+	ctx, cancel := withDefaultTimeout()
+	defer cancel()
+	return c.UserTagEntriesContext(ctx, tagID, filter)
+}
+
+// UserTagEntriesContext fetches entries for a user tag.
+func (c *Client) UserTagEntriesContext(ctx context.Context, tagID int64, filter *Filter) (*EntryResultSet, error) {
+	path := buildFilterQueryString(fmt.Sprintf("/v1/user-tags/%d/entries", tagID), filter)
+
+	body, err := c.request.Get(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	defer body.Close()
+
+	var result EntryResultSet
+	if err := json.NewDecoder(body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("miniflux: response error (%v)", err)
+	}
+
+	return &result, nil
+}
+
+// SetEntryUserTags sets the user tags for an entry.
+func (c *Client) SetEntryUserTags(entryID int64, userTagIDs []int64) error {
+	ctx, cancel := withDefaultTimeout()
+	defer cancel()
+	return c.SetEntryUserTagsContext(ctx, entryID, userTagIDs)
+}
+
+// SetEntryUserTagsContext sets the user tags for an entry.
+func (c *Client) SetEntryUserTagsContext(ctx context.Context, entryID int64, userTagIDs []int64) error {
+	_, err := c.request.Put(ctx, fmt.Sprintf("/v1/entries/%d/user-tags", entryID), &EntryUserTagsRequest{
+		UserTagIDs: userTagIDs,
+	})
+	return err
+}
+
 // Feeds gets all feeds.
 func (c *Client) Feeds() (Feeds, error) {
 	ctx, cancel := withDefaultTimeout()

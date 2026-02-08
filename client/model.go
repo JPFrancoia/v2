@@ -49,6 +49,8 @@ type User struct {
 	ExternalFontHosts         string     `json:"external_font_hosts"`
 	AlwaysOpenExternalLinks   bool       `json:"always_open_external_links"`
 	OpenExternalLinksInNewTab bool       `json:"open_external_links_in_new_tab"`
+	ShowVotingButtons         bool       `json:"show_voting_buttons"`
+	ShowFeedTags              bool       `json:"show_feed_tags"`
 }
 
 func (u User) String() string {
@@ -96,6 +98,8 @@ type UserModificationRequest struct {
 	ExternalFontHosts         *string  `json:"external_font_hosts"`
 	AlwaysOpenExternalLinks   *bool    `json:"always_open_external_links"`
 	OpenExternalLinksInNewTab *bool    `json:"open_external_links_in_new_tab"`
+	ShowVotingButtons         *bool    `json:"show_voting_buttons"`
+	ShowFeedTags              *bool    `json:"show_feed_tags"`
 }
 
 // Users represents a list of users.
@@ -357,6 +361,36 @@ type APIKeys []*APIKey
 // APIKeyCreationRequest represents the request to create an API key.
 type APIKeyCreationRequest struct {
 	Description string `json:"description"`
+}
+
+// UserTag represents a user-defined tag.
+type UserTag struct {
+	ID         int64  `json:"id"`
+	UserID     int64  `json:"user_id"`
+	Title      string `json:"title"`
+	EntryCount *int   `json:"entry_count,omitempty"`
+}
+
+func (t UserTag) String() string {
+	return fmt.Sprintf("#%d %s", t.ID, t.Title)
+}
+
+// UserTags represents a list of user tags.
+type UserTags []*UserTag
+
+// UserTagCreationRequest represents the request to create a user tag.
+type UserTagCreationRequest struct {
+	Title string `json:"title"`
+}
+
+// UserTagModificationRequest represents the request to update a user tag.
+type UserTagModificationRequest struct {
+	Title *string `json:"title"`
+}
+
+// EntryUserTagsRequest represents the request to set user tags on an entry.
+type EntryUserTagsRequest struct {
+	UserTagIDs []int64 `json:"user_tag_ids"`
 }
 
 func SetOptionalField[T any](value T) *T {

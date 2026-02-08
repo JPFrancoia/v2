@@ -93,6 +93,18 @@ func (h *handler) showUnreadFeedEntryPage(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	userTags, err := h.store.UserTags(user.ID)
+	if err != nil {
+		html.ServerError(w, r, err)
+		return
+	}
+
+	entryUserTagIDs, err := h.store.EntryUserTagIDs(user.ID, entry.ID)
+	if err != nil {
+		html.ServerError(w, r, err)
+		return
+	}
+
 	sess := session.New(h.store, request.SessionID(r))
 	view := view.New(h.tpl, r, sess)
 	view.Set("entry", entry)
@@ -105,6 +117,8 @@ func (h *handler) showUnreadFeedEntryPage(w http.ResponseWriter, r *http.Request
 	view.Set("countUnread", h.store.CountUnreadEntries(user.ID))
 	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
 	view.Set("hasSaveEntry", h.store.HasSaveEntry(user.ID))
+	view.Set("userTags", userTags)
+	view.Set("entryUserTagIDs", entryUserTagIDs)
 
 	html.OK(w, r, view.Render("entry"))
 }

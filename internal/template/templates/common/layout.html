@@ -99,6 +99,9 @@
                 <li {{ if eq .menu "categories" }}class="active"{{ end }} title="{{ t "tooltip.keyboard_shortcuts" "g c" }}">
                     <a href="{{ route "categories" }}" data-page="categories">{{ icon "categories" }}{{ t "menu.categories" }}</a>
                 </li>
+                <li {{ if eq .menu "tags" }}class="active"{{ end }}>
+                    <a href="{{ route "userTags" }}" data-page="tags">{{ icon "tag" }}{{ t "menu.tags" }}</a>
+                </li>
                 <li {{ if eq .menu "search" }}class="active"{{ end }} title="{{ t "tooltip.keyboard_shortcuts" "/" }}">
                     <a href="{{ route "search" }}" data-page="search">{{ icon "search" }}{{ t "menu.search" }}</a>
                 </li>

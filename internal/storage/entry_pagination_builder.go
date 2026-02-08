@@ -59,6 +59,14 @@ func (e *EntryPaginationBuilder) WithStatus(status string) {
 	}
 }
 
+// WithUserTagID adds user tag ID to the condition.
+func (e *EntryPaginationBuilder) WithUserTagID(userTagID int64) {
+	if userTagID > 0 {
+		e.conditions = append(e.conditions, fmt.Sprintf("e.id IN (SELECT entry_id FROM entry_user_tags WHERE user_tag_id = $%d)", len(e.args)+1))
+		e.args = append(e.args, userTagID)
+	}
+}
+
 func (e *EntryPaginationBuilder) WithTags(tags []string) {
 	if len(tags) > 0 {
 		for _, tag := range tags {

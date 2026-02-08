@@ -45,6 +45,7 @@ type User struct {
 	AlwaysOpenExternalLinks         bool       `json:"always_open_external_links"`
 	OpenExternalLinksInNewTab       bool       `json:"open_external_links_in_new_tab"`
 	ShowVotingButtons               bool       `json:"show_voting_buttons"`
+	ShowFeedTags                    bool       `json:"show_feed_tags"`
 }
 
 // UserCreationRequest represents the request to create a user.
@@ -90,6 +91,7 @@ type UserModificationRequest struct {
 	AlwaysOpenExternalLinks         *bool    `json:"always_open_external_links"`
 	OpenExternalLinksInNewTab       *bool    `json:"open_external_links_in_new_tab"`
 	ShowVotingButtons               *bool    `json:"show_voting_buttons"`
+	ShowFeedTags                    *bool    `json:"show_feed_tags"`
 }
 
 // Patch updates the User object with the modification request.
@@ -220,6 +222,10 @@ func (u *UserModificationRequest) Patch(user *User) {
 
 	if u.ShowVotingButtons != nil {
 		user.ShowVotingButtons = *u.ShowVotingButtons
+	}
+
+	if u.ShowFeedTags != nil {
+		user.ShowFeedTags = *u.ShowFeedTags
 	}
 }
 

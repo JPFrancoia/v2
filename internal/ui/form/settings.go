@@ -56,6 +56,7 @@ type SettingsForm struct {
 	AlwaysOpenExternalLinks   bool
 	OpenExternalLinksInNewTab bool
 	ShowVotingButtons         bool
+	ShowFeedTags              bool
 }
 
 // MarkAsReadBehavior returns the MarkReadBehavior from the given MarkReadOnView and MarkReadOnMediaPlayerCompletion values.
@@ -122,6 +123,7 @@ func (s *SettingsForm) Merge(user *model.User) *model.User {
 	user.AlwaysOpenExternalLinks = s.AlwaysOpenExternalLinks
 	user.OpenExternalLinksInNewTab = s.OpenExternalLinksInNewTab
 	user.ShowVotingButtons = s.ShowVotingButtons
+	user.ShowFeedTags = s.ShowFeedTags
 
 	MarkReadOnView, MarkReadOnMediaPlayerCompletion := extractMarkAsReadBehavior(s.MarkReadBehavior)
 	user.MarkReadOnView = MarkReadOnView
@@ -217,5 +219,6 @@ func NewSettingsForm(r *http.Request) *SettingsForm {
 		AlwaysOpenExternalLinks:   r.FormValue("always_open_external_links") == "1",
 		OpenExternalLinksInNewTab: r.FormValue("open_external_links_in_new_tab") == "1",
 		ShowVotingButtons:         r.FormValue("show_voting_buttons") == "1",
+		ShowFeedTags:              r.FormValue("show_feed_tags") == "1",
 	}
 }

@@ -100,7 +100,8 @@ func (s *Storage) CreateUser(userCreationRequest *model.UserCreationRequest) (*m
 			keep_filter_entry_rules,
 			always_open_external_links,
 			open_external_links_in_new_tab,
-			show_voting_buttons
+			show_voting_buttons,
+			show_feed_tags
 	`
 
 	tx, err := s.db.Begin()
@@ -148,6 +149,7 @@ func (s *Storage) CreateUser(userCreationRequest *model.UserCreationRequest) (*m
 		&user.AlwaysOpenExternalLinks,
 		&user.OpenExternalLinksInNewTab,
 		&user.ShowVotingButtons,
+		&user.ShowFeedTags,
 	)
 	if err != nil {
 		tx.Rollback()
@@ -216,9 +218,10 @@ func (s *Storage) UpdateUser(user *model.User) error {
 				keep_filter_entry_rules=$29,
 				always_open_external_links=$30,
 				open_external_links_in_new_tab=$31,
-				show_voting_buttons=$32
+				show_voting_buttons=$32,
+				show_feed_tags=$33
 			WHERE
-				id=$33
+				id=$34
 		`
 
 		_, err = s.db.Exec(
@@ -255,6 +258,7 @@ func (s *Storage) UpdateUser(user *model.User) error {
 			user.AlwaysOpenExternalLinks,
 			user.OpenExternalLinksInNewTab,
 			user.ShowVotingButtons,
+			user.ShowFeedTags,
 			user.ID,
 		)
 		if err != nil {
@@ -293,9 +297,10 @@ func (s *Storage) UpdateUser(user *model.User) error {
 				keep_filter_entry_rules=$28,
 				always_open_external_links=$29,
 				open_external_links_in_new_tab=$30,
-				show_voting_buttons=$31
+				show_voting_buttons=$31,
+				show_feed_tags=$32
 			WHERE
-				id=$32
+				id=$33
 		`
 
 		_, err := s.db.Exec(
@@ -331,6 +336,7 @@ func (s *Storage) UpdateUser(user *model.User) error {
 			user.AlwaysOpenExternalLinks,
 			user.OpenExternalLinksInNewTab,
 			user.ShowVotingButtons,
+			user.ShowFeedTags,
 			user.ID,
 		)
 
@@ -388,7 +394,8 @@ func (s *Storage) UserByID(userID int64) (*model.User, error) {
 			keep_filter_entry_rules,
 			always_open_external_links,
 			open_external_links_in_new_tab,
-			show_voting_buttons
+			show_voting_buttons,
+			show_feed_tags
 		FROM
 			users
 		WHERE
@@ -433,7 +440,8 @@ func (s *Storage) UserByUsername(username string) (*model.User, error) {
 			keep_filter_entry_rules,
 			always_open_external_links,
 			open_external_links_in_new_tab,
-			show_voting_buttons
+			show_voting_buttons,
+			show_feed_tags
 		FROM
 			users
 		WHERE
@@ -478,7 +486,8 @@ func (s *Storage) UserByField(field, value string) (*model.User, error) {
 			keep_filter_entry_rules,
 			always_open_external_links,
 			open_external_links_in_new_tab,
-			show_voting_buttons
+			show_voting_buttons,
+			show_feed_tags
 		FROM
 			users
 		WHERE
@@ -531,7 +540,8 @@ func (s *Storage) UserByAPIKey(token string) (*model.User, error) {
 			u.keep_filter_entry_rules,
 			u.always_open_external_links,
 			u.open_external_links_in_new_tab,
-			u.show_voting_buttons
+			u.show_voting_buttons,
+			u.show_feed_tags
 		FROM
 			users u
 		LEFT JOIN
@@ -578,6 +588,7 @@ func (s *Storage) fetchUser(query string, args ...any) (*model.User, error) {
 		&user.AlwaysOpenExternalLinks,
 		&user.OpenExternalLinksInNewTab,
 		&user.ShowVotingButtons,
+		&user.ShowFeedTags,
 	)
 
 	if err == sql.ErrNoRows {

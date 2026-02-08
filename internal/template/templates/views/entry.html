@@ -188,7 +188,7 @@
             </span>
             {{ end }}
         </div>
-        {{ if .entry.Tags }}
+        {{ if and .entry.Tags (or (not .user) .user.ShowFeedTags) }}
         <div class="entry-tags">
             {{ t "entry.tags.label" }}
             {{ $allTags := .entry.Tags }}
@@ -225,6 +225,45 @@
                     {{ end }}
                     </ul>
                 </details>
+            {{ end }}
+        </div>
+        {{ end }}
+        {{ if .user }}
+        <div class="entry-user-tags">
+            <span class="entry-user-tags-assigned">
+                {{ $entryUserTagIDs := .entryUserTagIDs }}
+                {{ range .userTags }}
+                    {{ if hasInt64 $entryUserTagIDs .ID }}
+                    <span class="entry-user-tag-label" data-user-tag-id="{{ .ID }}">{{ .Title }}</span>
+                    {{ end }}
+                {{ end }}
+            </span>
+            {{ if .userTags }}
+            <details class="entry-user-tags-dropdown">
+                <summary class="entry-user-tags-toggle" title="{{ t "entry.user_tags.label" }}">{{ icon "tag" }}<span class="icon-label">{{ t "menu.tags" }}</span></summary>
+                <div class="entry-user-tags-panel">
+                    <ul class="entry-user-tags-checklist">
+                        {{ range .userTags }}
+                        <li>
+                            <label>
+                                <input type="checkbox" name="user_tag_ids" value="{{ .ID }}"
+                                    {{ if hasInt64 $entryUserTagIDs .ID }}checked{{ end }}>
+                                {{ .Title }}
+                            </label>
+                        </li>
+                        {{ end }}
+                    </ul>
+                    <button
+                        type="button"
+                        class="button button-primary entry-user-tags-save"
+                        data-save-tags-url="{{ route "updateEntryUserTags" "entryID" .entry.ID }}"
+                        data-label-loading="{{ t "entry.state.saving" }}"
+                        data-label-done="{{ t "entry.user_tags.save" }}"
+                        >{{ t "entry.user_tags.save" }}</button>
+                </div>
+            </details>
+            {{ else }}
+            <em class="entry-user-tags-empty">{{ t "entry.user_tags.none_defined" }}</em>
             {{ end }}
         </div>
         {{ end }}

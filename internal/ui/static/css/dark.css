@@ -112,6 +112,11 @@
     --keyboard-shortcuts-li-color: #9b9b9b;
 
     --counter-color: #bbb;
+
+    --entry-user-tag-bg: #444;
+    --entry-user-tag-color: #ddd;
+    --entry-user-tags-panel-border: #555;
+    --entry-user-tags-panel-bg: #333;
 }
 
 html {

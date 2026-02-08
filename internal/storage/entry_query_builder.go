@@ -157,6 +157,15 @@ func (e *EntryQueryBuilder) WithStatuses(statuses []string) *EntryQueryBuilder {
 	return e
 }
 
+// WithUserTagID filter by user tag ID.
+func (e *EntryQueryBuilder) WithUserTagID(userTagID int64) *EntryQueryBuilder {
+	if userTagID > 0 {
+		e.conditions = append(e.conditions, fmt.Sprintf("e.id IN (SELECT entry_id FROM entry_user_tags WHERE user_tag_id = $%d)", len(e.args)+1))
+		e.args = append(e.args, userTagID)
+	}
+	return e
+}
+
 // WithTags filter by a list of entry tags.
 func (e *EntryQueryBuilder) WithTags(tags []string) *EntryQueryBuilder {
 	if len(tags) > 0 {

@@ -1,0 +1,44 @@
+{{ define "title"}}{{ .tag.Title }} ({{ .total }}){{ end }}
+
+{{ define "page_header"}}
+<section class="page-header" aria-labelledby="page-header-title page-header-title-count">
+    <h1 id="page-header-title" dir="auto">
+        {{ .tag.Title }}
+        <span aria-hidden="true"> ({{ .total }})</span>
+    </h1>
+    <span id="page-header-title-count" class="sr-only">{{ plural "page.tag_entry_count" .total .total }}</span>
+</section>
+{{ end }}
+
+{{ define "content"}}
+{{ if not .entries }}
+    <p role="alert" class="alert alert-error">{{ t "alert.no_user_tag_entry" }}</p>
+{{ else }}
+    {{ template "pagination" .pagination }}
+    <div class="items">
+        {{ range .entries }}
+        <article
+            class="item touch-item item-status-{{ .Status }}"
+            data-id="{{ .ID }}"
+            aria-labelledby="entry-title-{{ .ID }}"
+            tabindex="-1"
+        >
+            <header class="item-header" dir="auto">
+                <h2 class="item-title" id="entry-title-{{ .ID }}">
+                    {{ if ne .Feed.Icon.ExternalIconID "" }}
+                    <a href="{{ route "feedIcon" "externalIconID" .Feed.Icon.ExternalIconID }}" class="no-page-load"><img class="item-header-icon" src="{{ route "feedIcon" "externalIconID" .Feed.Icon.ExternalIconID }}" width="16" height="16" loading="lazy" alt="{{ .Feed.Title }}"></a>
+                    {{ end }}
+                    <a href="{{ route "userTagEntry" "userTagID" $.tag.ID "entryID" .ID }}">{{ .Title }}</a>
+                </h2>
+                <span class="category">
+                    <a href="{{ route "categoryEntries" "categoryID" .Feed.Category.ID }}">{{ .Feed.Category.Title }}</a>
+                </span>
+            </header>
+            {{ template "item_meta" dict "user" $.user "entry" . "hasSaveEntry" $.hasSaveEntry }}
+        </article>
+        {{ end }}
+    </div>
+    {{ template "pagination" .pagination }}
+{{ end }}
+
+{{ end }}
