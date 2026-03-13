@@ -1312,7 +1312,7 @@ function handleSaveUserTags(buttonElement) {
             // Update the inline tag labels.
             const assignedSpan = container.querySelector(".entry-user-tags-assigned");
             if (assignedSpan) {
-                assignedSpan.innerHTML = "";
+                assignedSpan.replaceChildren();
                 checkedTags.forEach((tag) => {
                     const span = document.createElement("span");
                     span.className = "entry-user-tag-label";
