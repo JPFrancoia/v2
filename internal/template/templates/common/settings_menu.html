@@ -16,7 +16,7 @@
             <a href="{{ routePath "/sessions" }}">{{ icon "sessions" }}{{ t "menu.sessions" }}</a>
         </li>
         <li>
-            <a href="{{ route "userTags" }}">{{ icon "tag" }}{{ t "menu.tags" }}</a>
+            <a href="{{ routePath "/user-tags" }}">{{ icon "tag" }}{{ t "menu.tags" }}</a>
         </li>
         {{ if .user.IsAdmin }}
             <li>

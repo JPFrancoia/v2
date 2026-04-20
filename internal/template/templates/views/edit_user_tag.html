@@ -6,10 +6,10 @@
     <nav aria-label="{{ t "page.edit_tag.title" .tag.Title }} {{ t "menu.title" }}">
         <ul>
             <li>
-                <a href="{{ route "userTags" }}">{{ icon "tag" }}{{ t "menu.tags" }}</a>
+                <a href="{{ routePath "/user-tags" }}">{{ icon "tag" }}{{ t "menu.tags" }}</a>
             </li>
             <li>
-                <a href="{{ route "createUserTag" }}">{{ icon "tag" }}{{ t "menu.create_tag" }}</a>
+                <a href="{{ routePath "/user-tags/create" }}">{{ icon "tag" }}{{ t "menu.create_tag" }}</a>
             </li>
         </ul>
     </nav>
@@ -17,7 +17,7 @@
 {{ end }}
 
 {{ define "content"}}
-<form action="{{ route "updateUserTag" "userTagID" .tag.ID }}" method="post" autocomplete="off">
+<form action="{{ routePath "/user-tag/%d/update" .tag.ID }}" method="post" autocomplete="off">
     <input type="hidden" name="csrf" value="{{ .csrf }}">
 
     {{ if .errorMessage }}

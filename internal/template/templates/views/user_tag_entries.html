@@ -26,12 +26,12 @@
             <header class="item-header" dir="auto">
                 <h2 class="item-title" id="entry-title-{{ .ID }}">
                     {{ if ne .Feed.Icon.ExternalIconID "" }}
-                    <a href="{{ route "feedIcon" "externalIconID" .Feed.Icon.ExternalIconID }}" class="no-page-load"><img class="item-header-icon" src="{{ route "feedIcon" "externalIconID" .Feed.Icon.ExternalIconID }}" width="16" height="16" loading="lazy" alt="{{ .Feed.Title }}"></a>
+                    <a href="{{ routePath "/feed-icon/%s" .Feed.Icon.ExternalIconID }}" class="no-page-load"><img class="item-header-icon" src="{{ routePath "/feed-icon/%s" .Feed.Icon.ExternalIconID }}" width="16" height="16" loading="lazy" alt="{{ .Feed.Title }}"></a>
                     {{ end }}
-                    <a href="{{ route "userTagEntry" "userTagID" $.tag.ID "entryID" .ID }}">{{ .Title }}</a>
+                    <a href="{{ routePath "/user-tag/%d/entry/%d" $.tag.ID .ID }}">{{ .Title }}</a>
                 </h2>
                 <span class="category">
-                    <a href="{{ route "categoryEntries" "categoryID" .Feed.Category.ID }}">{{ .Feed.Category.Title }}</a>
+                    <a href="{{ routePath "/category/%d/entries" .Feed.Category.ID }}">{{ .Feed.Category.Title }}</a>
                 </span>
             </header>
             {{ template "item_meta" dict "user" $.user "entry" . "hasSaveEntry" $.hasSaveEntry }}

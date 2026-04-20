@@ -57,7 +57,7 @@
                         class="page-button vote-button vote-up{{ if eq .entry.Vote 1 }} vote-active{{ end }}"
                         title="{{ t "entry.vote.upvote" }}"
                         data-vote-entry="true"
-                        data-vote-url="{{ route "updateEntryVote" "entryID" .entry.ID "vote" "1" }}"
+                        data-vote-url="{{ routePath "/entry/vote/%d/1" .entry.ID }}"
                         data-current-vote="{{ .entry.Vote }}"
                         data-vote-value="1"
                         >▲<span class="icon-label">{{ t "entry.vote.upvote" }}</span></button>
@@ -68,7 +68,7 @@
                         class="page-button vote-button vote-down{{ if eq .entry.Vote -1 }} vote-active{{ end }}"
                         title="{{ t "entry.vote.downvote" }}"
                         data-vote-entry="true"
-                        data-vote-url="{{ route "updateEntryVote" "entryID" .entry.ID "vote" "-1" }}"
+                        data-vote-url="{{ routePath "/entry/vote/%d/-1" .entry.ID }}"
                         data-current-vote="{{ .entry.Vote }}"
                         data-vote-value="-1"
                         >▼<span class="icon-label">{{ t "entry.vote.downvote" }}</span></button>
@@ -256,7 +256,7 @@
                     <button
                         type="button"
                         class="button button-primary entry-user-tags-save"
-                        data-save-tags-url="{{ route "updateEntryUserTags" "entryID" .entry.ID }}"
+                        data-save-tags-url="{{ routePath "/entry/%d/user-tags" .entry.ID }}"
                         data-label-loading="{{ t "entry.state.saving" }}"
                         data-label-done="{{ t "entry.user_tags.save" }}"
                         >{{ t "entry.user_tags.save" }}</button>

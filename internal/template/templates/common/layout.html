@@ -100,7 +100,7 @@
                     <a href="{{ routePath "/categories" }}" data-page="categories">{{ icon "categories" }}{{ t "menu.categories" }}</a>
                 </li>
                 <li {{ if eq .menu "tags" }}class="active"{{ end }}>
-                    <a href="{{ route "userTags" }}" data-page="tags">{{ icon "tag" }}{{ t "menu.tags" }}</a>
+                    <a href="{{ routePath "/user-tags" }}" data-page="tags">{{ icon "tag" }}{{ t "menu.tags" }}</a>
                 </li>
                 <li {{ if eq .menu "search" }}class="active"{{ end }} title="{{ t "tooltip.keyboard_shortcuts" "/" }}">
                     <a href="{{ routePath "/search" }}" data-page="search">{{ icon "search" }}{{ t "menu.search" }}</a>

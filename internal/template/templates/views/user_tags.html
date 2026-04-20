@@ -10,7 +10,7 @@
     <nav aria-label="{{ t "page.tags.title" }} {{ t "menu.title" }}">
         <ul>
             <li>
-                <a href="{{ route "createUserTag" }}">{{ icon "tag" }}{{ t "menu.create_tag" }}</a>
+                <a href="{{ routePath "/user-tags/create" }}">{{ icon "tag" }}{{ t "menu.create_tag" }}</a>
             </li>
         </ul>
     </nav>
@@ -30,7 +30,7 @@
         >
             <header id="tag-title-{{ .ID }}" class="item-header" dir="auto">
                 <h2 class="item-title">
-                    <a href="{{ route "userTagEntries" "userTagID" .ID }}">
+                    <a href="{{ routePath "/user-tag/%d/entries" .ID }}">
                         {{ .Title }}
                         {{ if .EntryCount }}
                         <span class="category-item-total" aria-hidden="true">({{ deRef .EntryCount }})</span>
@@ -42,10 +42,10 @@
             <div class="item-meta">
                 <ul class="item-meta-icons">
                     <li class="item-meta-icons-entries">
-                        <a href="{{ route "userTagEntries" "userTagID" .ID }}">{{ icon "entries" }}<span class="icon-label">{{ t "page.tags.entries" }}</span></a>
+                        <a href="{{ routePath "/user-tag/%d/entries" .ID }}">{{ icon "entries" }}<span class="icon-label">{{ t "page.tags.entries" }}</span></a>
                     </li>
                     <li class="item-meta-icons-edit">
-                        <a href="{{ route "editUserTag" "userTagID" .ID }}">{{ icon "edit" }}<span class="icon-label">{{ t "menu.edit_tag" }}</span></a>
+                        <a href="{{ routePath "/user-tag/%d/edit" .ID }}">{{ icon "edit" }}<span class="icon-label">{{ t "menu.edit_tag" }}</span></a>
                     </li>
                     <li class="item-meta-icons-delete">
                         <button
@@ -55,7 +55,7 @@
                             data-label-yes="{{ t "confirm.yes" }}"
                             data-label-no="{{ t "confirm.no" }}"
                             data-label-loading="{{ t "confirm.loading" }}"
-                            data-url="{{ route "removeUserTag" "userTagID" .ID }}">{{ icon "delete" }}<span class="icon-label">{{ t "action.remove" }}</span></button>
+                            data-url="{{ routePath "/user-tag/%d/remove" .ID }}">{{ icon "delete" }}<span class="icon-label">{{ t "action.remove" }}</span></button>
                     </li>
                 </ul>
             </div>
