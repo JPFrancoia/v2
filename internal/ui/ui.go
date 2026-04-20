@@ -108,7 +108,7 @@ func Serve(store *storage.Storage, pool *worker.Pool) http.Handler {
 	mux.HandleFunc("GET /user-tag/{userTagID}/edit", handler.showEditUserTagPage)
 	mux.HandleFunc("POST /user-tag/{userTagID}/update", handler.updateUserTag)
 	mux.HandleFunc("POST /user-tag/{userTagID}/remove", handler.removeUserTag)
-	mux.HandleFunc("POST /entry/{entryID}/user-tags", handler.updateEntryUserTags)
+	mux.HandleFunc("POST /entry/user-tags/{entryID}", handler.updateEntryUserTags)
 
 	// Entry pages.
 	mux.HandleFunc("POST /entry/status", handler.updateEntriesStatus)

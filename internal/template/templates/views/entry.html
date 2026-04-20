@@ -256,7 +256,7 @@
                     <button
                         type="button"
                         class="button button-primary entry-user-tags-save"
-                        data-save-tags-url="{{ routePath "/entry/%d/user-tags" .entry.ID }}"
+                        data-save-tags-url="{{ routePath "/entry/user-tags/%d" .entry.ID }}"
                         data-label-loading="{{ t "entry.state.saving" }}"
                         data-label-done="{{ t "entry.user_tags.save" }}"
                         >{{ t "entry.user_tags.save" }}</button>
