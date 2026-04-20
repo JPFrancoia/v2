@@ -6,6 +6,8 @@ package icon // import "miniflux.app/v2/internal/reader/icon"
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/binary"
+	"hash/crc32"
 	"image"
 	"strings"
 	"testing"
@@ -246,12 +248,10 @@ func TestFindIconURLsFromHTMLDocument_DataURLs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The function processes queries in order: rel="icon", then rel="shortcut icon", etc.
-	// So both rel="icon" links are found first, then the rel="shortcut icon" link
 	expected := []string{
 		"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAGAhGAQ+QAAAABJRU5ErkJggg==",
-		"https://example.org/regular-icon.ico",
 		"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'></svg>",
+		"https://example.org/regular-icon.ico",
 	}
 
 	if len(iconURLs) != len(expected) {
@@ -400,24 +400,6 @@ func TestResizeIconWebp(t *testing.T) {
 	}
 }
 
-func TestEnsureRemoteIconURLAllowedRejectsPrivateNetworks(t *testing.T) {
-	if err := ensureRemoteIconURLAllowed("http://192.168.0.1/favicon.ico", false); err == nil {
-		t.Fatal("Expected private network hosts to be rejected")
-	}
-}
-
-func TestEnsureRemoteIconURLAllowedAllowsPublicNetworks(t *testing.T) {
-	if err := ensureRemoteIconURLAllowed("https://1.1.1.1/favicon.ico", false); err != nil {
-		t.Fatalf("Expected public network hosts to be allowed: %v", err)
-	}
-}
-
-func TestEnsureRemoteIconURLAllowedAllowsPrivateWhenEnabled(t *testing.T) {
-	if err := ensureRemoteIconURLAllowed("http://10.0.0.5/icon.png", true); err != nil {
-		t.Fatalf("Expected private network hosts to be allowed when explicitly enabled: %v", err)
-	}
-}
-
 func TestResizeInvalidImage(t *testing.T) {
 	icon := model.Icon{
 		Content:  []byte("invalid data"),
@@ -425,6 +407,28 @@ func TestResizeInvalidImage(t *testing.T) {
 	}
 	if !bytes.Equal(icon.Content, resizeIcon(&icon).Content) {
 		t.Fatalf("Tried to convert an invalid image")
+	}
+}
+
+func TestResizeIconTooLargeDimensions(t *testing.T) {
+	icon := model.Icon{
+		Content:  mustMinimalPNG(t, 4097, 7),
+		MimeType: "image/png",
+	}
+
+	if resizeIcon(&icon) != nil {
+		t.Fatalf("Should reject images with too large dimensions")
+	}
+}
+
+func TestResizeIconTooLargePixelCount(t *testing.T) {
+	icon := model.Icon{
+		Content:  mustMinimalPNG(t, 4096, 4097),
+		MimeType: "image/png",
+	}
+
+	if resizeIcon(&icon) != nil {
+		t.Fatalf("Should reject images with too many pixels")
 	}
 }
 
@@ -459,5 +463,58 @@ func TestMinifySvgWithError(t *testing.T) {
 	// MimeType should remain unchanged
 	if result.MimeType != "image/svg+xml" {
 		t.Fatalf("Expected MimeType to remain image/svg+xml, got %s", result.MimeType)
+	}
+}
+
+func mustMinimalPNG(t *testing.T, width, height uint32) []byte {
+	t.Helper()
+
+	var b bytes.Buffer
+	b.Write([]byte{137, 80, 78, 71, 13, 10, 26, 10})
+	writePNGChunk(t, &b, "IHDR", func(data []byte) {
+		binary.BigEndian.PutUint32(data[0:4], width)
+		binary.BigEndian.PutUint32(data[4:8], height)
+		data[8] = 8
+		data[9] = 2
+	})
+	writePNGChunk(t, &b, "IEND", nil)
+
+	return b.Bytes()
+}
+
+func writePNGChunk(t *testing.T, b *bytes.Buffer, chunkType string, fill func([]byte)) {
+	t.Helper()
+
+	dataLen := 0
+	if chunkType == "IHDR" {
+		dataLen = 13
+	}
+
+	if err := binary.Write(b, binary.BigEndian, uint32(dataLen)); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := b.WriteString(chunkType); err != nil {
+		t.Fatal(err)
+	}
+
+	data := make([]byte, dataLen)
+	if fill != nil {
+		fill(data)
+	}
+	if _, err := b.Write(data); err != nil {
+		t.Fatal(err)
+	}
+
+	crc := crc32.NewIEEE()
+	if _, err := crc.Write([]byte(chunkType)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := crc.Write(data); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := binary.Write(b, binary.BigEndian, crc.Sum32()); err != nil {
+		t.Fatal(err)
 	}
 }

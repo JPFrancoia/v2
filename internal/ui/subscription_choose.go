@@ -8,30 +8,27 @@ import (
 
 	"miniflux.app/v2/internal/config"
 	"miniflux.app/v2/internal/http/request"
-	"miniflux.app/v2/internal/http/response/html"
-	"miniflux.app/v2/internal/http/route"
+	"miniflux.app/v2/internal/http/response"
 	"miniflux.app/v2/internal/model"
 	feedHandler "miniflux.app/v2/internal/reader/handler"
 	"miniflux.app/v2/internal/ui/form"
-	"miniflux.app/v2/internal/ui/session"
 	"miniflux.app/v2/internal/ui/view"
 )
 
 func (h *handler) showChooseSubscriptionPage(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.UserByID(request.UserID(r))
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	categories, err := h.store.Categories(user.ID)
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
-	sess := session.New(h.store, request.SessionID(r))
-	view := view.New(h.tpl, r, sess)
+	view := view.New(h.tpl, r)
 	view.Set("categories", categories)
 	view.Set("menu", "feeds")
 	view.Set("user", user)
@@ -43,7 +40,7 @@ func (h *handler) showChooseSubscriptionPage(w http.ResponseWriter, r *http.Requ
 	if validationErr := subscriptionForm.Validate(); validationErr != nil {
 		view.Set("form", subscriptionForm)
 		view.Set("errorMessage", validationErr.Translate(user.Language))
-		html.OK(w, r, view.Render("add_subscription"))
+		response.HTML(w, r, view.Render("add_subscription"))
 		return
 	}
 
@@ -51,6 +48,7 @@ func (h *handler) showChooseSubscriptionPage(w http.ResponseWriter, r *http.Requ
 		CategoryID:                  subscriptionForm.CategoryID,
 		FeedURL:                     subscriptionForm.URL,
 		Crawler:                     subscriptionForm.Crawler,
+		IgnoreEntryUpdates:          subscriptionForm.IgnoreEntryUpdates,
 		AllowSelfSignedCertificates: subscriptionForm.AllowSelfSignedCertificates,
 		UserAgent:                   subscriptionForm.UserAgent,
 		Cookie:                      subscriptionForm.Cookie,
@@ -70,9 +68,9 @@ func (h *handler) showChooseSubscriptionPage(w http.ResponseWriter, r *http.Requ
 	if localizedError != nil {
 		view.Set("form", subscriptionForm)
 		view.Set("errorMessage", localizedError.Translate(user.Language))
-		html.OK(w, r, view.Render("add_subscription"))
+		response.HTML(w, r, view.Render("add_subscription"))
 		return
 	}
 
-	html.Redirect(w, r, route.Path(h.router, "feedEntries", "feedID", feed.ID))
+	response.HTMLRedirect(w, r, h.routePath("/feed/%d/entries", feed.ID))
 }

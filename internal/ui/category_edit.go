@@ -7,27 +7,26 @@ import (
 	"net/http"
 
 	"miniflux.app/v2/internal/http/request"
-	"miniflux.app/v2/internal/http/response/html"
+	"miniflux.app/v2/internal/http/response"
 	"miniflux.app/v2/internal/ui/form"
-	"miniflux.app/v2/internal/ui/session"
 	"miniflux.app/v2/internal/ui/view"
 )
 
 func (h *handler) showEditCategoryPage(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.UserByID(request.UserID(r))
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	category, err := h.store.Category(request.UserID(r), request.RouteInt64Param(r, "categoryID"))
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	if category == nil {
-		html.NotFound(w, r)
+		response.HTMLNotFound(w, r)
 		return
 	}
 
@@ -36,8 +35,7 @@ func (h *handler) showEditCategoryPage(w http.ResponseWriter, r *http.Request) {
 		HideGlobally: category.HideGlobally,
 	}
 
-	sess := session.New(h.store, request.SessionID(r))
-	view := view.New(h.tpl, r, sess)
+	view := view.New(h.tpl, r)
 	view.Set("form", categoryForm)
 	view.Set("category", category)
 	view.Set("menu", "categories")
@@ -45,5 +43,5 @@ func (h *handler) showEditCategoryPage(w http.ResponseWriter, r *http.Request) {
 	view.Set("countUnread", h.store.CountUnreadEntries(user.ID))
 	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
 
-	html.OK(w, r, view.Render("edit_category"))
+	response.HTML(w, r, view.Render("edit_category"))
 }

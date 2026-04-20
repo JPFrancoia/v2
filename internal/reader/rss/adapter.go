@@ -32,7 +32,7 @@ func (r *rssAdapter) buildFeed(baseURL string) *model.Feed {
 	}
 
 	// Ensure the Site URL is absolute.
-	if absoluteSiteURL, err := urllib.AbsoluteURL(baseURL, feed.SiteURL); err == nil {
+	if absoluteSiteURL, err := urllib.ResolveToAbsoluteURL(baseURL, feed.SiteURL); err == nil {
 		feed.SiteURL = absoluteSiteURL
 	}
 
@@ -40,7 +40,7 @@ func (r *rssAdapter) buildFeed(baseURL string) *model.Feed {
 	for _, atomLink := range r.rss.Channel.Links {
 		atomLinkHref := strings.TrimSpace(atomLink.Href)
 		if atomLinkHref != "" && atomLink.Rel == "self" {
-			if absoluteFeedURL, err := urllib.AbsoluteURL(feed.FeedURL, atomLinkHref); err == nil {
+			if absoluteFeedURL, err := urllib.ResolveToAbsoluteURL(feed.FeedURL, atomLinkHref); err == nil {
 				feed.FeedURL = absoluteFeedURL
 				break
 			}
@@ -61,10 +61,14 @@ func (r *rssAdapter) buildFeed(baseURL string) *model.Feed {
 
 	// Get the feed icon URL if defined.
 	if r.rss.Channel.Image != nil {
-		if absoluteIconURL, err := urllib.AbsoluteURL(feed.SiteURL, r.rss.Channel.Image.URL); err == nil {
+		if absoluteIconURL, err := urllib.ResolveToAbsoluteURL(feed.SiteURL, r.rss.Channel.Image.URL); err == nil {
 			feed.IconURL = absoluteIconURL
 		}
 	}
+
+	// Track GUIDs already seen in this feed to disambiguate items from
+	// non-conformant feeds that reuse the same <guid> for every entry.
+	seenGUIDs := make(map[string]int)
 
 	for _, item := range r.rss.Channel.Items {
 		entry := model.NewEntry()
@@ -83,7 +87,7 @@ func (r *rssAdapter) buildFeed(baseURL string) *model.Feed {
 				entry.URL = feed.SiteURL
 			}
 		} else {
-			if absoluteEntryURL, err := urllib.AbsoluteURL(feed.SiteURL, entryURL); err == nil {
+			if absoluteEntryURL, err := urllib.ResolveToAbsoluteURL(feed.SiteURL, entryURL); err == nil {
 				entry.URL = absoluteEntryURL
 			} else {
 				entry.URL = entryURL
@@ -105,9 +109,24 @@ func (r *rssAdapter) buildFeed(baseURL string) *model.Feed {
 		}
 
 		// Generate the entry hash.
+		//
+		// The RSS 2.0 spec requires <guid> to uniquely identify the item, but
+		// some feeds ship the same GUID for every entry. Keep the first
+		// occurrence stable (so existing stored entries still match) and
+		// disambiguate later collisions using the entry URL or, as a last
+		// resort, the item position.
 		switch {
 		case item.GUID.Data != "":
-			entry.Hash = crypto.SHA256(item.GUID.Data)
+			n := seenGUIDs[item.GUID.Data]
+			seenGUIDs[item.GUID.Data] = n + 1
+			switch {
+			case n == 0:
+				entry.Hash = crypto.SHA256(item.GUID.Data)
+			case entry.URL != "":
+				entry.Hash = crypto.SHA256(item.GUID.Data + "|" + entry.URL)
+			default:
+				entry.Hash = crypto.SHA256(item.GUID.Data + "|" + strconv.Itoa(n))
+			}
 		case entryURL != "":
 			entry.Hash = crypto.SHA256(entryURL)
 		default:
@@ -309,7 +328,7 @@ func findEntryEnclosures(rssItem *rssItem, siteURL string) model.EnclosureList {
 			continue
 		}
 		if _, found := duplicates[mediaURL]; !found {
-			if mediaAbsoluteURL, err := urllib.AbsoluteURL(siteURL, mediaURL); err != nil {
+			if mediaAbsoluteURL, err := urllib.ResolveToAbsoluteURL(siteURL, mediaURL); err != nil {
 				slog.Debug("Unable to build absolute URL for media thumbnail",
 					slog.String("url", mediaThumbnail.URL),
 					slog.String("site_url", siteURL),
@@ -341,7 +360,7 @@ func findEntryEnclosures(rssItem *rssItem, siteURL string) model.EnclosureList {
 			continue
 		}
 
-		if absoluteEnclosureURL, err := urllib.AbsoluteURL(siteURL, enclosureURL); err == nil {
+		if absoluteEnclosureURL, err := urllib.ResolveToAbsoluteURL(siteURL, enclosureURL); err == nil {
 			enclosureURL = absoluteEnclosureURL
 		}
 
@@ -363,7 +382,7 @@ func findEntryEnclosures(rssItem *rssItem, siteURL string) model.EnclosureList {
 		}
 		if _, found := duplicates[mediaURL]; !found {
 			mediaURL := strings.TrimSpace(mediaContent.URL)
-			if mediaAbsoluteURL, err := urllib.AbsoluteURL(siteURL, mediaURL); err != nil {
+			if mediaAbsoluteURL, err := urllib.ResolveToAbsoluteURL(siteURL, mediaURL); err != nil {
 				slog.Debug("Unable to build absolute URL for media content",
 					slog.String("url", mediaContent.URL),
 					slog.String("site_url", siteURL),
@@ -387,7 +406,7 @@ func findEntryEnclosures(rssItem *rssItem, siteURL string) model.EnclosureList {
 		}
 		if _, found := duplicates[mediaURL]; !found {
 			mediaURL := strings.TrimSpace(mediaPeerLink.URL)
-			if mediaAbsoluteURL, err := urllib.AbsoluteURL(siteURL, mediaURL); err != nil {
+			if mediaAbsoluteURL, err := urllib.ResolveToAbsoluteURL(siteURL, mediaURL); err != nil {
 				slog.Debug("Unable to build absolute URL for media peer link",
 					slog.String("url", mediaPeerLink.URL),
 					slog.String("site_url", siteURL),

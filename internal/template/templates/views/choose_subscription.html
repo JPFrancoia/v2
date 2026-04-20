@@ -8,7 +8,7 @@
 {{ end }}
 
 {{ define "content"}}
-<form action="{{ route "chooseSubscription" }}" method="POST">
+<form action="{{ routePath "/subscriptions" }}" method="POST">
     <input type="hidden" name="csrf" value="{{ .csrf }}">
     <input type="hidden" name="category_id" value="{{ .form.CategoryID }}">
     <input type="hidden" name="user_agent" value="{{ .form.UserAgent }}">
@@ -28,6 +28,9 @@
     {{ end }}
     {{ if .form.Crawler }}
         <input type="hidden" name="crawler" value="1">
+    {{ end }}
+    {{ if .form.IgnoreEntryUpdates }}
+        <input type="hidden" name="ignore_entry_updates" value="1">
     {{ end }}
     {{ if .form.AllowSelfSignedCertificates }}
         <input type="hidden" name="allow_self_signed_certificates" value="1">

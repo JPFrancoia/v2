@@ -7,11 +7,9 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-
-	"github.com/gorilla/mux"
 )
 
-// FormInt64Value returns a form value as integer.
+// FormInt64Value returns the named form value parsed as int64, or 0 on error.
 func FormInt64Value(r *http.Request, param string) int64 {
 	value := r.FormValue(param)
 	integer, err := strconv.ParseInt(value, 10, 64)
@@ -22,10 +20,9 @@ func FormInt64Value(r *http.Request, param string) int64 {
 	return integer
 }
 
-// RouteInt64Param returns an URL route parameter as int64.
+// RouteInt64Param returns the named route parameter parsed as int64, or 0 when missing or invalid.
 func RouteInt64Param(r *http.Request, param string) int64 {
-	vars := mux.Vars(r)
-	value, err := strconv.ParseInt(vars[param], 10, 64)
+	value, err := strconv.ParseInt(routeParam(r, param), 10, 64)
 	if err != nil {
 		return 0
 	}
@@ -37,13 +34,12 @@ func RouteInt64Param(r *http.Request, param string) int64 {
 	return value
 }
 
-// RouteStringParam returns a URL route parameter as string.
+// RouteStringParam returns the named route parameter as a string.
 func RouteStringParam(r *http.Request, param string) string {
-	vars := mux.Vars(r)
-	return vars[param]
+	return routeParam(r, param)
 }
 
-// QueryStringParam returns a query string parameter as string.
+// QueryStringParam returns the named query parameter, or defaultValue if it is empty.
 func QueryStringParam(r *http.Request, param, defaultValue string) string {
 	value := r.URL.Query().Get(param)
 	if value == "" {
@@ -52,7 +48,7 @@ func QueryStringParam(r *http.Request, param, defaultValue string) string {
 	return value
 }
 
-// QueryStringParamList returns all values associated to the parameter.
+// QueryStringParamList returns the non-empty, trimmed values for the named query parameter.
 func QueryStringParamList(r *http.Request, param string) []string {
 	var results []string
 	values := r.URL.Query()
@@ -69,7 +65,7 @@ func QueryStringParamList(r *http.Request, param string) []string {
 	return results
 }
 
-// QueryIntParam returns a query string parameter as integer.
+// QueryIntParam returns the named query parameter parsed as int, or defaultValue when missing, invalid, or negative.
 func QueryIntParam(r *http.Request, param string, defaultValue int) int {
 	value := r.URL.Query().Get(param)
 	if value == "" {
@@ -88,7 +84,7 @@ func QueryIntParam(r *http.Request, param string, defaultValue int) int {
 	return int(val)
 }
 
-// QueryInt64Param returns a query string parameter as int64.
+// QueryInt64Param returns the named query parameter parsed as int64, or defaultValue when missing, invalid, or negative.
 func QueryInt64Param(r *http.Request, param string, defaultValue int64) int64 {
 	value := r.URL.Query().Get(param)
 	if value == "" {
@@ -107,7 +103,7 @@ func QueryInt64Param(r *http.Request, param string, defaultValue int64) int64 {
 	return val
 }
 
-// QueryBoolParam returns a query string parameter as bool.
+// QueryBoolParam returns the named query parameter parsed as bool, or defaultValue when missing or invalid.
 func QueryBoolParam(r *http.Request, param string, defaultValue bool) bool {
 	value := r.URL.Query().Get(param)
 	if value == "" {
@@ -123,9 +119,13 @@ func QueryBoolParam(r *http.Request, param string, defaultValue bool) bool {
 	return val
 }
 
-// HasQueryParam checks if the query string contains the given parameter.
+// HasQueryParam reports whether the query string contains the named parameter.
 func HasQueryParam(r *http.Request, param string) bool {
 	values := r.URL.Query()
 	_, ok := values[param]
 	return ok
+}
+
+func routeParam(r *http.Request, param string) string {
+	return r.PathValue(param)
 }

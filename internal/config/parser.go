@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/url"
 	"os"
 	"strconv"
@@ -47,6 +48,49 @@ func (cp *configParser) ParseFile(filename string) (*configOptions, error) {
 	}
 
 	return cp.options, nil
+}
+
+// Validate checks for invalid or incomplete option combinations.
+func (c *configOptions) Validate() error {
+	if c.OAuth2Provider() == "oidc" && c.OAuth2OIDCDiscoveryEndpoint() == "" {
+		return errors.New("OAUTH2_OIDC_DISCOVERY_ENDPOINT must be configured when using the OIDC provider")
+	}
+
+	if c.DisableLocalAuth() {
+		if c.OAuth2Provider() == "" && c.AuthProxyHeader() == "" {
+			return errors.New("DISABLE_LOCAL_AUTH is enabled but neither OAUTH2_PROVIDER nor AUTH_PROXY_HEADER is set. Please enable at least one authentication source")
+		}
+	}
+
+	if c.AuthProxyHeader() != "" && len(c.TrustedReverseProxyNetworks()) == 0 {
+		return errors.New("TRUSTED_REVERSE_PROXY_NETWORKS must be configured when AUTH_PROXY_HEADER is used")
+	}
+
+	if (c.CertFile() != "") != (c.CertKeyFile() != "") {
+		return errors.New("CERT_FILE and KEY_FILE must both be provided")
+	}
+
+	if c.CertDomain() != "" && c.CertFile() != "" {
+		return errors.New("CERT_DOMAIN and CERT_FILE/KEY_FILE are mutually exclusive")
+	}
+
+	if (c.MetricsUsername() != "") != (c.MetricsPassword() != "") {
+		return errors.New("METRICS_USERNAME and METRICS_PASSWORD must both be provided")
+	}
+
+	if c.DatabaseMinConns() > c.DatabaseMaxConns() {
+		return errors.New("DATABASE_MIN_CONNS must be less than or equal to DATABASE_MAX_CONNS")
+	}
+
+	if c.SchedulerRoundRobinMinInterval() > c.SchedulerRoundRobinMaxInterval() {
+		return errors.New("SCHEDULER_ROUND_ROBIN_MIN_INTERVAL must be less than or equal to SCHEDULER_ROUND_ROBIN_MAX_INTERVAL")
+	}
+
+	if c.SchedulerEntryFrequencyMinInterval() > c.SchedulerEntryFrequencyMaxInterval() {
+		return errors.New("SCHEDULER_ENTRY_FREQUENCY_MIN_INTERVAL must be less than or equal to SCHEDULER_ENTRY_FREQUENCY_MAX_INTERVAL")
+	}
+
+	return nil
 }
 
 func (cp *configParser) postParsing() error {
@@ -119,6 +163,9 @@ func (cp *configParser) parseLines(lines []string) error {
 func (cp *configParser) parseLine(key, value string) error {
 	field, exists := cp.options.options[key]
 	if !exists {
+		if key == "FILTER_ENTRY_MAX_AGE_DAYS" {
+			slog.Warn("Configuration option FILTER_ENTRY_MAX_AGE_DAYS is deprecated; use user filter rule max-age:<duration> instead")
+		}
 		// Ignore unknown configuration keys to avoid parsing unrelated environment variables.
 		return nil
 	}

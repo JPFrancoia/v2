@@ -4,6 +4,7 @@
 package sanitizer // import "miniflux.app/v2/internal/reader/sanitizer"
 
 import (
+	"errors"
 	"io"
 	"net/url"
 	"slices"
@@ -15,6 +16,10 @@ import (
 	"miniflux.app/v2/internal/urllib"
 
 	"golang.org/x/net/html"
+)
+
+const (
+	maxDepth = 512 // The maximum allowed depths for nested HTML tags, same was WebKit.
 )
 
 var (
@@ -117,6 +122,7 @@ var (
 		"bandcamp.com":         {},
 		"cdn.embedly.com":      {},
 		"dailymotion.com":      {},
+		"framatube.org":        {},
 		"open.spotify.com":     {},
 		"player.bilibili.com":  {},
 		"player.twitch.tv":     {},
@@ -130,14 +136,16 @@ var (
 
 	blockedResourceURLSubstrings = []string{
 		"api.flattr.com",
+		"www.facebook.com/sharer.php",
 		"feeds.feedburner.com",
 		"feedsportal.com",
+		"linkedin.com/shareArticle",
 		"pinterest.com/pin/create/button/",
 		"stats.wordpress.com",
 		"twitter.com/intent/tweet",
 		"twitter.com/share",
-		"facebook.com/sharer.php",
-		"linkedin.com/shareArticle",
+		"x.com/intent/tweet",
+		"x.com/share",
 	}
 
 	// See https://www.iana.org/assignments/uri-schemes/uri-schemes.xhtml
@@ -200,14 +208,13 @@ var (
 	}
 )
 
+// SanitizerOptions holds options for the HTML sanitizer.
 type SanitizerOptions struct {
 	OpenLinksInNewTab bool
 }
 
+// SanitizeHTML takes raw HTML input and removes any disallowed tags and attributes.
 func SanitizeHTML(baseURL, rawHTML string, sanitizerOptions *SanitizerOptions) string {
-	var tagStack []string
-	var parentTag string
-	var blockedStack []string
 	var buffer strings.Builder
 
 	// Educated guess about how big the sanitized HTML will be,
@@ -215,239 +222,156 @@ func SanitizeHTML(baseURL, rawHTML string, sanitizerOptions *SanitizerOptions) s
 	estimatedRatio := len(rawHTML) * 3 / 4
 	buffer.Grow(estimatedRatio)
 
-	// Errors are a non-issue, so they're handled later in the function.
+	// We need to surround `rawHTML` with body tags so that html.Parse
+	// will consider it a valid html document.
+	doc, err := html.Parse(io.MultiReader(
+		strings.NewReader("<body>"),
+		strings.NewReader(rawHTML),
+		strings.NewReader("</body>"),
+	))
+	if err != nil {
+		return ""
+	}
+
+	/* The structure of `doc` is always:
+	<html>
+	<head>...</head>
+	<body>..</body>
+	</html>
+	*/
+	body := doc.FirstChild.FirstChild.NextSibling
+
+	// Errors are a non-issue, so they're handled in filterAndRenderHTML
 	parsedBaseUrl, _ := url.Parse(baseURL)
-
-	tokenizer := html.NewTokenizer(strings.NewReader(rawHTML))
-	for {
-		if tokenizer.Next() == html.ErrorToken {
-			err := tokenizer.Err()
-			if err == io.EOF {
-				return buffer.String()
-			}
-
+	for c := body.FirstChild; c != nil; c = c.NextSibling {
+		// -2 because of `<html><body>…`
+		if err := filterAndRenderHTML(&buffer, c, parsedBaseUrl, sanitizerOptions, maxDepth-2); err != nil {
 			return ""
 		}
-
-		token := tokenizer.Token()
-
-		// Note: MathML elements are not fully supported by golang.org/x/net/html.
-		// See https://github.com/golang/net/blob/master/html/atom/gen.go
-		// and https://github.com/golang/net/blob/master/html/atom/table.go
-		tagName := token.Data
-		if tagName == "" {
-			continue
-		}
-
-		switch token.Type {
-		case html.TextToken:
-			if len(blockedStack) > 0 {
-				continue
-			}
-
-			// An iframe element never has fallback content.
-			// See https://www.w3.org/TR/2010/WD-html5-20101019/the-iframe-element.html#the-iframe-element
-			if parentTag == "iframe" {
-				continue
-			}
-
-			buffer.WriteString(token.String())
-		case html.StartTagToken:
-			parentTag = tagName
-
-			if isPixelTracker(tagName, token.Attr) {
-				continue
-			}
-
-			if isBlockedTag(tagName) || slices.ContainsFunc(token.Attr, func(attr html.Attribute) bool { return attr.Key == "hidden" }) {
-				blockedStack = append(blockedStack, tagName)
-				continue
-			}
-
-			if len(blockedStack) == 0 && isValidTag(tagName) {
-				attrNames, htmlAttributes := sanitizeAttributes(parsedBaseUrl, tagName, token.Attr, sanitizerOptions)
-				if hasRequiredAttributes(tagName, attrNames) {
-					if len(attrNames) > 0 {
-						// Rewrite the start tag with allowed attributes.
-						buffer.WriteString("<" + tagName + " " + htmlAttributes + ">")
-					} else {
-						// Rewrite the start tag without any attributes.
-						buffer.WriteString("<" + tagName + ">")
-					}
-
-					tagStack = append(tagStack, tagName)
-				}
-			}
-		case html.EndTagToken:
-			if len(blockedStack) == 0 {
-				if isValidTag(tagName) && slices.Contains(tagStack, tagName) {
-					buffer.WriteString("</" + tagName + ">")
-				}
-			} else {
-				if blockedStack[len(blockedStack)-1] == tagName {
-					blockedStack = blockedStack[:len(blockedStack)-1]
-				}
-			}
-		case html.SelfClosingTagToken:
-			if isPixelTracker(tagName, token.Attr) {
-				continue
-			}
-			if len(blockedStack) == 0 && isValidTag(tagName) {
-				attrNames, htmlAttributes := sanitizeAttributes(parsedBaseUrl, tagName, token.Attr, sanitizerOptions)
-				if hasRequiredAttributes(tagName, attrNames) {
-					if len(attrNames) > 0 {
-						buffer.WriteString("<" + tagName + " " + htmlAttributes + "/>")
-					} else {
-						buffer.WriteString("<" + tagName + "/>")
-					}
-				}
-			}
-		}
 	}
+
+	return buffer.String()
 }
 
-func sanitizeAttributes(parsedBaseUrl *url.URL, tagName string, attributes []html.Attribute, sanitizerOptions *SanitizerOptions) ([]string, string) {
-	htmlAttrs := make([]string, 0, len(attributes))
-	attrNames := make([]string, 0, len(attributes))
-	var err error
-	var isAnchorLink bool
-	var isYouTubeEmbed bool
+func findAllowedIframeSourceDomain(iframeSourceURL string) (string, bool) {
+	iframeSourceDomain := urllib.DomainWithoutWWW(iframeSourceURL)
 
-	for _, attribute := range attributes {
-		if !isValidAttribute(tagName, attribute.Key) {
-			continue
-		}
-
-		value := attribute.Val
-
-		switch tagName {
-		case "math":
-			if attribute.Key == "xmlns" {
-				if value != "http://www.w3.org/1998/Math/MathML" {
-					value = "http://www.w3.org/1998/Math/MathML"
-				}
-			}
-		case "img":
-			switch attribute.Key {
-			case "fetchpriority":
-				if !isValidFetchPriorityValue(value) {
-					continue
-				}
-			case "decoding":
-				if !isValidDecodingValue(value) {
-					continue
-				}
-			case "width", "height":
-				if !isPositiveInteger(value) {
-					continue
-				}
-
-				// Discard width and height attributes when width is larger than Miniflux layout (750px)
-				if imgWidth := getIntegerAttributeValue("width", attributes); imgWidth > 750 {
-					continue
-				}
-			case "srcset":
-				value = sanitizeSrcsetAttr(parsedBaseUrl, value)
-			}
-		case "source":
-			if attribute.Key == "srcset" {
-				value = sanitizeSrcsetAttr(parsedBaseUrl, value)
-			}
-		}
-
-		if isExternalResourceAttribute(attribute.Key) {
-			switch {
-			case tagName == "iframe":
-				iframeSourceDomain, trustedIframeDomain := findAllowedIframeSourceDomain(attribute.Val)
-				if !trustedIframeDomain {
-					continue
-				}
-
-				value = rewriteIframeURL(attribute.Val)
-
-				if iframeSourceDomain == "youtube.com" || iframeSourceDomain == "youtube-nocookie.com" {
-					isYouTubeEmbed = true
-				}
-			case tagName == "img" && attribute.Key == "src" && isValidDataAttribute(attribute.Val):
-				value = attribute.Val
-			case tagName == "a" && attribute.Key == "href" && strings.HasPrefix(attribute.Val, "#"):
-				value = attribute.Val
-				isAnchorLink = true
-			default:
-				value, err = absoluteURLParsedBase(parsedBaseUrl, value)
-				if err != nil {
-					continue
-				}
-
-				if !hasValidURIScheme(value) || isBlockedResource(value) {
-					continue
-				}
-
-				// TODO use feedURL instead of baseURL twice.
-				parsedValueUrl, _ := url.Parse(value)
-				if cleanedURL, err := urlcleaner.RemoveTrackingParameters(parsedBaseUrl, parsedBaseUrl, parsedValueUrl); err == nil {
-					value = cleanedURL
-				}
-			}
-		}
-
-		attrNames = append(attrNames, attribute.Key)
-		htmlAttrs = append(htmlAttrs, attribute.Key+`="`+html.EscapeString(value)+`"`)
+	if _, ok := iframeAllowList[iframeSourceDomain]; ok {
+		return iframeSourceDomain, true
 	}
 
-	if !isAnchorLink {
-		extraAttrNames, extraHTMLAttributes := getExtraAttributes(tagName, isYouTubeEmbed, sanitizerOptions)
-		if len(extraAttrNames) > 0 {
-			attrNames = append(attrNames, extraAttrNames...)
-			htmlAttrs = append(htmlAttrs, extraHTMLAttributes...)
-		}
+	if ytDomain := config.Opts.YouTubeEmbedDomain(); ytDomain != "" && iframeSourceDomain == strings.TrimPrefix(ytDomain, "www.") {
+		return iframeSourceDomain, true
 	}
 
-	return attrNames, strings.Join(htmlAttrs, " ")
+	if invidiousInstance := config.Opts.InvidiousInstance(); invidiousInstance != "" && iframeSourceDomain == strings.TrimPrefix(invidiousInstance, "www.") {
+		return iframeSourceDomain, true
+	}
+
+	return "", false
 }
 
-func getExtraAttributes(tagName string, isYouTubeEmbed bool, sanitizerOptions *SanitizerOptions) ([]string, []string) {
+func filterAndRenderHTML(buf *strings.Builder, n *html.Node, parsedBaseUrl *url.URL, sanitizerOptions *SanitizerOptions, depth uint) error {
+	if n == nil {
+		return nil
+	}
+
+	if depth == 0 {
+		return errors.New("maximum nested tags limit reached")
+	}
+
+	switch n.Type {
+	case html.TextNode:
+		buf.WriteString(html.EscapeString(n.Data))
+	case html.ElementNode:
+		tag := n.Data
+		if shouldIgnoreTag(n, tag) {
+			return nil
+		}
+
+		_, ok := allowedHTMLTagsAndAttributes[tag]
+		if !ok {
+			// The tag isn't allowed, but we're still interested in its content
+			return filterAndRenderHTMLChildren(buf, n, parsedBaseUrl, sanitizerOptions, depth-1)
+		}
+
+		htmlAttributes, hasAllRequiredAttributes := sanitizeAttributes(parsedBaseUrl, tag, n.Attr, sanitizerOptions)
+		if !hasAllRequiredAttributes {
+			if tag == "iframe" {
+				// A blocked iframe should not have its inner content rendered.
+				return nil
+			}
+			// The tag doesn't have every required attributes but we're still interested in its content
+			return filterAndRenderHTMLChildren(buf, n, parsedBaseUrl, sanitizerOptions, depth-1)
+		}
+		buf.WriteByte('<')
+		buf.WriteString(n.Data)
+		if htmlAttributes != "" {
+			buf.WriteByte(' ')
+			buf.WriteString(htmlAttributes)
+		}
+		buf.WriteByte('>')
+
+		if isSelfContainedTag(tag) {
+			return nil
+		}
+
+		if tag != "iframe" {
+			// iframes aren't allowed to have child nodes.
+			filterAndRenderHTMLChildren(buf, n, parsedBaseUrl, sanitizerOptions, depth-1)
+		}
+
+		buf.WriteString("</")
+		buf.WriteString(n.Data)
+		buf.WriteByte('>')
+	default:
+	}
+	return nil
+}
+
+func filterAndRenderHTMLChildren(buf *strings.Builder, n *html.Node, parsedBaseUrl *url.URL, sanitizerOptions *SanitizerOptions, depth uint) error {
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if err := filterAndRenderHTML(buf, c, parsedBaseUrl, sanitizerOptions, depth); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func hasRequiredAttributes(s *mandatoryAttributesStruct, tagName string) bool {
 	switch tagName {
 	case "a":
-		attributeNames := []string{"rel", "referrerpolicy"}
-		htmlAttributes := []string{`rel="noopener noreferrer"`, `referrerpolicy="no-referrer"`}
-		if sanitizerOptions.OpenLinksInNewTab {
-			attributeNames = append(attributeNames, "target")
-			htmlAttributes = append(htmlAttributes, `target="_blank"`)
-		}
-		return attributeNames, htmlAttributes
-	case "video", "audio":
-		return []string{"controls"}, []string{"controls"}
+		return s.href
 	case "iframe":
-		extraAttrNames := []string{}
-		extraHTMLAttributes := []string{}
-
-		// Note: the referrerpolicy seems to be required to avoid YouTube error 153 video player configuration error
-		// See https://developers.google.com/youtube/terms/required-minimum-functionality#embedded-player-api-client-identity
-		if isYouTubeEmbed {
-			extraAttrNames = append(extraAttrNames, "referrerpolicy")
-			extraHTMLAttributes = append(extraHTMLAttributes, `referrerpolicy="strict-origin-when-cross-origin"`)
-		}
-
-		extraAttrNames = append(extraAttrNames, "sandbox", "loading")
-		extraHTMLAttributes = append(extraHTMLAttributes, `sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"`, `loading="lazy"`)
-
-		return extraAttrNames, extraHTMLAttributes
-	case "img":
-		return []string{"loading"}, []string{`loading="lazy"`}
-	default:
-		return nil, nil
+		return s.src
+	case "source", "img":
+		return s.src || s.srcset
 	}
+	return true
 }
 
-func isValidTag(tagName string) bool {
-	_, ok := allowedHTMLTagsAndAttributes[tagName]
-	return ok
+func hasValidURIScheme(absoluteURL string) bool {
+	for _, scheme := range validURISchemes {
+		if strings.HasPrefix(absoluteURL, scheme) {
+			return true
+		}
+	}
+	return false
 }
 
-func isValidAttribute(tagName, attributeName string) bool {
-	if attributes, ok := allowedHTMLTagsAndAttributes[tagName]; ok {
-		return slices.Contains(attributes, attributeName)
+func isBlockedResource(absoluteURL string) bool {
+	for _, blockedURL := range blockedResourceURLSubstrings {
+		if strings.Contains(absoluteURL, blockedURL) {
+			return true
+		}
+	}
+	return false
+}
+
+func isBlockedTag(tagName string) bool {
+	switch tagName {
+	case "noscript", "script", "style":
+		return true
 	}
 	return false
 }
@@ -459,6 +383,15 @@ func isExternalResourceAttribute(attribute string) bool {
 	default:
 		return false
 	}
+}
+
+func isHidden(n *html.Node) bool {
+	for _, attr := range n.Attr {
+		if attr.Key == "hidden" {
+			return true
+		}
+	}
+	return false
 }
 
 func isPixelTracker(tagName string, attributes []html.Attribute) bool {
@@ -482,58 +415,48 @@ func isPixelTracker(tagName string, attributes []html.Attribute) bool {
 	return hasHeight && hasWidth
 }
 
-func hasRequiredAttributes(tagName string, attributes []string) bool {
-	switch tagName {
-	case "a":
-		return slices.Contains(attributes, "href")
-	case "iframe":
-		return slices.Contains(attributes, "src")
-	case "source", "img":
-		for _, attribute := range attributes {
-			if attribute == "src" || attribute == "srcset" {
-				return true
-			}
-		}
+func isPositiveInteger(value string) bool {
+	if value == "" {
 		return false
-	default:
+	}
+	if number, err := strconv.Atoi(value); err == nil {
+		return number > 0
+	}
+	return false
+}
+
+func isSelfContainedTag(tag string) bool {
+	switch tag {
+	case "area", "base", "br", "col", "embed", "hr", "img", "input",
+		"link", "meta", "param", "source", "track", "wbr":
 		return true
 	}
+	return false
 }
 
-func hasValidURIScheme(absoluteURL string) bool {
-	for _, scheme := range validURISchemes {
-		if strings.HasPrefix(absoluteURL, scheme) {
+func isValidDataAttribute(value string) bool {
+	for _, prefix := range dataAttributeAllowedPrefixes {
+		if strings.HasPrefix(value, prefix) {
 			return true
 		}
 	}
 	return false
 }
 
-func isBlockedResource(absoluteURL string) bool {
-	for _, blockedURL := range blockedResourceURLSubstrings {
-		if strings.Contains(absoluteURL, blockedURL) {
-			return true
-		}
+func isValidDecodingValue(value string) bool {
+	switch value {
+	case "sync", "async", "auto":
+		return true
 	}
 	return false
 }
 
-func findAllowedIframeSourceDomain(iframeSourceURL string) (string, bool) {
-	iframeSourceDomain := urllib.DomainWithoutWWW(iframeSourceURL)
-
-	if _, ok := iframeAllowList[iframeSourceDomain]; ok {
-		return iframeSourceDomain, true
+func isValidFetchPriorityValue(value string) bool {
+	switch value {
+	case "high", "low", "auto":
+		return true
 	}
-
-	if ytDomain := config.Opts.YouTubeEmbedDomain(); ytDomain != "" && iframeSourceDomain == strings.TrimPrefix(ytDomain, "www.") {
-		return iframeSourceDomain, true
-	}
-
-	if invidiousInstance := config.Opts.InvidiousInstance(); invidiousInstance != "" && iframeSourceDomain == strings.TrimPrefix(invidiousInstance, "www.") {
-		return iframeSourceDomain, true
-	}
-
-	return "", false
+	return false
 }
 
 func rewriteIframeURL(link string) string {
@@ -563,83 +486,188 @@ func rewriteIframeURL(link string) string {
 	return link
 }
 
-func isBlockedTag(tagName string) bool {
-	switch tagName {
-	case "noscript", "script", "style":
-		return true
+type mandatoryAttributesStruct struct {
+	href   bool
+	src    bool
+	srcset bool
+}
+
+func trackAttributes(s *mandatoryAttributesStruct, attributeName string) {
+	switch attributeName {
+	case "href":
+		s.href = true
+	case "src":
+		s.src = true
+	case "srcset":
+		s.srcset = true
 	}
-	return false
+}
+
+func sanitizeAttributes(parsedBaseUrl *url.URL, tagName string, attributes []html.Attribute, sanitizerOptions *SanitizerOptions) (string, bool) {
+	htmlAttrs := make([]string, 0, len(attributes))
+
+	// Keep track of mandatory attributes for some tags
+	mandatoryAttributes := mandatoryAttributesStruct{false, false, false}
+
+	var isAnchorLink bool
+	var isYouTubeEmbed bool
+
+	// We know the element is present, as the tag was validated in the caller of `sanitizeAttributes`
+	allowedAttributes := allowedHTMLTagsAndAttributes[tagName]
+
+	for _, attribute := range attributes {
+		if !slices.Contains(allowedAttributes, attribute.Key) {
+			continue
+		}
+
+		value := attribute.Val
+
+		switch tagName {
+		case "math":
+			if attribute.Key == "xmlns" {
+				if value != "http://www.w3.org/1998/Math/MathML" {
+					value = "http://www.w3.org/1998/Math/MathML"
+				}
+			}
+		case "img":
+			switch attribute.Key {
+			case "fetchpriority":
+				if !isValidFetchPriorityValue(value) {
+					continue
+				}
+			case "decoding":
+				if !isValidDecodingValue(value) {
+					continue
+				}
+			case "width", "height":
+				if !isPositiveInteger(value) {
+					continue
+				}
+			case "srcset":
+				value = sanitizeSrcsetAttr(parsedBaseUrl, value)
+				if value == "" {
+					continue
+				}
+			}
+		case "source":
+			if attribute.Key == "srcset" {
+				value = sanitizeSrcsetAttr(parsedBaseUrl, value)
+				if value == "" {
+					continue
+				}
+			}
+		}
+
+		if isExternalResourceAttribute(attribute.Key) {
+			switch {
+			case tagName == "iframe":
+				iframeSourceDomain, trustedIframeDomain := findAllowedIframeSourceDomain(attribute.Val)
+				if !trustedIframeDomain {
+					return "", false
+				}
+
+				value = rewriteIframeURL(attribute.Val)
+
+				if iframeSourceDomain == "youtube.com" || iframeSourceDomain == "youtube-nocookie.com" {
+					isYouTubeEmbed = true
+				}
+			case tagName == "img" && attribute.Key == "src" && isValidDataAttribute(attribute.Val):
+				value = attribute.Val
+			case tagName == "a" && attribute.Key == "href" && strings.HasPrefix(attribute.Val, "#"):
+				value = attribute.Val
+				isAnchorLink = true
+			default:
+				if isBlockedResource(value) {
+					return "", false
+				}
+
+				var err error
+				value, err = urllib.ResolveToAbsoluteURLWithParsedBaseURL(parsedBaseUrl, value)
+				if err != nil {
+					continue
+				}
+
+				if !hasValidURIScheme(value) {
+					continue
+				}
+
+				// TODO use feedURL instead of baseURL twice.
+				parsedValueUrl, _ := url.Parse(value)
+				if cleanedURL, err := urlcleaner.RemoveTrackingParameters(parsedBaseUrl, parsedBaseUrl, parsedValueUrl); err == nil {
+					value = cleanedURL
+				}
+			}
+		}
+
+		trackAttributes(&mandatoryAttributes, attribute.Key)
+		htmlAttrs = append(htmlAttrs, attribute.Key+`="`+html.EscapeString(value)+`"`)
+	}
+
+	if !hasRequiredAttributes(&mandatoryAttributes, tagName) {
+		return "", false
+	}
+
+	if !isAnchorLink {
+		switch tagName {
+		case "a":
+			htmlAttrs = append(htmlAttrs, `rel="noopener noreferrer"`, `referrerpolicy="no-referrer"`)
+			if sanitizerOptions.OpenLinksInNewTab {
+				htmlAttrs = append(htmlAttrs, `target="_blank"`)
+			}
+		case "video", "audio":
+			htmlAttrs = append(htmlAttrs, "controls")
+		case "iframe":
+			htmlAttrs = append(htmlAttrs, `sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"`, `loading="lazy"`)
+
+			// Note: the referrerpolicy seems to be required to avoid YouTube error 153 video player configuration error
+			// See https://developers.google.com/youtube/terms/required-minimum-functionality#embedded-player-api-client-identity
+			if isYouTubeEmbed {
+				htmlAttrs = append(htmlAttrs, `referrerpolicy="strict-origin-when-cross-origin"`)
+			}
+
+		case "img":
+			htmlAttrs = append(htmlAttrs, `loading="lazy"`)
+		}
+	}
+
+	return strings.Join(htmlAttrs, " "), true
 }
 
 func sanitizeSrcsetAttr(parsedBaseURL *url.URL, value string) string {
-	imageCandidates := ParseSrcSetAttribute(value)
+	candidates := ParseSrcSetAttribute(value)
+	if len(candidates) == 0 {
+		return ""
+	}
 
-	for _, imageCandidate := range imageCandidates {
-		if absoluteURL, err := absoluteURLParsedBase(parsedBaseURL, imageCandidate.ImageURL); err == nil {
-			imageCandidate.ImageURL = absoluteURL
+	sanitizedCandidates := make([]*imageCandidate, 0, len(candidates))
+
+	for _, imageCandidate := range candidates {
+		absoluteURL, err := urllib.ResolveToAbsoluteURLWithParsedBaseURL(parsedBaseURL, imageCandidate.ImageURL)
+		if err != nil {
+			continue
 		}
-	}
 
-	return imageCandidates.String()
-}
-
-func isValidDataAttribute(value string) bool {
-	for _, prefix := range dataAttributeAllowedPrefixes {
-		if strings.HasPrefix(value, prefix) {
-			return true
+		if !hasValidURIScheme(absoluteURL) || isBlockedResource(absoluteURL) {
+			continue
 		}
+
+		imageCandidate.ImageURL = absoluteURL
+		sanitizedCandidates = append(sanitizedCandidates, imageCandidate)
 	}
-	return false
+
+	return imageCandidates(sanitizedCandidates).String()
 }
 
-func isPositiveInteger(value string) bool {
-	if value == "" {
-		return false
-	}
-	if number, err := strconv.Atoi(value); err == nil {
-		return number > 0
-	}
-	return false
-}
-
-func getIntegerAttributeValue(name string, attributes []html.Attribute) int {
-	for _, attribute := range attributes {
-		if attribute.Key == name {
-			number, _ := strconv.Atoi(attribute.Val)
-			return number
-		}
-	}
-	return 0
-}
-
-func isValidFetchPriorityValue(value string) bool {
-	switch value {
-	case "high", "low", "auto":
+func shouldIgnoreTag(n *html.Node, tag string) bool {
+	if isPixelTracker(tag, n.Attr) {
 		return true
 	}
-	return false
-}
-
-func isValidDecodingValue(value string) bool {
-	switch value {
-	case "sync", "async", "auto":
+	if isBlockedTag(tag) {
 		return true
 	}
+	if isHidden(n) {
+		return true
+	}
+
 	return false
-}
-
-// absoluteURLParsedBase is used instead of urllib.AbsoluteURL to avoid parsing baseURL over and over.
-func absoluteURLParsedBase(parsedBaseURL *url.URL, input string) (string, error) {
-	absURL, u, err := urllib.GetAbsoluteURL(input)
-	if err != nil {
-		return "", err
-	}
-	if absURL != "" {
-		return absURL, nil
-	}
-	if parsedBaseURL == nil {
-		return "", nil
-	}
-
-	return parsedBaseURL.ResolveReference(u).String(), nil
 }

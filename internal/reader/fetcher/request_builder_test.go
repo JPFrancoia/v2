@@ -7,8 +7,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
+
+	"miniflux.app/v2/internal/config"
+	"miniflux.app/v2/internal/proxyrotator"
 )
 
 func TestNewRequestBuilder(t *testing.T) {
@@ -300,8 +304,8 @@ func TestRequestBuilder_WithoutCompression(t *testing.T) {
 
 func TestRequestBuilder_WithCompression(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Accept-Encoding") != "br, gzip" {
-			t.Errorf("Expected Accept-Encoding to be 'br, gzip', got '%s'", r.Header.Get("Accept-Encoding"))
+		if r.Header.Get("Accept-Encoding") != "br,gzip" {
+			t.Errorf("Expected Accept-Encoding to be 'br,gzip', got '%s'", r.Header.Get("Accept-Encoding"))
 		}
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -398,6 +402,143 @@ func TestRequestBuilder_InvalidURL(t *testing.T) {
 	}
 }
 
+func TestRequestBuilder_RefusePrivateNetworkByDefault(t *testing.T) {
+	configureFetcherAllowPrivateNetworksOption(t, "0")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	builder := NewRequestBuilder()
+	_, err := builder.ExecuteRequest(server.URL)
+	if err == nil {
+		t.Fatal("Expected private network request to be rejected")
+	}
+
+	if !strings.Contains(err.Error(), "refusing to access private network host") {
+		t.Fatalf("Unexpected error for private network request: %v", err)
+	}
+}
+
+func TestRequestBuilder_AllowPrivateNetworkWhenEnabled(t *testing.T) {
+	configureFetcherAllowPrivateNetworksOption(t, "1")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	builder := NewRequestBuilder()
+	resp, err := builder.ExecuteRequest(server.URL)
+	if err != nil {
+		t.Fatalf("Expected private network request to succeed when enabled: %v", err)
+	}
+	defer resp.Body.Close()
+}
+
+func TestRequestBuilder_AllowPrivateConfiguredProxy(t *testing.T) {
+	configureFetcherAllowPrivateNetworksOption(t, "0")
+
+	tests := []struct {
+		name      string
+		configure func(t *testing.T, builder *RequestBuilder, proxyURL string) *RequestBuilder
+	}{
+		{
+			name: "feed proxy",
+			configure: func(t *testing.T, builder *RequestBuilder, proxyURL string) *RequestBuilder {
+				return builder.WithCustomFeedProxyURL(proxyURL)
+			},
+		},
+		{
+			name: "application proxy",
+			configure: func(t *testing.T, builder *RequestBuilder, proxyURL string) *RequestBuilder {
+				t.Helper()
+
+				parsedProxyURL, err := url.Parse(proxyURL)
+				if err != nil {
+					t.Fatalf("Unable to parse proxy URL: %v", err)
+				}
+
+				return builder.WithCustomApplicationProxyURL(parsedProxyURL).UseCustomApplicationProxyURL(true)
+			},
+		},
+		{
+			name: "proxy rotator",
+			configure: func(t *testing.T, builder *RequestBuilder, proxyURL string) *RequestBuilder {
+				t.Helper()
+
+				rotator, err := proxyrotator.NewProxyRotator([]string{proxyURL})
+				if err != nil {
+					t.Fatalf("Unable to create proxy rotator: %v", err)
+				}
+
+				return builder.WithProxyRotator(rotator)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			targetURL := "http://feed.invalid/rss.xml"
+			proxyRequests := make(chan string, 1)
+			proxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				select {
+				case proxyRequests <- r.URL.String():
+				default:
+				}
+
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer proxyServer.Close()
+
+			builder := tt.configure(t, NewRequestBuilder(), proxyServer.URL)
+			resp, err := builder.ExecuteRequest(targetURL)
+			if err != nil {
+				t.Fatalf("Expected private proxy request to succeed: %v", err)
+			}
+			defer resp.Body.Close()
+
+			select {
+			case gotURL := <-proxyRequests:
+				if gotURL != targetURL {
+					t.Fatalf("Expected proxy request URL to be %q, got %q", targetURL, gotURL)
+				}
+			default:
+				t.Fatal("Expected request to be sent through the proxy")
+			}
+		})
+	}
+}
+
+func TestRequestBuilder_RefusePrivateNetworkOnRedirect(t *testing.T) {
+	configureFetcherAllowPrivateNetworksOption(t, "0")
+
+	// Target server on a loopback address (private).
+	privateServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer privateServer.Close()
+
+	// Redirector that sends the client to the private server.
+	// Because the Control callback checks the IP at connection time, the
+	// redirect target is also validated (unlike a pre-flight DNS check).
+	redirectServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, privateServer.URL, http.StatusFound)
+	}))
+	defer redirectServer.Close()
+
+	builder := NewRequestBuilder()
+	_, err := builder.ExecuteRequest(redirectServer.URL)
+	if err == nil {
+		t.Fatal("Expected redirect to private network to be rejected")
+	}
+
+	if !strings.Contains(err.Error(), "refusing to access private network host") {
+		t.Fatalf("Unexpected error for redirected private network request: %v", err)
+	}
+}
+
 func TestRequestBuilder_TimeoutConfiguration(t *testing.T) {
 	// Create a slow server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -419,4 +560,22 @@ func TestRequestBuilder_TimeoutConfiguration(t *testing.T) {
 	if duration > 1500*time.Millisecond {
 		t.Errorf("Expected timeout around 1s, took %v", duration)
 	}
+}
+
+func configureFetcherAllowPrivateNetworksOption(t *testing.T, value string) {
+	t.Helper()
+
+	t.Setenv("FETCHER_ALLOW_PRIVATE_NETWORKS", value)
+
+	configParser := config.NewConfigParser()
+	parsedOptions, err := configParser.ParseEnvironmentVariables()
+	if err != nil {
+		t.Fatalf("Unable to configure test options: %v", err)
+	}
+
+	previousOptions := config.Opts
+	config.Opts = parsedOptions
+	t.Cleanup(func() {
+		config.Opts = previousOptions
+	})
 }

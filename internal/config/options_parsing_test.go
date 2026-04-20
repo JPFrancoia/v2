@@ -1273,22 +1273,6 @@ func TestDatabaseConnectionLifetimeOptionParsing(t *testing.T) {
 	}
 }
 
-func TestFilterEntryMaxAgeDaysOptionParsing(t *testing.T) {
-	configParser := NewConfigParser()
-
-	if configParser.options.FilterEntryMaxAgeDays() != 0 {
-		t.Fatalf("Expected FILTER_ENTRY_MAX_AGE_DAYS to be 0 by default")
-	}
-
-	if err := configParser.parseLines([]string{"FILTER_ENTRY_MAX_AGE_DAYS=7"}); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if configParser.options.FilterEntryMaxAgeDays() != 7 {
-		t.Fatalf("Expected FILTER_ENTRY_MAX_AGE_DAYS to be 7 days")
-	}
-}
-
 func TestForceRefreshIntervalOptionParsing(t *testing.T) {
 	configParser := NewConfigParser()
 
@@ -1367,27 +1351,51 @@ func TestHTTPClientTimeoutOptionParsing(t *testing.T) {
 	}
 }
 
-func TestIconFetchAllowPrivateNetworksOptionParsing(t *testing.T) {
+func TestFetcherAllowPrivateNetworksOptionParsing(t *testing.T) {
 	configParser := NewConfigParser()
 
-	if configParser.options.IconFetchAllowPrivateNetworks() {
-		t.Fatalf("Expected ICON_FETCH_ALLOW_PRIVATE_NETWORKS to be disabled by default")
+	if configParser.options.FetcherAllowPrivateNetworks() {
+		t.Fatalf("Expected FETCHER_ALLOW_PRIVATE_NETWORKS to be disabled by default")
 	}
 
-	if err := configParser.parseLines([]string{"ICON_FETCH_ALLOW_PRIVATE_NETWORKS=1"}); err != nil {
+	if err := configParser.parseLines([]string{"FETCHER_ALLOW_PRIVATE_NETWORKS=1"}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if !configParser.options.IconFetchAllowPrivateNetworks() {
-		t.Fatalf("Expected ICON_FETCH_ALLOW_PRIVATE_NETWORKS to be enabled")
+	if !configParser.options.FetcherAllowPrivateNetworks() {
+		t.Fatalf("Expected FETCHER_ALLOW_PRIVATE_NETWORKS to be enabled")
 	}
 
-	if err := configParser.parseLines([]string{"ICON_FETCH_ALLOW_PRIVATE_NETWORKS=0"}); err != nil {
+	if err := configParser.parseLines([]string{"FETCHER_ALLOW_PRIVATE_NETWORKS=0"}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if configParser.options.IconFetchAllowPrivateNetworks() {
-		t.Fatalf("Expected ICON_FETCH_ALLOW_PRIVATE_NETWORKS to be disabled")
+	if configParser.options.FetcherAllowPrivateNetworks() {
+		t.Fatalf("Expected FETCHER_ALLOW_PRIVATE_NETWORKS to be disabled")
+	}
+}
+
+func TestIntegrationAllowPrivateNetworksOptionParsing(t *testing.T) {
+	configParser := NewConfigParser()
+
+	if configParser.options.IntegrationAllowPrivateNetworks() {
+		t.Fatalf("Expected INTEGRATION_ALLOW_PRIVATE_NETWORKS to be disabled by default")
+	}
+
+	if err := configParser.parseLines([]string{"INTEGRATION_ALLOW_PRIVATE_NETWORKS=1"}); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if !configParser.options.IntegrationAllowPrivateNetworks() {
+		t.Fatalf("Expected INTEGRATION_ALLOW_PRIVATE_NETWORKS to be enabled")
+	}
+
+	if err := configParser.parseLines([]string{"INTEGRATION_ALLOW_PRIVATE_NETWORKS=0"}); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if configParser.options.IntegrationAllowPrivateNetworks() {
+		t.Fatalf("Expected INTEGRATION_ALLOW_PRIVATE_NETWORKS to be disabled")
 	}
 }
 
@@ -1455,30 +1463,6 @@ func TestMediaProxyHTTPClientTimeoutOptionParsing(t *testing.T) {
 
 	if configParser.options.MediaProxyHTTPClientTimeout().Seconds() != 60 {
 		t.Fatalf("Expected MEDIA_PROXY_HTTP_CLIENT_TIMEOUT to be 60 seconds")
-	}
-}
-
-func TestMediaProxyAllowPrivateNetworksOptionParsing(t *testing.T) {
-	configParser := NewConfigParser()
-
-	if configParser.options.MediaProxyAllowPrivateNetworks() {
-		t.Fatalf("Expected MEDIA_PROXY_ALLOW_PRIVATE_NETWORKS to be disabled by default")
-	}
-
-	if err := configParser.parseLines([]string{"MEDIA_PROXY_ALLOW_PRIVATE_NETWORKS=1"}); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if !configParser.options.MediaProxyAllowPrivateNetworks() {
-		t.Fatalf("Expected MEDIA_PROXY_ALLOW_PRIVATE_NETWORKS to be enabled")
-	}
-
-	if err := configParser.parseLines([]string{"MEDIA_PROXY_ALLOW_PRIVATE_NETWORKS=0"}); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if configParser.options.MediaProxyAllowPrivateNetworks() {
-		t.Fatalf("Expected MEDIA_PROXY_ALLOW_PRIVATE_NETWORKS to be disabled")
 	}
 }
 
@@ -1659,6 +1643,11 @@ func TestTrustedReverseProxyNetworksOptionParsing(t *testing.T) {
 	if !slices.Contains(allowedNetworks, "192.168.1.0/24") {
 		t.Errorf("Expected 192.168.1.0/24 in allowed networks")
 	}
+
+	// Test invalid value
+	if err := configParser.parseLines([]string{"TRUSTED_REVERSE_PROXY_NETWORKS=127.0.0.1"}); err == nil {
+		t.Fatal("Expected error when parsing invalid CIDR notation IP 127.0.0.1, got nil")
+	}
 }
 
 func TestYouTubeEmbedDomainOptionParsing(t *testing.T) {
@@ -1761,5 +1750,296 @@ func TestConfigMapWithRedactedSecrets(t *testing.T) {
 	// The value should be redacted
 	if configMap[0].Value != "<redacted>" {
 		t.Fatalf("Expected ADMIN_PASSWORD value to be redacted, got '%s'", configMap[0].Value)
+	}
+}
+
+func TestValidateOIDCProviderRequiresDiscoveryEndpoint(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{"OAUTH2_PROVIDER=oidc"}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	err := configParser.options.Validate()
+	if err == nil {
+		t.Fatal("Expected error when OIDC provider is set without discovery endpoint")
+	}
+	if err.Error() != "OAUTH2_OIDC_DISCOVERY_ENDPOINT must be configured when using the OIDC provider" {
+		t.Fatalf("Unexpected error message: %v", err)
+	}
+}
+
+func TestValidateOIDCProviderWithDiscoveryEndpoint(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{
+		"OAUTH2_PROVIDER=oidc",
+		"OAUTH2_OIDC_DISCOVERY_ENDPOINT=https://example.com/.well-known/openid-configuration",
+	}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
+func TestValidateDisableLocalAuthWithoutAlternative(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{"DISABLE_LOCAL_AUTH=1"}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err == nil {
+		t.Fatal("Expected error when local auth is disabled without alternative")
+	}
+}
+
+func TestValidateDisableLocalAuthWithOAuth2ButNoUserCreation(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{
+		"DISABLE_LOCAL_AUTH=1",
+		"OAUTH2_PROVIDER=oidc",
+		"OAUTH2_OIDC_DISCOVERY_ENDPOINT=https://example.com/.well-known/openid-configuration",
+	}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
+func TestValidateDisableLocalAuthWithOAuth2AndUserCreation(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{
+		"DISABLE_LOCAL_AUTH=1",
+		"OAUTH2_PROVIDER=oidc",
+		"OAUTH2_OIDC_DISCOVERY_ENDPOINT=https://example.com/.well-known/openid-configuration",
+		"OAUTH2_USER_CREATION=1",
+	}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
+func TestValidateDisableLocalAuthWithAuthProxyButNoUserCreation(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{
+		"DISABLE_LOCAL_AUTH=1",
+		"AUTH_PROXY_HEADER=X-Forwarded-User",
+		"AUTH_PROXY_USER_CREATION=0",
+		"TRUSTED_REVERSE_PROXY_NETWORKS=10.0.0.0/8",
+	}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
+func TestValidateDisableLocalAuthWithAuthProxyAndUserCreation(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{
+		"DISABLE_LOCAL_AUTH=1",
+		"AUTH_PROXY_HEADER=X-Forwarded-User",
+		"AUTH_PROXY_USER_CREATION=1",
+		"TRUSTED_REVERSE_PROXY_NETWORKS=10.0.0.0/8",
+	}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
+func TestValidateAuthProxyRequiresTrustedNetworks(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{"AUTH_PROXY_HEADER=X-Forwarded-User"}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	err := configParser.options.Validate()
+	if err == nil {
+		t.Fatal("Expected error when auth proxy header is set without trusted networks")
+	}
+	if err.Error() != "TRUSTED_REVERSE_PROXY_NETWORKS must be configured when AUTH_PROXY_HEADER is used" {
+		t.Fatalf("Unexpected error message: %v", err)
+	}
+}
+
+func TestValidateAuthProxyWithTrustedNetworks(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{
+		"AUTH_PROXY_HEADER=X-Forwarded-User",
+		"TRUSTED_REVERSE_PROXY_NETWORKS=10.0.0.0/8",
+	}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
+func TestValidateCertFileMissingKeyFile(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{"CERT_FILE=/path/to/cert.pem"}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err == nil {
+		t.Fatal("Expected error when CERT_FILE is set without KEY_FILE")
+	}
+}
+
+func TestValidateKeyFileMissingCertFile(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{"KEY_FILE=/path/to/key.pem"}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err == nil {
+		t.Fatal("Expected error when KEY_FILE is set without CERT_FILE")
+	}
+}
+
+func TestValidateCertFileAndKeyFile(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{
+		"CERT_FILE=/path/to/cert.pem",
+		"KEY_FILE=/path/to/key.pem",
+	}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
+func TestValidateCertDomainAndCertFileMutuallyExclusive(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{
+		"CERT_DOMAIN=example.com",
+		"CERT_FILE=/path/to/cert.pem",
+		"KEY_FILE=/path/to/key.pem",
+	}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err == nil {
+		t.Fatal("Expected error when both CERT_DOMAIN and CERT_FILE are set")
+	}
+}
+
+func TestValidateCertDomainAlone(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{"CERT_DOMAIN=example.com"}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
+func TestValidateMetricsUsernameWithoutPassword(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{"METRICS_USERNAME=admin"}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err == nil {
+		t.Fatal("Expected error when METRICS_USERNAME is set without METRICS_PASSWORD")
+	}
+}
+
+func TestValidateMetricsPasswordWithoutUsername(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{"METRICS_PASSWORD=secret"}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err == nil {
+		t.Fatal("Expected error when METRICS_PASSWORD is set without METRICS_USERNAME")
+	}
+}
+
+func TestValidateMetricsUsernameAndPassword(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{
+		"METRICS_USERNAME=admin",
+		"METRICS_PASSWORD=secret",
+	}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
+func TestValidateDatabaseMinConnsGreaterThanMaxConns(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{
+		"DATABASE_MIN_CONNS=25",
+		"DATABASE_MAX_CONNS=10",
+	}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err == nil {
+		t.Fatal("Expected error when DATABASE_MIN_CONNS > DATABASE_MAX_CONNS")
+	}
+}
+
+func TestValidateDatabaseMinConnsEqualToMaxConns(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{
+		"DATABASE_MIN_CONNS=10",
+		"DATABASE_MAX_CONNS=10",
+	}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
+func TestValidateSchedulerRoundRobinMinGreaterThanMax(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{
+		"SCHEDULER_ROUND_ROBIN_MIN_INTERVAL=1440",
+		"SCHEDULER_ROUND_ROBIN_MAX_INTERVAL=60",
+	}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err == nil {
+		t.Fatal("Expected error when SCHEDULER_ROUND_ROBIN_MIN_INTERVAL > SCHEDULER_ROUND_ROBIN_MAX_INTERVAL")
+	}
+}
+
+func TestValidateSchedulerRoundRobinMinLessThanMax(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{
+		"SCHEDULER_ROUND_ROBIN_MIN_INTERVAL=60",
+		"SCHEDULER_ROUND_ROBIN_MAX_INTERVAL=1440",
+	}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
+func TestValidateSchedulerEntryFrequencyMinGreaterThanMax(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{
+		"SCHEDULER_ENTRY_FREQUENCY_MIN_INTERVAL=1440",
+		"SCHEDULER_ENTRY_FREQUENCY_MAX_INTERVAL=5",
+	}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err == nil {
+		t.Fatal("Expected error when SCHEDULER_ENTRY_FREQUENCY_MIN_INTERVAL > SCHEDULER_ENTRY_FREQUENCY_MAX_INTERVAL")
+	}
+}
+
+func TestValidateSchedulerEntryFrequencyMinLessThanMax(t *testing.T) {
+	configParser := NewConfigParser()
+	if err := configParser.parseLines([]string{
+		"SCHEDULER_ENTRY_FREQUENCY_MIN_INTERVAL=5",
+		"SCHEDULER_ENTRY_FREQUENCY_MAX_INTERVAL=1440",
+	}); err != nil {
+		t.Fatalf("Unexpected parse error: %v", err)
+	}
+	if err := configParser.options.Validate(); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
 	}
 }

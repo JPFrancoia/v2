@@ -5,6 +5,7 @@ package config // import "miniflux.app/v2/internal/config"
 
 import (
 	"maps"
+	"net"
 	"net/url"
 	"slices"
 	"strings"
@@ -218,6 +219,11 @@ func NewConfigOptions() *configOptions {
 				rawValue:        "0",
 				valueType:       boolType,
 			},
+			"FETCHER_ALLOW_PRIVATE_NETWORKS": {
+				parsedBoolValue: false,
+				rawValue:        "0",
+				valueType:       boolType,
+			},
 			"FETCH_BILIBILI_WATCH_TIME": {
 				parsedBoolValue: false,
 				rawValue:        "0",
@@ -237,14 +243,6 @@ func NewConfigOptions() *configOptions {
 				parsedBoolValue: false,
 				rawValue:        "0",
 				valueType:       boolType,
-			},
-			"FILTER_ENTRY_MAX_AGE_DAYS": {
-				parsedIntValue: 0,
-				rawValue:       "0",
-				valueType:      intType,
-				validator: func(rawValue string) error {
-					return validateGreaterOrEqualThan(rawValue, 0)
-				},
 			},
 			"FORCE_REFRESH_INTERVAL": {
 				parsedDuration: 30 * time.Minute,
@@ -300,7 +298,7 @@ func NewConfigOptions() *configOptions {
 				rawValue:        "0",
 				valueType:       boolType,
 			},
-			"ICON_FETCH_ALLOW_PRIVATE_NETWORKS": {
+			"INTEGRATION_ALLOW_PRIVATE_NETWORKS": {
 				parsedBoolValue: false,
 				rawValue:        "0",
 				valueType:       boolType,
@@ -359,11 +357,6 @@ func NewConfigOptions() *configOptions {
 			"MEDIA_PROXY_CUSTOM_URL": {
 				rawValue:  "",
 				valueType: urlType,
-			},
-			"MEDIA_PROXY_ALLOW_PRIVATE_NETWORKS": {
-				parsedBoolValue: false,
-				rawValue:        "0",
-				valueType:       boolType,
 			},
 			"MEDIA_PROXY_HTTP_CLIENT_TIMEOUT": {
 				parsedDuration: 120 * time.Second,
@@ -572,6 +565,15 @@ func NewConfigOptions() *configOptions {
 				parsedStringList: []string{},
 				rawValue:         "",
 				valueType:        stringListType,
+				validator: func(rawValue string) error {
+					for ip := range strings.SplitSeq(rawValue, ",") {
+						if _, _, err := net.ParseCIDR(ip); err != nil {
+							return err
+						}
+					}
+
+					return nil
+				},
 			},
 			"WATCHDOG": {
 				parsedBoolValue: true,
@@ -718,10 +720,6 @@ func (c *configOptions) FetchYouTubeWatchTime() bool {
 	return c.options["FETCH_YOUTUBE_WATCH_TIME"].parsedBoolValue
 }
 
-func (c *configOptions) FilterEntryMaxAgeDays() int {
-	return c.options["FILTER_ENTRY_MAX_AGE_DAYS"].parsedIntValue
-}
-
 func (c *configOptions) ForceRefreshInterval() time.Duration {
 	return c.options["FORCE_REFRESH_INTERVAL"].parsedDuration
 }
@@ -793,8 +791,15 @@ func (c *configOptions) HTTPS() bool {
 	return c.options["HTTPS"].parsedBoolValue
 }
 
-func (c *configOptions) IconFetchAllowPrivateNetworks() bool {
-	return c.options["ICON_FETCH_ALLOW_PRIVATE_NETWORKS"].parsedBoolValue
+func (c *configOptions) FetcherAllowPrivateNetworks() bool {
+	return c.options["FETCHER_ALLOW_PRIVATE_NETWORKS"].parsedBoolValue
+}
+
+func (c *configOptions) IntegrationAllowPrivateNetworks() bool {
+	if c == nil {
+		return false
+	}
+	return c.options["INTEGRATION_ALLOW_PRIVATE_NETWORKS"].parsedBoolValue
 }
 
 func (c *configOptions) InvidiousInstance() string {
@@ -847,10 +852,6 @@ func (c *configOptions) MaintenanceMode() bool {
 
 func (c *configOptions) MediaCustomProxyURL() *url.URL {
 	return c.options["MEDIA_PROXY_CUSTOM_URL"].parsedURLValue
-}
-
-func (c *configOptions) MediaProxyAllowPrivateNetworks() bool {
-	return c.options["MEDIA_PROXY_ALLOW_PRIVATE_NETWORKS"].parsedBoolValue
 }
 
 func (c *configOptions) MediaProxyHTTPClientTimeout() time.Duration {

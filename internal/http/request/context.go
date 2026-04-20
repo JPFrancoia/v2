@@ -5,8 +5,6 @@ package request // import "miniflux.app/v2/internal/http/request"
 
 import (
 	"net/http"
-	"strconv"
-	"time"
 
 	"miniflux.app/v2/internal/model"
 )
@@ -21,51 +19,60 @@ const (
 	UserTimezoneContextKey
 	IsAdminUserContextKey
 	IsAuthenticatedContextKey
-	UserSessionTokenContextKey
-	UserLanguageContextKey
-	UserThemeContextKey
-	SessionIDContextKey
-	CSRFContextKey
-	OAuth2StateContextKey
-	OAuth2CodeVerifierContextKey
-	FlashMessageContextKey
-	FlashErrorMessageContextKey
-	LastForceRefreshContextKey
+	WebSessionContextKey
 	ClientIPContextKey
 	GoogleReaderTokenKey
-	WebAuthnDataContextKey
 )
 
-func WebAuthnSessionData(r *http.Request) *model.WebAuthnSession {
-	if v := r.Context().Value(WebAuthnDataContextKey); v != nil {
-		if value, valid := v.(model.WebAuthnSession); valid {
-			return &value
+// WebSession returns the current web session from the request context, if present.
+func WebSession(r *http.Request) *model.WebSession {
+	if v := r.Context().Value(WebSessionContextKey); v != nil {
+		if value, valid := v.(*model.WebSession); valid {
+			return value
 		}
 	}
 	return nil
 }
 
-// GoogleReaderToken returns the google reader token if it exists.
+// GoogleReaderToken returns the Google Reader token from the request context, if present.
 func GoogleReaderToken(r *http.Request) string {
 	return getContextStringValue(r, GoogleReaderTokenKey)
 }
 
-// IsAdminUser checks if the logged user is administrator.
+// IsAdminUser reports whether the logged-in user is an administrator.
 func IsAdminUser(r *http.Request) bool {
 	return getContextBoolValue(r, IsAdminUserContextKey)
 }
 
-// IsAuthenticated returns a boolean if the user is authenticated.
+// IsAuthenticated reports whether the user is authenticated.
 func IsAuthenticated(r *http.Request) bool {
-	return getContextBoolValue(r, IsAuthenticatedContextKey)
+	if getContextBoolValue(r, IsAuthenticatedContextKey) {
+		return true
+	}
+
+	if session := WebSession(r); session != nil {
+		return session.IsAuthenticated()
+	}
+
+	return false
 }
 
-// UserID returns the UserID of the logged user.
+// UserID returns the logged-in user's ID from the request context.
 func UserID(r *http.Request) int64 {
-	return getContextInt64Value(r, UserIDContextKey)
+	if userID := getContextInt64Value(r, UserIDContextKey); userID != 0 {
+		return userID
+	}
+
+	if session := WebSession(r); session != nil {
+		if id, ok := session.UserID(); ok {
+			return id
+		}
+	}
+
+	return 0
 }
 
-// UserName returns the username of the logged user.
+// UserName returns the logged-in user's username, or "unknown" when unset.
 func UserName(r *http.Request) string {
 	value := getContextStringValue(r, UserNameContextKey)
 	if value == "" {
@@ -74,7 +81,7 @@ func UserName(r *http.Request) string {
 	return value
 }
 
-// UserTimezone returns the timezone used by the logged user.
+// UserTimezone returns the user's timezone, defaulting to "UTC" when unset.
 func UserTimezone(r *http.Request) string {
 	value := getContextStringValue(r, UserTimezoneContextKey)
 	if value == "" {
@@ -83,69 +90,7 @@ func UserTimezone(r *http.Request) string {
 	return value
 }
 
-// UserLanguage get the locale used by the current logged user.
-func UserLanguage(r *http.Request) string {
-	language := getContextStringValue(r, UserLanguageContextKey)
-	if language == "" {
-		language = "en_US"
-	}
-	return language
-}
-
-// UserTheme get the theme used by the current logged user.
-func UserTheme(r *http.Request) string {
-	theme := getContextStringValue(r, UserThemeContextKey)
-	if theme == "" {
-		theme = "system_serif"
-	}
-	return theme
-}
-
-// CSRF returns the current CSRF token.
-func CSRF(r *http.Request) string {
-	return getContextStringValue(r, CSRFContextKey)
-}
-
-// SessionID returns the current session ID.
-func SessionID(r *http.Request) string {
-	return getContextStringValue(r, SessionIDContextKey)
-}
-
-// UserSessionToken returns the current user session token.
-func UserSessionToken(r *http.Request) string {
-	return getContextStringValue(r, UserSessionTokenContextKey)
-}
-
-// OAuth2State returns the current OAuth2 state.
-func OAuth2State(r *http.Request) string {
-	return getContextStringValue(r, OAuth2StateContextKey)
-}
-
-func OAuth2CodeVerifier(r *http.Request) string {
-	return getContextStringValue(r, OAuth2CodeVerifierContextKey)
-}
-
-// FlashMessage returns the message message if any.
-func FlashMessage(r *http.Request) string {
-	return getContextStringValue(r, FlashMessageContextKey)
-}
-
-// FlashErrorMessage returns the message error message if any.
-func FlashErrorMessage(r *http.Request) string {
-	return getContextStringValue(r, FlashErrorMessageContextKey)
-}
-
-// LastForceRefresh returns the last force refresh timestamp.
-func LastForceRefresh(r *http.Request) time.Time {
-	jsonStringValue := getContextStringValue(r, LastForceRefreshContextKey)
-	timestamp, err := strconv.ParseInt(jsonStringValue, 10, 64)
-	if err != nil {
-		return time.Time{}
-	}
-	return time.Unix(timestamp, 0)
-}
-
-// ClientIP returns the client IP address stored in the context.
+// ClientIP returns the client IP address stored in the request context.
 func ClientIP(r *http.Request) string {
 	return getContextStringValue(r, ClientIPContextKey)
 }

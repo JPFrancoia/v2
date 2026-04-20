@@ -31,7 +31,6 @@ import (
 	"strings"
 	"time"
 
-	"miniflux.app/v2/internal/config"
 	"miniflux.app/v2/internal/model"
 )
 
@@ -70,10 +69,6 @@ func parseRule(userDefinedRule string) (bool, filterRule) {
 }
 
 func IsBlockedEntry(blockRules filterRules, allowRules filterRules, feed *model.Feed, entry *model.Entry) bool {
-	if isBlockedGlobally(entry) {
-		return true
-	}
-
 	if matchesEntryFilterRules(blockRules, feed, entry) {
 		return true
 	}
@@ -96,26 +91,6 @@ func IsBlockedEntry(blockRules filterRules, allowRules filterRules, feed *model.
 			return true // Block entry if it doesn't match keeplist rules
 		}
 		return false // Allow entry if it matches keeplist rules or rule is invalid (ignored)
-	}
-
-	return false
-}
-
-func isBlockedGlobally(entry *model.Entry) bool {
-	if config.Opts == nil {
-		return false
-	}
-
-	if config.Opts.FilterEntryMaxAgeDays() > 0 {
-		maxAge := time.Duration(config.Opts.FilterEntryMaxAgeDays()) * 24 * time.Hour
-		if entry.Date.Before(time.Now().Add(-maxAge)) {
-			slog.Debug("Entry is blocked globally due to max age",
-				slog.String("entry_url", entry.URL),
-				slog.Time("entry_date", entry.Date),
-				slog.Duration("max_age", maxAge),
-			)
-			return true
-		}
 	}
 
 	return false
@@ -263,8 +238,7 @@ func containsRegexPattern(pattern string, items []string) bool {
 func parseDuration(duration string) (time.Duration, error) {
 	// Handle common duration formats like "30d", "7d", "1h", "1m", etc.
 	// Go's time.ParseDuration doesn't support days, so we handle them manually
-	if strings.HasSuffix(duration, "d") {
-		daysStr := strings.TrimSuffix(duration, "d")
+	if daysStr, ok := strings.CutSuffix(duration, "d"); ok {
 		days := 0
 		if daysStr != "" {
 			var err error

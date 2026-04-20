@@ -7,11 +7,9 @@ import (
 	"net/http"
 
 	"miniflux.app/v2/internal/http/request"
-	"miniflux.app/v2/internal/http/response/html"
-	"miniflux.app/v2/internal/http/route"
+	"miniflux.app/v2/internal/http/response"
 	"miniflux.app/v2/internal/model"
 	"miniflux.app/v2/internal/ui/form"
-	"miniflux.app/v2/internal/ui/session"
 	"miniflux.app/v2/internal/ui/view"
 	"miniflux.app/v2/internal/validator"
 )
@@ -19,26 +17,25 @@ import (
 func (h *handler) updateCategory(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.UserByID(request.UserID(r))
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	categoryID := request.RouteInt64Param(r, "categoryID")
 	category, err := h.store.Category(request.UserID(r), categoryID)
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	if category == nil {
-		html.NotFound(w, r)
+		response.HTMLNotFound(w, r)
 		return
 	}
 
 	categoryForm := form.NewCategoryForm(r)
 
-	sess := session.New(h.store, request.SessionID(r))
-	view := view.New(h.tpl, r, sess)
+	view := view.New(h.tpl, r)
 	view.Set("form", categoryForm)
 	view.Set("category", category)
 	view.Set("menu", "categories")
@@ -47,21 +44,21 @@ func (h *handler) updateCategory(w http.ResponseWriter, r *http.Request) {
 	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
 
 	categoryRequest := &model.CategoryModificationRequest{
-		Title:        model.SetOptionalField(categoryForm.Title),
-		HideGlobally: model.SetOptionalField(categoryForm.HideGlobally),
+		Title:        new(categoryForm.Title),
+		HideGlobally: new(categoryForm.HideGlobally),
 	}
 
 	if validationErr := validator.ValidateCategoryModification(h.store, user.ID, category.ID, categoryRequest); validationErr != nil {
 		view.Set("errorMessage", validationErr.Translate(user.Language))
-		html.OK(w, r, view.Render("create_category"))
+		response.HTML(w, r, view.Render("edit_category"))
 		return
 	}
 
 	categoryRequest.Patch(category)
 	if err := h.store.UpdateCategory(category); err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
-	html.Redirect(w, r, route.Path(h.router, "categoryFeeds", "categoryID", categoryID))
+	response.HTMLRedirect(w, r, h.routePath("/category/%d/feeds", categoryID))
 }

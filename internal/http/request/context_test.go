@@ -7,7 +7,15 @@ import (
 	"context"
 	"net/http"
 	"testing"
+
+	"miniflux.app/v2/internal/model"
 )
+
+func newRequestWithWebSession(session *model.WebSession) *http.Request {
+	r, _ := http.NewRequest("GET", "http://example.org", nil)
+	ctx := context.WithValue(r.Context(), WebSessionContextKey, session)
+	return r.WithContext(ctx)
+}
 
 func TestContextStringValue(t *testing.T) {
 	r, _ := http.NewRequest("GET", "http://example.org", nil)
@@ -168,6 +176,15 @@ func TestIsAuthenticated(t *testing.T) {
 	if result != expected {
 		t.Errorf(`Unexpected context value, got %v instead of %v`, result, expected)
 	}
+
+	session := &model.WebSession{}
+	session.SetUser(&model.User{ID: 42})
+	r = newRequestWithWebSession(session)
+
+	result = IsAuthenticated(r)
+	if !result {
+		t.Errorf("Unexpected context value, got %v instead of true", result)
+	}
 }
 
 func TestUserID(t *testing.T) {
@@ -189,6 +206,39 @@ func TestUserID(t *testing.T) {
 
 	if result != expected {
 		t.Errorf(`Unexpected context value, got %v instead of %v`, result, expected)
+	}
+
+	session := &model.WebSession{}
+	session.SetUser(&model.User{ID: 456})
+	r = newRequestWithWebSession(session)
+
+	result = UserID(r)
+	expected = int64(456)
+
+	if result != expected {
+		t.Errorf(`Unexpected context value, got %v instead of %v`, result, expected)
+	}
+}
+
+func TestUserName(t *testing.T) {
+	r, _ := http.NewRequest("GET", "http://example.org", nil)
+
+	result := UserName(r)
+	expected := "unknown"
+
+	if result != expected {
+		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
+	}
+
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, UserNameContextKey, "jane")
+	r = r.WithContext(ctx)
+
+	result = UserName(r)
+	expected = "jane"
+
+	if result != expected {
+		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
 	}
 }
 
@@ -214,179 +264,21 @@ func TestUserTimezone(t *testing.T) {
 	}
 }
 
-func TestUserLanguage(t *testing.T) {
+func TestWebSession(t *testing.T) {
 	r, _ := http.NewRequest("GET", "http://example.org", nil)
 
-	result := UserLanguage(r)
-	expected := "en_US"
-
-	if result != expected {
-		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
+	if result := WebSession(r); result != nil {
+		t.Fatalf("Unexpected context value, got %v instead of nil", result)
 	}
 
+	session := &model.WebSession{ID: "session-id"}
 	ctx := r.Context()
-	ctx = context.WithValue(ctx, UserLanguageContextKey, "fr_FR")
+	ctx = context.WithValue(ctx, WebSessionContextKey, session)
 	r = r.WithContext(ctx)
 
-	result = UserLanguage(r)
-	expected = "fr_FR"
-
-	if result != expected {
-		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
-	}
-}
-
-func TestUserTheme(t *testing.T) {
-	r, _ := http.NewRequest("GET", "http://example.org", nil)
-
-	result := UserTheme(r)
-	expected := "system_serif"
-
-	if result != expected {
-		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
-	}
-
-	ctx := r.Context()
-	ctx = context.WithValue(ctx, UserThemeContextKey, "dark_serif")
-	r = r.WithContext(ctx)
-
-	result = UserTheme(r)
-	expected = "dark_serif"
-
-	if result != expected {
-		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
-	}
-}
-
-func TestCSRF(t *testing.T) {
-	r, _ := http.NewRequest("GET", "http://example.org", nil)
-
-	result := CSRF(r)
-	expected := ""
-
-	if result != expected {
-		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
-	}
-
-	ctx := r.Context()
-	ctx = context.WithValue(ctx, CSRFContextKey, "secret")
-	r = r.WithContext(ctx)
-
-	result = CSRF(r)
-	expected = "secret"
-
-	if result != expected {
-		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
-	}
-}
-
-func TestSessionID(t *testing.T) {
-	r, _ := http.NewRequest("GET", "http://example.org", nil)
-
-	result := SessionID(r)
-	expected := ""
-
-	if result != expected {
-		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
-	}
-
-	ctx := r.Context()
-	ctx = context.WithValue(ctx, SessionIDContextKey, "id")
-	r = r.WithContext(ctx)
-
-	result = SessionID(r)
-	expected = "id"
-
-	if result != expected {
-		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
-	}
-}
-
-func TestUserSessionToken(t *testing.T) {
-	r, _ := http.NewRequest("GET", "http://example.org", nil)
-
-	result := UserSessionToken(r)
-	expected := ""
-
-	if result != expected {
-		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
-	}
-
-	ctx := r.Context()
-	ctx = context.WithValue(ctx, UserSessionTokenContextKey, "token")
-	r = r.WithContext(ctx)
-
-	result = UserSessionToken(r)
-	expected = "token"
-
-	if result != expected {
-		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
-	}
-}
-
-func TestOAuth2State(t *testing.T) {
-	r, _ := http.NewRequest("GET", "http://example.org", nil)
-
-	result := OAuth2State(r)
-	expected := ""
-
-	if result != expected {
-		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
-	}
-
-	ctx := r.Context()
-	ctx = context.WithValue(ctx, OAuth2StateContextKey, "state")
-	r = r.WithContext(ctx)
-
-	result = OAuth2State(r)
-	expected = "state"
-
-	if result != expected {
-		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
-	}
-}
-
-func TestFlashMessage(t *testing.T) {
-	r, _ := http.NewRequest("GET", "http://example.org", nil)
-
-	result := FlashMessage(r)
-	expected := ""
-
-	if result != expected {
-		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
-	}
-
-	ctx := r.Context()
-	ctx = context.WithValue(ctx, FlashMessageContextKey, "message")
-	r = r.WithContext(ctx)
-
-	result = FlashMessage(r)
-	expected = "message"
-
-	if result != expected {
-		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
-	}
-}
-
-func TestFlashErrorMessage(t *testing.T) {
-	r, _ := http.NewRequest("GET", "http://example.org", nil)
-
-	result := FlashErrorMessage(r)
-	expected := ""
-
-	if result != expected {
-		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
-	}
-
-	ctx := r.Context()
-	ctx = context.WithValue(ctx, FlashErrorMessageContextKey, "error message")
-	r = r.WithContext(ctx)
-
-	result = FlashErrorMessage(r)
-	expected = "error message"
-
-	if result != expected {
-		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
+	result := WebSession(r)
+	if result == nil || result.ID != "session-id" {
+		t.Fatalf("Unexpected context value, got %#v instead of session-id", result)
 	}
 }
 
@@ -406,6 +298,28 @@ func TestClientIP(t *testing.T) {
 
 	result = ClientIP(r)
 	expected = "127.0.0.1"
+
+	if result != expected {
+		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
+	}
+}
+
+func TestGoogleReaderToken(t *testing.T) {
+	r, _ := http.NewRequest("GET", "http://example.org", nil)
+
+	result := GoogleReaderToken(r)
+	expected := ""
+
+	if result != expected {
+		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)
+	}
+
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, GoogleReaderTokenKey, "token")
+	r = r.WithContext(ctx)
+
+	result = GoogleReaderToken(r)
+	expected = "token"
 
 	if result != expected {
 		t.Errorf(`Unexpected context value, got %q instead of %q`, result, expected)

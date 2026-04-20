@@ -22,6 +22,8 @@ type Client struct {
 // New returns a new Miniflux client.
 //
 // Deprecated: use NewClient instead.
+//
+//go:fix inline
 func New(endpoint string, credentials ...string) *Client {
 	return NewClient(endpoint, credentials...)
 }
@@ -334,14 +336,14 @@ func (c *Client) MarkAllAsReadContext(ctx context.Context, userID int64) error {
 	return err
 }
 
-// IntegrationsStatus fetches the integrations status for the logged user.
+// IntegrationsStatus fetches the integrations status for the signed-in user.
 func (c *Client) IntegrationsStatus() (bool, error) {
 	ctx, cancel := withDefaultTimeout()
 	defer cancel()
 	return c.IntegrationsStatusContext(ctx)
 }
 
-// IntegrationsStatusContext fetches the integrations status for the logged user.
+// IntegrationsStatusContext fetches the integrations status for the signed-in user.
 func (c *Client) IntegrationsStatusContext(ctx context.Context) (bool, error) {
 	body, err := c.request.Get(ctx, "/v1/integrations/status")
 	if err != nil {
@@ -360,7 +362,7 @@ func (c *Client) IntegrationsStatusContext(ctx context.Context) (bool, error) {
 	return response.HasIntegrations, nil
 }
 
-// Discover try to find subscriptions from a website.
+// Discover tries to find subscriptions on a website.
 func (c *Client) Discover(url string) (Subscriptions, error) {
 	ctx, cancel := withDefaultTimeout()
 	defer cancel()
@@ -383,14 +385,14 @@ func (c *Client) DiscoverContext(ctx context.Context, url string) (Subscriptions
 	return subscriptions, nil
 }
 
-// Categories gets the list of categories.
+// Categories retrieves the list of categories.
 func (c *Client) Categories() (Categories, error) {
 	ctx, cancel := withDefaultTimeout()
 	defer cancel()
 	return c.CategoriesContext(ctx)
 }
 
-// CategoriesContext gets the list of categories.
+// CategoriesContext retrieves the list of categories.
 func (c *Client) CategoriesContext(ctx context.Context) (Categories, error) {
 	body, err := c.request.Get(ctx, "/v1/categories")
 	if err != nil {
@@ -486,7 +488,7 @@ func (c *Client) UpdateCategory(categoryID int64, title string) (*Category, erro
 // UpdateCategoryContext updates a category.
 func (c *Client) UpdateCategoryContext(ctx context.Context, categoryID int64, title string) (*Category, error) {
 	body, err := c.request.Put(ctx, fmt.Sprintf("/v1/categories/%d", categoryID), &CategoryModificationRequest{
-		Title: SetOptionalField(title),
+		Title: new(title),
 	})
 	if err != nil {
 		return nil, err
@@ -537,14 +539,14 @@ func (c *Client) MarkCategoryAsReadContext(ctx context.Context, categoryID int64
 	return err
 }
 
-// CategoryFeeds gets feeds of a category.
+// CategoryFeeds returns all feeds for a category.
 func (c *Client) CategoryFeeds(categoryID int64) (Feeds, error) {
 	ctx, cancel := withDefaultTimeout()
 	defer cancel()
 	return c.CategoryFeedsContext(ctx, categoryID)
 }
 
-// CategoryFeedsContext gets feeds of a category.
+// CategoryFeedsContext returns all feeds for a category.
 func (c *Client) CategoryFeedsContext(ctx context.Context, categoryID int64) (Feeds, error) {
 	body, err := c.request.Get(ctx, fmt.Sprintf("/v1/categories/%d/feeds", categoryID))
 	if err != nil {
@@ -733,14 +735,14 @@ func (c *Client) FeedsContext(ctx context.Context) (Feeds, error) {
 	return feeds, nil
 }
 
-// Export creates OPML file.
+// Export exports subscriptions as an OPML document.
 func (c *Client) Export() ([]byte, error) {
 	ctx, cancel := withDefaultTimeout()
 	defer cancel()
 	return c.ExportContext(ctx)
 }
 
-// ExportContext creates OPML file.
+// ExportContext exports subscriptions as an OPML document.
 func (c *Client) ExportContext(ctx context.Context) ([]byte, error) {
 	body, err := c.request.Get(ctx, "/v1/export")
 	if err != nil {
@@ -1011,7 +1013,7 @@ func (c *Client) EntryContext(ctx context.Context, entryID int64) (*Entry, error
 	return entry, nil
 }
 
-// Entries fetch entries.
+// Entries fetches entries using the given filter.
 func (c *Client) Entries(filter *Filter) (*EntryResultSet, error) {
 	ctx, cancel := withDefaultTimeout()
 	defer cancel()
@@ -1036,7 +1038,7 @@ func (c *Client) EntriesContext(ctx context.Context, filter *Filter) (*EntryResu
 	return &result, nil
 }
 
-// FeedEntries fetch feed entries.
+// FeedEntries fetches entries for a feed using the given filter.
 func (c *Client) FeedEntries(feedID int64, filter *Filter) (*EntryResultSet, error) {
 	ctx, cancel := withDefaultTimeout()
 	defer cancel()
@@ -1061,7 +1063,7 @@ func (c *Client) FeedEntriesContext(ctx context.Context, feedID int64, filter *F
 	return &result, nil
 }
 
-// CategoryEntries fetch entries of a category.
+// CategoryEntries fetches entries for a category using the given filter.
 func (c *Client) CategoryEntries(categoryID int64, filter *Filter) (*EntryResultSet, error) {
 	ctx, cancel := withDefaultTimeout()
 	defer cancel()
@@ -1127,7 +1129,7 @@ func (c *Client) UpdateEntryContext(ctx context.Context, entryID int64, entryCha
 	return entry, nil
 }
 
-// ToggleStarred toggles entry starred value.
+// ToggleStarred toggles the starred flag of an entry.
 func (c *Client) ToggleStarred(entryID int64) error {
 	ctx, cancel := withDefaultTimeout()
 	defer cancel()
@@ -1216,14 +1218,14 @@ func (c *Client) FetchCountersContext(ctx context.Context) (*FeedCounters, error
 	return &result, nil
 }
 
-// FlushHistory changes all entries with the status "read" to "removed".
+// FlushHistory deletes all entries with the status "read".
 func (c *Client) FlushHistory() error {
 	ctx, cancel := withDefaultTimeout()
 	defer cancel()
 	return c.FlushHistoryContext(ctx)
 }
 
-// FlushHistoryContext changes all entries with the status "read" to "removed".
+// FlushHistoryContext deletes all entries with the status "read".
 func (c *Client) FlushHistoryContext(ctx context.Context) error {
 	_, err := c.request.Put(ctx, "/v1/flush-history", nil)
 	return err

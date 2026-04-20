@@ -4,10 +4,25 @@
 package fetcher // import "miniflux.app/v2/internal/reader/fetcher"
 
 import (
+	"errors"
+	"io"
 	"net/http"
 	"testing"
 	"time"
 )
+
+type testReadCloser struct {
+	closed bool
+}
+
+func (rc *testReadCloser) Read(_ []byte) (int, error) {
+	return 0, io.EOF
+}
+
+func (rc *testReadCloser) Close() error {
+	rc.closed = true
+	return nil
+}
 
 func TestIsModified(t *testing.T) {
 	var cachedEtag = "abc123"
@@ -172,5 +187,108 @@ func TestCacheControlMaxAgeInMinutes(t *testing.T) {
 				t.Errorf("Expected %d, got %d for scenario %q", tc.Expected, rh.CacheControlMaxAge(), name)
 			}
 		})
+	}
+}
+
+func TestIsCloudflareChallenge(t *testing.T) {
+	makeResp := func(status int, headers map[string]string) *http.Response {
+		h := http.Header{}
+		for k, v := range headers {
+			h.Set(k, v)
+		}
+		return &http.Response{StatusCode: status, Header: h}
+	}
+
+	cases := map[string]struct {
+		response *http.Response
+		expected bool
+	}{
+		"403 with cf-mitigated challenge and html": {
+			response: makeResp(http.StatusForbidden, map[string]string{
+				"Cf-Mitigated": "challenge",
+				"Content-Type": "text/html; charset=UTF-8",
+			}),
+			expected: true,
+		},
+		"cf-mitigated challenge header on 200": {
+			response: makeResp(http.StatusOK, map[string]string{
+				"Cf-Mitigated": "challenge",
+				"Content-Type": "text/html",
+			}),
+			expected: false,
+		},
+		"403 cf-mitigated challenge without html": {
+			response: makeResp(http.StatusForbidden, map[string]string{
+				"Cf-Mitigated": "challenge",
+				"Content-Type": "application/json",
+			}),
+			expected: false,
+		},
+		"403 from cloudflare with html but no challenge signal": {
+			response: makeResp(http.StatusForbidden, map[string]string{
+				"Server":       "cloudflare",
+				"Cf-Ray":       "8abc123def456-IAD",
+				"Content-Type": "text/html; charset=UTF-8",
+			}),
+			expected: false,
+		},
+		"503 from cloudflare with html but no challenge signal": {
+			response: makeResp(http.StatusServiceUnavailable, map[string]string{
+				"Server":       "cloudflare",
+				"Cf-Ray":       "8abc123def456-IAD",
+				"Content-Type": "text/html",
+			}),
+			expected: false,
+		},
+		"403 from non-cloudflare server": {
+			response: makeResp(http.StatusForbidden, map[string]string{
+				"Server":       "nginx",
+				"Content-Type": "text/html",
+			}),
+			expected: false,
+		},
+		"500 from cloudflare with html": {
+			response: makeResp(http.StatusInternalServerError, map[string]string{
+				"Server":       "cloudflare",
+				"Cf-Ray":       "8abc123def456-IAD",
+				"Content-Type": "text/html",
+			}),
+			expected: false,
+		},
+		"200 OK from cloudflare": {
+			response: makeResp(http.StatusOK, map[string]string{
+				"Server":       "cloudflare",
+				"Cf-Ray":       "8abc123def456-IAD",
+				"Content-Type": "application/rss+xml",
+			}),
+			expected: false,
+		},
+		"nil response": {
+			response: nil,
+			expected: false,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			rh := &ResponseHandler{httpResponse: tc.response}
+			if got := rh.isCloudflareChallenge(); got != tc.expected {
+				t.Errorf("isCloudflareChallenge() = %v, want %v", got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestResponseHandlerCloseClosesBodyOnClientError(t *testing.T) {
+	body := &testReadCloser{}
+	rh := ResponseHandler{
+		httpResponse: &http.Response{Body: body},
+		clientErr:    errors.New("boom"),
+	}
+
+	rh.Close()
+
+	if !body.closed {
+		t.Error("Expected response body to be closed")
 	}
 }

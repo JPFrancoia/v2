@@ -5,7 +5,6 @@ package validator // import "miniflux.app/v2/internal/validator"
 
 import (
 	"errors"
-	"net/url"
 	"regexp"
 	"strings"
 )
@@ -41,12 +40,7 @@ func IsValidRegex(expr string) bool {
 	return err == nil
 }
 
-// IsValidURL verifies if the provided value is a valid absolute URL.
-func IsValidURL(absoluteURL string) bool {
-	_, err := url.ParseRequestURI(absoluteURL)
-	return err == nil
-}
-
+// IsValidDomain verifies a single domain name against length and character constraints.
 func IsValidDomain(domain string) bool {
 	domain = strings.ToLower(domain)
 
@@ -57,9 +51,10 @@ func IsValidDomain(domain string) bool {
 	return domainRegex.MatchString(domain)
 }
 
+// IsValidDomainList verifies a space-separated list of domains for validity.
 func IsValidDomainList(value string) bool {
-	domains := strings.Split(strings.TrimSpace(value), " ")
-	for _, domain := range domains {
+	domains := strings.SplitSeq(strings.TrimSpace(value), " ")
+	for domain := range domains {
 		if !IsValidDomain(domain) {
 			return false
 		}

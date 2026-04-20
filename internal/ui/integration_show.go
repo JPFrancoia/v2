@@ -7,22 +7,21 @@ import (
 	"net/http"
 
 	"miniflux.app/v2/internal/http/request"
-	"miniflux.app/v2/internal/http/response/html"
+	"miniflux.app/v2/internal/http/response"
 	"miniflux.app/v2/internal/ui/form"
-	"miniflux.app/v2/internal/ui/session"
 	"miniflux.app/v2/internal/ui/view"
 )
 
 func (h *handler) showIntegrationPage(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.UserByID(request.UserID(r))
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	integration, err := h.store.Integration(user.ID)
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
@@ -148,13 +147,12 @@ func (h *handler) showIntegrationPage(w http.ResponseWriter, r *http.Request) {
 		ArchiveorgEnabled:                integration.ArchiveorgEnabled,
 	}
 
-	sess := session.New(h.store, request.SessionID(r))
-	view := view.New(h.tpl, r, sess)
+	view := view.New(h.tpl, r)
 	view.Set("form", integrationForm)
 	view.Set("menu", "settings")
 	view.Set("user", user)
 	view.Set("countUnread", h.store.CountUnreadEntries(user.ID))
 	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
 
-	html.OK(w, r, view.Render("integrations"))
+	response.HTML(w, r, view.Render("integrations"))
 }

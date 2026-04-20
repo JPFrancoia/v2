@@ -8,6 +8,7 @@ import (
 	"compress/gzip"
 	"io"
 	"log/slog"
+	"mime"
 	"net/http"
 	"strings"
 	"time"
@@ -27,6 +28,11 @@ type Builder struct {
 	body              any
 }
 
+// NewBuilder creates a new response builder.
+func NewBuilder(w http.ResponseWriter, r *http.Request) *Builder {
+	return &Builder{w: w, r: r, statusCode: http.StatusOK, headers: make(map[string]string), enableCompression: true}
+}
+
 // WithStatus uses the given status code to build the response.
 func (b *Builder) WithStatus(statusCode int) *Builder {
 	b.statusCode = statusCode
@@ -39,15 +45,33 @@ func (b *Builder) WithHeader(key, value string) *Builder {
 	return b
 }
 
-// WithBody uses the given body to build the response.
-func (b *Builder) WithBody(body any) *Builder {
+// WithBodyAsBytes uses the given bytes to build the response.
+func (b *Builder) WithBodyAsBytes(body []byte) *Builder {
+	b.body = body
+	return b
+}
+
+// WithBodyAsString uses the given string to build the response.
+func (b *Builder) WithBodyAsString(body string) *Builder {
+	b.body = body
+	return b
+}
+
+// WithBodyAsReader uses the given reader to build the response.
+func (b *Builder) WithBodyAsReader(body io.Reader) *Builder {
 	b.body = body
 	return b
 }
 
 // WithAttachment forces the document to be downloaded by the web browser.
 func (b *Builder) WithAttachment(filename string) *Builder {
-	b.headers["Content-Disposition"] = "attachment; filename=" + filename
+	b.headers["Content-Disposition"] = formatContentDisposition("attachment", filename)
+	return b
+}
+
+// WithInline suggests an inline filename for the current response.
+func (b *Builder) WithInline(filename string) *Builder {
+	b.headers["Content-Disposition"] = formatContentDisposition("inline", filename)
 	return b
 }
 
@@ -59,11 +83,12 @@ func (b *Builder) WithoutCompression() *Builder {
 
 // WithCaching adds caching headers to the response.
 func (b *Builder) WithCaching(etag string, duration time.Duration, callback func(*Builder)) {
+	etag = normalizeETag(etag)
 	b.headers["ETag"] = etag
-	b.headers["Cache-Control"] = "public"
+	b.headers["Cache-Control"] = "public, immutable"
 	b.headers["Expires"] = time.Now().Add(duration).UTC().Format(http.TimeFormat)
 
-	if etag == b.r.Header.Get("If-None-Match") {
+	if ifNoneMatch(b.r.Header.Get("If-None-Match"), etag) {
 		b.statusCode = http.StatusNotModified
 		b.body = nil
 		b.Write()
@@ -108,6 +133,7 @@ func (b *Builder) writeHeaders() {
 
 func (b *Builder) compress(data []byte) {
 	if b.enableCompression && len(data) > compressionThreshold {
+		b.headers["Vary"] = "Accept-Encoding"
 		acceptEncoding := b.r.Header.Get("Accept-Encoding")
 		switch {
 		case strings.Contains(acceptEncoding, "br"):
@@ -141,7 +167,36 @@ func (b *Builder) compress(data []byte) {
 	b.w.Write(data)
 }
 
-// New creates a new response builder.
-func New(w http.ResponseWriter, r *http.Request) *Builder {
-	return &Builder{w: w, r: r, statusCode: http.StatusOK, headers: make(map[string]string), enableCompression: true}
+func normalizeETag(etag string) string {
+	etag = strings.TrimSpace(etag)
+	if etag == "" {
+		return ""
+	}
+	if strings.HasPrefix(etag, `"`) || strings.HasPrefix(etag, `W/"`) {
+		return etag
+	}
+	return `"` + etag + `"`
+}
+
+func ifNoneMatch(headerValue, etag string) bool {
+	if headerValue == "" || etag == "" {
+		return false
+	}
+	if strings.TrimSpace(headerValue) == "*" {
+		return true
+	}
+	// Weak ETag comparison: the opaque-tag (quoted string without W/ prefix) must match.
+	return strings.Contains(headerValue, strings.TrimPrefix(etag, `W/`))
+}
+
+func formatContentDisposition(dispositionType, filename string) string {
+	if filename == "" {
+		return dispositionType
+	}
+
+	if value := mime.FormatMediaType(dispositionType, map[string]string{"filename": filename}); value != "" {
+		return value
+	}
+
+	return dispositionType
 }

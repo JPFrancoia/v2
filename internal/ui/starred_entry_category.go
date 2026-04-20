@@ -7,18 +7,16 @@ import (
 	"net/http"
 
 	"miniflux.app/v2/internal/http/request"
-	"miniflux.app/v2/internal/http/response/html"
-	"miniflux.app/v2/internal/http/route"
+	"miniflux.app/v2/internal/http/response"
 	"miniflux.app/v2/internal/model"
 	"miniflux.app/v2/internal/storage"
-	"miniflux.app/v2/internal/ui/session"
 	"miniflux.app/v2/internal/ui/view"
 )
 
 func (h *handler) showStarredCategoryEntryPage(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.UserByID(request.UserID(r))
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
@@ -28,23 +26,22 @@ func (h *handler) showStarredCategoryEntryPage(w http.ResponseWriter, r *http.Re
 	builder := h.store.NewEntryQueryBuilder(user.ID)
 	builder.WithCategoryID(categoryID)
 	builder.WithEntryID(entryID)
-	builder.WithoutStatus(model.EntryStatusRemoved)
 
 	entry, err := builder.GetEntry()
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	if entry == nil {
-		html.NotFound(w, r)
+		response.HTMLNotFound(w, r)
 		return
 	}
 
 	if entry.ShouldMarkAsReadOnView(user) {
 		err = h.store.SetEntriesStatus(user.ID, []int64{entry.ID}, model.EntryStatusRead)
 		if err != nil {
-			html.ServerError(w, r, err)
+			response.HTMLServerError(w, r, err)
 			return
 		}
 
@@ -52,7 +49,7 @@ func (h *handler) showStarredCategoryEntryPage(w http.ResponseWriter, r *http.Re
 	}
 
 	if user.AlwaysOpenExternalLinks {
-		html.Redirect(w, r, entry.URL)
+		response.HTMLRedirect(w, r, entry.URL)
 		return
 	}
 
@@ -62,34 +59,33 @@ func (h *handler) showStarredCategoryEntryPage(w http.ResponseWriter, r *http.Re
 
 	prevEntry, nextEntry, err := entryPaginationBuilder.Entries()
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	nextEntryRoute := ""
 	if nextEntry != nil {
-		nextEntryRoute = route.Path(h.router, "starredCategoryEntry", "categoryID", categoryID, "entryID", nextEntry.ID)
+		nextEntryRoute = h.routePath("/starred/category/%d/entry/%d", categoryID, nextEntry.ID)
 	}
 
 	prevEntryRoute := ""
 	if prevEntry != nil {
-		prevEntryRoute = route.Path(h.router, "starredCategoryEntry", "categoryID", categoryID, "entryID", prevEntry.ID)
+		prevEntryRoute = h.routePath("/starred/category/%d/entry/%d", categoryID, prevEntry.ID)
 	}
 
 	userTags, err := h.store.UserTags(user.ID)
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	entryUserTagIDs, err := h.store.EntryUserTagIDs(user.ID, entry.ID)
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
-	sess := session.New(h.store, request.SessionID(r))
-	view := view.New(h.tpl, r, sess)
+	view := view.New(h.tpl, r)
 	view.Set("entry", entry)
 	view.Set("prevEntry", prevEntry)
 	view.Set("nextEntry", nextEntry)
@@ -103,5 +99,5 @@ func (h *handler) showStarredCategoryEntryPage(w http.ResponseWriter, r *http.Re
 	view.Set("userTags", userTags)
 	view.Set("entryUserTagIDs", entryUserTagIDs)
 
-	html.OK(w, r, view.Render("entry"))
+	response.HTML(w, r, view.Render("entry"))
 }

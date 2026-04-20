@@ -7,13 +7,11 @@ import (
 	"net/http"
 
 	"miniflux.app/v2/internal/http/request"
-	"miniflux.app/v2/internal/http/response/html"
-	"miniflux.app/v2/internal/http/route"
+	"miniflux.app/v2/internal/http/response"
 	"miniflux.app/v2/internal/locale"
 	"miniflux.app/v2/internal/model"
 	"miniflux.app/v2/internal/timezone"
 	"miniflux.app/v2/internal/ui/form"
-	"miniflux.app/v2/internal/ui/session"
 	"miniflux.app/v2/internal/ui/view"
 	"miniflux.app/v2/internal/validator"
 )
@@ -21,20 +19,19 @@ import (
 func (h *handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.UserByID(request.UserID(r))
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	creds, err := h.store.WebAuthnCredentialsByUserID(user.ID)
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	settingsForm := form.NewSettingsForm(r)
 
-	sess := session.New(h.store, request.SessionID(r))
-	view := view.New(h.tpl, r, sess)
+	view := view.New(h.tpl, r)
 	view.Set("form", settingsForm)
 	view.Set("readBehaviors", map[string]any{
 		"NoAutoMarkAsRead":                           form.NoAutoMarkAsRead,
@@ -56,7 +53,7 @@ func (h *handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 
 	if validationErr := settingsForm.Validate(); validationErr != nil {
 		view.Set("errorMessage", validationErr.Translate(user.Language))
-		html.OK(w, r, view.Render("settings"))
+		response.HTML(w, r, view.Render("settings"))
 		return
 	}
 
@@ -83,18 +80,18 @@ func (h *handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 
 	if validationErr := validator.ValidateUserModification(h.store, user.ID, userModificationRequest); validationErr != nil {
 		view.Set("errorMessage", validationErr.Translate(user.Language))
-		html.OK(w, r, view.Render("settings"))
+		response.HTML(w, r, view.Render("settings"))
 		return
 	}
 
 	err = h.store.UpdateUser(settingsForm.Merge(user))
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
-	sess.SetLanguage(user.Language)
-	sess.SetTheme(user.Theme)
-	sess.NewFlashMessage(locale.NewPrinter(request.UserLanguage(r)).Printf("alert.prefs_saved"))
-	html.Redirect(w, r, route.Path(h.router, "settings"))
+	sess := request.WebSession(r)
+	sess.SetUser(user)
+	sess.SetSuccessMessage(locale.NewPrinter(sess.Language()).Printf("alert.prefs_saved"))
+	response.HTMLRedirect(w, r, h.routePath("/settings"))
 }

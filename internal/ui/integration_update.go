@@ -10,21 +10,19 @@ import (
 
 	"miniflux.app/v2/internal/crypto"
 	"miniflux.app/v2/internal/http/request"
-	"miniflux.app/v2/internal/http/response/html"
-	"miniflux.app/v2/internal/http/route"
+	"miniflux.app/v2/internal/http/response"
 	"miniflux.app/v2/internal/locale"
 	"miniflux.app/v2/internal/ui/form"
-	"miniflux.app/v2/internal/ui/session"
 )
 
 func (h *handler) updateIntegration(w http.ResponseWriter, r *http.Request) {
-	printer := locale.NewPrinter(request.UserLanguage(r))
-	sess := session.New(h.store, request.SessionID(r))
+	sess := request.WebSession(r)
+	printer := locale.NewPrinter(sess.Language())
 	userID := request.UserID(r)
 
 	integration, err := h.store.Integration(userID)
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
@@ -32,8 +30,8 @@ func (h *handler) updateIntegration(w http.ResponseWriter, r *http.Request) {
 	integrationForm.Merge(integration)
 
 	if integration.FeverUsername != "" && h.store.HasDuplicateFeverUsername(userID, integration.FeverUsername) {
-		sess.NewFlashErrorMessage(printer.Print("error.duplicate_fever_username"))
-		html.Redirect(w, r, route.Path(h.router, "integrations"))
+		sess.SetErrorMessage(printer.Print("error.duplicate_fever_username"))
+		response.HTMLRedirect(w, r, h.routePath("/integrations"))
 		return
 	}
 
@@ -46,8 +44,8 @@ func (h *handler) updateIntegration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if integration.GoogleReaderUsername != "" && h.store.HasDuplicateGoogleReaderUsername(userID, integration.GoogleReaderUsername) {
-		sess.NewFlashErrorMessage(printer.Print("error.duplicate_googlereader_username"))
-		html.Redirect(w, r, route.Path(h.router, "integrations"))
+		sess.SetErrorMessage(printer.Print("error.duplicate_googlereader_username"))
+		response.HTMLRedirect(w, r, h.routePath("/integrations"))
 		return
 	}
 
@@ -55,7 +53,7 @@ func (h *handler) updateIntegration(w http.ResponseWriter, r *http.Request) {
 		if integrationForm.GoogleReaderPassword != "" {
 			integration.GoogleReaderPassword, err = crypto.HashPassword(integrationForm.GoogleReaderPassword)
 			if err != nil {
-				html.ServerError(w, r, err)
+				response.HTMLServerError(w, r, err)
 				return
 			}
 		}
@@ -77,8 +75,8 @@ func (h *handler) updateIntegration(w http.ResponseWriter, r *http.Request) {
 
 	if integrationForm.LinktacoEnabled {
 		if integrationForm.LinktacoAPIToken == "" || integrationForm.LinktacoOrgSlug == "" {
-			sess.NewFlashErrorMessage(printer.Print("error.linktaco_missing_required_fields"))
-			html.Redirect(w, r, route.Path(h.router, "integrations"))
+			sess.SetErrorMessage(printer.Print("error.linktaco_missing_required_fields"))
+			response.HTMLRedirect(w, r, h.routePath("/integrations"))
 			return
 		}
 		if integration.LinktacoVisibility == "" {
@@ -88,10 +86,10 @@ func (h *handler) updateIntegration(w http.ResponseWriter, r *http.Request) {
 
 	err = h.store.UpdateIntegration(integration)
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
-	sess.NewFlashMessage(printer.Print("alert.prefs_saved"))
-	html.Redirect(w, r, route.Path(h.router, "integrations"))
+	sess.SetSuccessMessage(printer.Print("alert.prefs_saved"))
+	response.HTMLRedirect(w, r, h.routePath("/integrations"))
 }

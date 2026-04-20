@@ -580,7 +580,7 @@ func TestUpdateUserEndpointByChangingDefaultTheme(t *testing.T) {
 	regularUserClient := miniflux.NewClient(testConfig.testBaseURL, regularTestUser.Username, testConfig.testRegularPassword)
 
 	userUpdateRequest := &miniflux.UserModificationRequest{
-		Theme: miniflux.SetOptionalField("dark_serif"),
+		Theme: new("dark_serif"),
 	}
 
 	updatedUser, err := regularUserClient.UpdateUser(regularTestUser.ID, userUpdateRequest)
@@ -609,7 +609,7 @@ func TestUpdateUserEndpointByChangingExternalFonts(t *testing.T) {
 	regularUserClient := miniflux.NewClient(testConfig.testBaseURL, regularTestUser.Username, testConfig.testRegularPassword)
 
 	userUpdateRequest := &miniflux.UserModificationRequest{
-		ExternalFontHosts: miniflux.SetOptionalField("  fonts.example.org  "),
+		ExternalFontHosts: new("  fonts.example.org  "),
 	}
 
 	updatedUser, err := regularUserClient.UpdateUser(regularTestUser.ID, userUpdateRequest)
@@ -638,7 +638,7 @@ func TestUpdateUserEndpointByChangingExternalFontsWithInvalidValue(t *testing.T)
 	regularUserClient := miniflux.NewClient(testConfig.testBaseURL, regularTestUser.Username, testConfig.testRegularPassword)
 
 	userUpdateRequest := &miniflux.UserModificationRequest{
-		ExternalFontHosts: miniflux.SetOptionalField("'self' *"),
+		ExternalFontHosts: new("'self' *"),
 	}
 
 	if _, err := regularUserClient.UpdateUser(regularTestUser.ID, userUpdateRequest); err == nil {
@@ -662,7 +662,7 @@ func TestUpdateUserEndpointByChangingCustomJS(t *testing.T) {
 	regularUserClient := miniflux.NewClient(testConfig.testBaseURL, regularTestUser.Username, testConfig.testRegularPassword)
 
 	userUpdateRequest := &miniflux.UserModificationRequest{
-		CustomJS: miniflux.SetOptionalField("alert('Hello, World!');"),
+		CustomJS: new("alert('Hello, World!');"),
 	}
 
 	updatedUser, err := regularUserClient.UpdateUser(regularTestUser.ID, userUpdateRequest)
@@ -691,7 +691,7 @@ func TestUpdateUserEndpointByChangingDefaultThemeToInvalidValue(t *testing.T) {
 	regularUserClient := miniflux.NewClient(testConfig.testBaseURL, regularTestUser.Username, testConfig.testRegularPassword)
 
 	userUpdateRequest := &miniflux.UserModificationRequest{
-		Theme: miniflux.SetOptionalField("invalid_theme"),
+		Theme: new("invalid_theme"),
 	}
 
 	_, err = regularUserClient.UpdateUser(regularTestUser.ID, userUpdateRequest)
@@ -721,7 +721,7 @@ func TestRegularUsersCannotUpdateOtherUsers(t *testing.T) {
 	regularUserClient := miniflux.NewClient(testConfig.testBaseURL, regularTestUser.Username, testConfig.testRegularPassword)
 
 	userUpdateRequest := &miniflux.UserModificationRequest{
-		Theme: miniflux.SetOptionalField("dark_serif"),
+		Theme: new("dark_serif"),
 	}
 
 	_, err = regularUserClient.UpdateUser(adminUser.ID, userUpdateRequest)
@@ -1090,7 +1090,7 @@ func TestUpdateCategoryWithOptions(t *testing.T) {
 	}
 
 	updatedCategory, err := regularUserClient.UpdateCategoryWithOptions(newCategory.ID, &miniflux.CategoryModificationRequest{
-		Title: miniflux.SetOptionalField("new title"),
+		Title: new("new title"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1109,7 +1109,7 @@ func TestUpdateCategoryWithOptions(t *testing.T) {
 	}
 
 	updatedCategory, err = regularUserClient.UpdateCategoryWithOptions(newCategory.ID, &miniflux.CategoryModificationRequest{
-		HideGlobally: miniflux.SetOptionalField(true),
+		HideGlobally: new(true),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1128,14 +1128,14 @@ func TestUpdateCategoryWithOptions(t *testing.T) {
 	}
 
 	updatedCategory, err = regularUserClient.UpdateCategoryWithOptions(newCategory.ID, &miniflux.CategoryModificationRequest{
-		HideGlobally: miniflux.SetOptionalField(false),
+		HideGlobally: new(false),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if updatedCategory.ID != newCategory.ID {
-		t.Errorf(`Invalid categoryID, got %q`, updatedCategory.ID)
+		t.Errorf(`Invalid categoryID, got %d`, updatedCategory.ID)
 	}
 
 	if updatedCategory.Title != "new title" {
@@ -1612,7 +1612,7 @@ func TestUpdateFeedEndpoint(t *testing.T) {
 	}
 
 	feedUpdateRequest := &miniflux.FeedModificationRequest{
-		FeedURL: miniflux.SetOptionalField("https://example.org/feed.xml"),
+		FeedURL: new("https://example.org/feed.xml"),
 	}
 
 	updatedFeed, err := regularUserClient.UpdateFeed(feedID, feedUpdateRequest)
@@ -1653,7 +1653,7 @@ func TestCannotHaveDuplicateFeedWhenUpdatingFeed(t *testing.T) {
 	}
 
 	feedUpdateRequest := &miniflux.FeedModificationRequest{
-		FeedURL: miniflux.SetOptionalField(testConfig.testFeedURL),
+		FeedURL: new(testConfig.testFeedURL),
 	}
 
 	if _, err := regularUserClient.UpdateFeed(feedID, feedUpdateRequest); err == nil {
@@ -1685,7 +1685,7 @@ func TestUpdateFeedWithInvalidCategory(t *testing.T) {
 	}
 
 	feedUpdateRequest := &miniflux.FeedModificationRequest{
-		CategoryID: miniflux.SetOptionalField(int64(123456789)),
+		CategoryID: new(int64(123456789)),
 	}
 
 	if _, err := regularUserClient.UpdateFeed(feedID, feedUpdateRequest); err == nil {
@@ -2413,64 +2413,6 @@ func TestGetGlobalEntriesEndpoint(t *testing.T) {
 	}
 }
 
-func TestCannotGetRemovedEntries(t *testing.T) {
-	testConfig := newIntegrationTestConfig()
-	if !testConfig.isConfigured() {
-		t.Skip(skipIntegrationTestsMessage)
-	}
-
-	adminClient := miniflux.NewClient(testConfig.testBaseURL, testConfig.testAdminUsername, testConfig.testAdminPassword)
-
-	regularTestUser, err := adminClient.CreateUser(testConfig.genRandomUsername(), testConfig.testRegularPassword, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer adminClient.DeleteUser(regularTestUser.ID)
-
-	regularUserClient := miniflux.NewClient(testConfig.testBaseURL, regularTestUser.Username, testConfig.testRegularPassword)
-
-	feedID, err := regularUserClient.CreateFeed(&miniflux.FeedCreationRequest{
-		FeedURL: testConfig.testFeedURL,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	feedEntries, err := regularUserClient.Entries(&miniflux.Filter{FeedID: feedID})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if feedEntries.Total == 0 {
-		t.Fatalf(`Expected at least one entry, got none`)
-	}
-
-	if err := regularUserClient.UpdateEntries([]int64{feedEntries.Entries[0].ID}, miniflux.EntryStatusRemoved); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := regularUserClient.Entry(feedEntries.Entries[0].ID); err != miniflux.ErrNotFound {
-		t.Fatalf(`Expected entry to be not found, got %v`, err)
-	}
-
-	if _, err := regularUserClient.FeedEntry(feedID, feedEntries.Entries[0].ID); err != miniflux.ErrNotFound {
-		t.Fatalf(`Expected entry to be not found, got %v`, err)
-	}
-
-	if _, err := regularUserClient.CategoryEntry(feedEntries.Entries[0].Feed.Category.ID, feedEntries.Entries[0].ID); err != miniflux.ErrNotFound {
-		t.Fatalf(`Expected entry to be not found, got %v`, err)
-	}
-
-	updatedFeedEntries, err := regularUserClient.Entries(&miniflux.Filter{FeedID: feedID})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if updatedFeedEntries.Total != feedEntries.Total-1 {
-		t.Fatalf(`Expected %d entries, got %d`, feedEntries.Total-1, updatedFeedEntries.Total)
-	}
-}
-
 func TestUpdateEnclosureEndpoint(t *testing.T) {
 	testConfig := newIntegrationTestConfig()
 	if !testConfig.isConfigured() {
@@ -2718,8 +2660,8 @@ func TestUpdateEntryEndpoint(t *testing.T) {
 	}
 
 	entryUpdateRequest := &miniflux.EntryModificationRequest{
-		Title:   miniflux.SetOptionalField("New title"),
-		Content: miniflux.SetOptionalField("New content"),
+		Title:   new("New title"),
+		Content: new("New content"),
 	}
 
 	updatedEntry, err := regularUserClient.UpdateEntry(result.Entries[0].ID, entryUpdateRequest)
@@ -3084,24 +3026,5 @@ func TestUpdateEntryVoteEndpoint(t *testing.T) {
 
 	if err := anotherUserClient.UpdateEntryVote(entryID, 1); err != miniflux.ErrNotFound {
 		t.Fatalf(`Expected ErrNotFound when voting on another user's entry, got %v`, err)
-	}
-
-	// Test voting on removed entry
-	removedEntryResult, err := regularUserClient.FeedEntries(feedID, &miniflux.Filter{Limit: 2})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(removedEntryResult.Entries) < 2 {
-		t.Skip(`Not enough entries to test removed entry scenario`)
-	}
-
-	removedEntryID := removedEntryResult.Entries[1].ID
-	if err := regularUserClient.UpdateEntries([]int64{removedEntryID}, miniflux.EntryStatusRemoved); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := regularUserClient.UpdateEntryVote(removedEntryID, 1); err != miniflux.ErrNotFound {
-		t.Fatalf(`Expected ErrNotFound when voting on removed entry, got %v`, err)
 	}
 }

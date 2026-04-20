@@ -7,11 +7,9 @@ import (
 	"net/http"
 
 	"miniflux.app/v2/internal/http/request"
-	"miniflux.app/v2/internal/http/response/html"
-	"miniflux.app/v2/internal/http/route"
+	"miniflux.app/v2/internal/http/response"
 	"miniflux.app/v2/internal/model"
 	"miniflux.app/v2/internal/ui/form"
-	"miniflux.app/v2/internal/ui/session"
 	"miniflux.app/v2/internal/ui/view"
 	"miniflux.app/v2/internal/validator"
 )
@@ -19,14 +17,13 @@ import (
 func (h *handler) saveCategory(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.UserByID(request.UserID(r))
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	categoryForm := form.NewCategoryForm(r)
 
-	sess := session.New(h.store, request.SessionID(r))
-	view := view.New(h.tpl, r, sess)
+	view := view.New(h.tpl, r)
 	view.Set("form", categoryForm)
 	view.Set("menu", "categories")
 	view.Set("user", user)
@@ -37,14 +34,14 @@ func (h *handler) saveCategory(w http.ResponseWriter, r *http.Request) {
 
 	if validationErr := validator.ValidateCategoryCreation(h.store, user.ID, categoryCreationRequest); validationErr != nil {
 		view.Set("errorMessage", validationErr.Translate(user.Language))
-		html.OK(w, r, view.Render("create_category"))
+		response.HTML(w, r, view.Render("create_category"))
 		return
 	}
 
 	if _, err = h.store.CreateCategory(user.ID, categoryCreationRequest); err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
-	html.Redirect(w, r, route.Path(h.router, "categories"))
+	response.HTMLRedirect(w, r, h.routePath("/categories"))
 }

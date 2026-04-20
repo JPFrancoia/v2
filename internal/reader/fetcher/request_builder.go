@@ -4,22 +4,33 @@
 package fetcher // import "miniflux.app/v2/internal/reader/fetcher"
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
 	"slices"
+	"strings"
+	"syscall"
 	"time"
 
+	"miniflux.app/v2/internal/config"
 	"miniflux.app/v2/internal/proxyrotator"
+	"miniflux.app/v2/internal/urllib"
 )
 
 const (
 	defaultHTTPClientTimeout = 20 * time.Second
-	defaultAcceptHeader      = "application/xml, application/atom+xml, application/rss+xml, application/rdf+xml, application/feed+json, text/html, */*;q=0.9"
+	defaultAcceptHeader      = "application/xml,application/atom+xml,application/rss+xml,application/rdf+xml,application/feed+json,text/html,*/*;q=0.9"
+)
+
+var (
+	ErrHostnameResolution = errors.New("fetcher: unable to resolve request hostname")
+	ErrPrivateNetworkHost = errors.New("fetcher: refusing to access private network host")
 )
 
 type RequestBuilder struct {
@@ -130,16 +141,73 @@ func (r *RequestBuilder) WithoutCompression() *RequestBuilder {
 }
 
 func (r *RequestBuilder) ExecuteRequest(requestURL string) (*http.Response, error) {
+	var clientProxyURL *url.URL
+
+	switch {
+	case r.feedProxyURL != "":
+		var err error
+		clientProxyURL, err = url.Parse(r.feedProxyURL)
+		if err != nil {
+			return nil, fmt.Errorf(`fetcher: invalid feed proxy URL %q: %w`, r.feedProxyURL, err)
+		}
+	case r.useClientProxy && r.clientProxyURL != nil:
+		clientProxyURL = r.clientProxyURL
+	case r.proxyRotator != nil && r.proxyRotator.HasProxies():
+		clientProxyURL = r.proxyRotator.GetNextProxy()
+	}
+
+	directDialer := &net.Dialer{
+		Timeout:   10 * time.Second, // Default is 30s.
+		KeepAlive: 15 * time.Second, // Default is 30s.
+	}
+
+	proxyDialer := &net.Dialer{
+		Timeout:   10 * time.Second, // Default is 30s.
+		KeepAlive: 15 * time.Second, // Default is 30s.
+	}
+
+	proxyDialAddress := normalizeProxyDialAddress(clientProxyURL)
+
+	// Perform the private-network check inside the dialer's Control callback,
+	// which fires after DNS resolution but before the TCP connection is made.
+	// This eliminates TOCTOU / DNS-rebinding vulnerabilities: the resolved IP
+	// that is checked is exactly the IP that will be connected to.
+	allowPrivateNetworks := config.Opts == nil || config.Opts.FetcherAllowPrivateNetworks()
+	if !allowPrivateNetworks {
+		directDialer.Control = func(network, address string, c syscall.RawConn) error {
+			host, _, err := net.SplitHostPort(address)
+			if err != nil {
+				return err
+			}
+
+			ip := net.ParseIP(host)
+			if urllib.IsNonPublicIP(ip) {
+				return fmt.Errorf("%w %q", ErrPrivateNetworkHost, host)
+			}
+
+			return nil
+		}
+	}
+
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		// Setting `DialContext` disables HTTP/2, this option forces the transport to try HTTP/2 regardless.
 		ForceAttemptHTTP2: true,
-		DialContext: (&net.Dialer{
-			Timeout:   10 * time.Second, // Default is 30s.
-			KeepAlive: 15 * time.Second, // Default is 30s.
-		}).DialContext,
-		MaxIdleConns:    50,               // Default is 100.
-		IdleConnTimeout: 10 * time.Second, // Default is 90s.
+		MaxIdleConns:      50,               // Default is 100.
+		IdleConnTimeout:   10 * time.Second, // Default is 90s.
+	}
+
+	transport.DialContext = directDialer.DialContext
+	if !allowPrivateNetworks && proxyDialAddress != "" {
+		// Explicitly configured proxies are a trusted hop. Keep the private-network
+		// check for direct requests and redirects, but allow the connection to the proxy itself.
+		transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			if normalizeDialAddress(addr) == proxyDialAddress {
+				return proxyDialer.DialContext(ctx, network, addr)
+			}
+
+			return directDialer.DialContext(ctx, network, addr)
+		}
 	}
 
 	if r.ignoreTLSErrors {
@@ -161,21 +229,6 @@ func (r *RequestBuilder) ExecuteRequest(requestURL string) (*http.Response, erro
 		// https://pkg.go.dev/net/http#hdr-HTTP_2
 		// Programs that must disable HTTP/2 can do so by setting [Transport.TLSNextProto] (for clients) or [Server.TLSNextProto] (for servers) to a non-nil, empty map.
 		transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
-	}
-
-	var clientProxyURL *url.URL
-
-	switch {
-	case r.feedProxyURL != "":
-		var err error
-		clientProxyURL, err = url.Parse(r.feedProxyURL)
-		if err != nil {
-			return nil, fmt.Errorf(`fetcher: invalid feed proxy URL %q: %w`, r.feedProxyURL, err)
-		}
-	case r.useClientProxy && r.clientProxyURL != nil:
-		clientProxyURL = r.clientProxyURL
-	case r.proxyRotator != nil && r.proxyRotator.HasProxies():
-		clientProxyURL = r.proxyRotator.GetNextProxy()
 	}
 
 	var clientProxyURLRedacted string
@@ -205,7 +258,7 @@ func (r *RequestBuilder) ExecuteRequest(requestURL string) (*http.Response, erro
 	if r.disableCompression {
 		req.Header.Set("Accept-Encoding", "identity")
 	} else {
-		req.Header.Set("Accept-Encoding", "br, gzip")
+		req.Header.Set("Accept-Encoding", "br,gzip")
 	}
 
 	// Set default Accept header if not already set.
@@ -228,4 +281,35 @@ func (r *RequestBuilder) ExecuteRequest(requestURL string) (*http.Response, erro
 	))
 
 	return client.Do(req)
+}
+
+func normalizeDialAddress(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return ""
+	}
+
+	return net.JoinHostPort(strings.ToLower(host), port)
+}
+
+func normalizeProxyDialAddress(proxyURL *url.URL) string {
+	if proxyURL == nil {
+		return ""
+	}
+
+	port := proxyURL.Port()
+	if port == "" {
+		switch strings.ToLower(proxyURL.Scheme) {
+		case "", "http":
+			port = "80"
+		case "https":
+			port = "443"
+		case "socks5", "socks5h":
+			port = "1080"
+		default:
+			return ""
+		}
+	}
+
+	return net.JoinHostPort(strings.ToLower(proxyURL.Hostname()), port)
 }

@@ -7,7 +7,7 @@ package locale // import "miniflux.app/v2/internal/locale"
 // And http://www.unicode.org/cldr/charts/29/supplemental/language_plural_rules.html
 func getPluralForm(lang string, n int) int {
 	switch lang {
-	case "ar_AR":
+	case "ar_SA":
 		switch {
 		case n == 0:
 			return 0
@@ -31,6 +31,11 @@ func getPluralForm(lang string, n int) int {
 		default:
 			return 2
 		}
+	case "gl_ES":
+		if n != 1 {
+			return 1
+		}
+		return 0
 	case "id_ID", "ja_JP":
 		return 0
 	case "pl_PL":

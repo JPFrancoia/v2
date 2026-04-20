@@ -4,7 +4,6 @@
 package validator // import "miniflux.app/v2/internal/validator"
 
 import (
-	"slices"
 	"strings"
 	"unicode"
 
@@ -70,8 +69,8 @@ func ValidateUserModification(store *storage.Storage, userID int64, changes *mod
 	}
 
 	if changes.EntryDirection != nil {
-		if err := validateEntryDirection(*changes.EntryDirection); err != nil {
-			return err
+		if err := ValidateDirection(*changes.EntryDirection); err != nil {
+			return locale.NewLocalizedError("error.invalid_entry_direction")
 		}
 	}
 
@@ -130,14 +129,18 @@ func ValidateUserModification(store *storage.Storage, userID int64, changes *mod
 	}
 
 	if changes.BlockFilterEntryRules != nil {
-		if err := isValidFilterRules(*changes.BlockFilterEntryRules, "block"); err != nil {
-			return err
+		if *changes.BlockFilterEntryRules != "" {
+			if err := isValidFilterRules(*changes.BlockFilterEntryRules, "block"); err != nil {
+				return err
+			}
 		}
 	}
 
 	if changes.KeepFilterEntryRules != nil {
-		if err := isValidFilterRules(*changes.KeepFilterEntryRules, "keep"); err != nil {
-			return err
+		if *changes.KeepFilterEntryRules != "" {
+			if err := isValidFilterRules(*changes.KeepFilterEntryRules, "keep"); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -202,15 +205,8 @@ func validateLanguage(language string) *locale.LocalizedError {
 }
 
 func validateTimezone(timezoneValue string) *locale.LocalizedError {
-	if _, found := timezone.AvailableTimezones()[timezoneValue]; !found {
+	if !timezone.IsValid(timezoneValue) {
 		return locale.NewLocalizedError("error.invalid_timezone")
-	}
-	return nil
-}
-
-func validateEntryDirection(direction string) *locale.LocalizedError {
-	if direction != "asc" && direction != "desc" {
-		return locale.NewLocalizedError("error.invalid_entry_direction")
 	}
 	return nil
 }
@@ -254,38 +250,6 @@ func validateDefaultHomePage(defaultHomePage string) *locale.LocalizedError {
 func validateMediaPlaybackRate(mediaPlaybackRate float64) *locale.LocalizedError {
 	if mediaPlaybackRate < 0.25 || mediaPlaybackRate > 4 {
 		return locale.NewLocalizedError("error.settings_media_playback_rate_range")
-	}
-	return nil
-}
-
-func isValidFilterRules(filterEntryRules string, filterType string) *locale.LocalizedError {
-	// Valid Format: FieldName=RegEx\nFieldName=RegEx...
-	fieldNames := []string{"EntryTitle", "EntryURL", "EntryCommentsURL", "EntryContent", "EntryAuthor", "EntryTag", "EntryDate"}
-
-	rules := strings.Split(filterEntryRules, "\n")
-	for i, rule := range rules {
-		// Check if rule starts with a valid fieldName
-		idx := slices.IndexFunc(fieldNames, func(fieldName string) bool { return strings.HasPrefix(rule, fieldName) })
-		if idx == -1 {
-			return locale.NewLocalizedError("error.settings_"+filterType+"_rule_fieldname_invalid", i+1, "'"+strings.Join(fieldNames, "', '")+"'")
-		}
-		fieldName := fieldNames[idx]
-		fieldRegEx, _ := strings.CutPrefix(rule, fieldName)
-
-		// Check if regex begins with a =
-		if !strings.HasPrefix(fieldRegEx, "=") {
-			return locale.NewLocalizedError("error.settings_"+filterType+"_rule_separator_required", i+1)
-		}
-		fieldRegEx = strings.TrimPrefix(fieldRegEx, "=")
-
-		if fieldRegEx == "" {
-			return locale.NewLocalizedError("error.settings_"+filterType+"_rule_regex_required", i+1)
-		}
-
-		// Check if provided pattern is a valid RegEx
-		if !IsValidRegex(fieldRegEx) {
-			return locale.NewLocalizedError("error.settings_"+filterType+"_rule_invalid_regex", i+1)
-		}
 	}
 	return nil
 }

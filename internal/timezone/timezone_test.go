@@ -4,6 +4,7 @@
 package timezone // import "miniflux.app/v2/internal/timezone"
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -76,6 +77,19 @@ func TestConvertTimeWithIdenticalTimezone(t *testing.T) {
 	}
 }
 
+func TestConvertTimeWithEquivalentTimezone(t *testing.T) {
+	tz := "UTC"
+	// FixedZone creates a distinct pointer that has the same name as the cached location.
+	// The old pointer comparison would treat these as different, calling t.In() unnecessarily.
+	loc := time.FixedZone("UTC", 0)
+	input := time.Date(2024, 6, 15, 12, 0, 0, 0, loc)
+	output := Convert(tz, input)
+
+	if output.Location() != loc {
+		t.Fatal("Convert replaced the location even though timezone names match")
+	}
+}
+
 func TestConvertPostgresDateTimeWithNegativeTimezoneOffset(t *testing.T) {
 	tz := "US/Eastern"
 	input := time.Date(0, 1, 1, 0, 0, 0, 0, time.FixedZone("", -5))
@@ -87,5 +101,42 @@ func TestConvertPostgresDateTimeWithNegativeTimezoneOffset(t *testing.T) {
 
 	if year := output.Year(); year != 0 {
 		t.Fatalf(`Unexpected year, got %d instead of 0`, year)
+	}
+}
+
+func TestIsValid(t *testing.T) {
+	validTZ := []string{
+		"Antarctica/Davis",
+		"GMT",
+		"UTC",
+	}
+
+	for _, tz := range validTZ {
+		if !IsValid(tz) {
+			t.Fatalf(`Timezone %q should be valid and it's not`, tz)
+		}
+	}
+
+	invalidTZ := []string{
+		"MAP",
+		"Europe/Fronce",
+	}
+
+	for _, tz := range invalidTZ {
+		if IsValid(tz) {
+			t.Fatalf(`Timezone %q should be invalid and it's not`, tz)
+		}
+	}
+}
+
+func TestAvailableTimezones(t *testing.T) {
+	var got []string
+
+	for tz := range AvailableTimezones() {
+		got = append(got, tz)
+	}
+
+	if !slices.Equal(got, timezones) {
+		t.Fatalf("available timezones differ from source slice: expected %d entries, got %d", len(timezones), len(got))
 	}
 }

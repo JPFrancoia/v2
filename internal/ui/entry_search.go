@@ -7,43 +7,41 @@ import (
 	"net/http"
 
 	"miniflux.app/v2/internal/http/request"
-	"miniflux.app/v2/internal/http/response/html"
-	"miniflux.app/v2/internal/http/route"
+	"miniflux.app/v2/internal/http/response"
 	"miniflux.app/v2/internal/model"
 	"miniflux.app/v2/internal/storage"
-	"miniflux.app/v2/internal/ui/session"
 	"miniflux.app/v2/internal/ui/view"
 )
 
 func (h *handler) showSearchEntryPage(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.UserByID(request.UserID(r))
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	entryID := request.RouteInt64Param(r, "entryID")
 	searchQuery := request.QueryStringParam(r, "q", "")
+	unreadOnly := request.QueryBoolParam(r, "unread", false)
 	builder := h.store.NewEntryQueryBuilder(user.ID)
 	builder.WithSearchQuery(searchQuery)
 	builder.WithEntryID(entryID)
-	builder.WithoutStatus(model.EntryStatusRemoved)
 
 	entry, err := builder.GetEntry()
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	if entry == nil {
-		html.NotFound(w, r)
+		response.HTMLNotFound(w, r)
 		return
 	}
 
 	if entry.ShouldMarkAsReadOnView(user) {
 		err = h.store.SetEntriesStatus(user.ID, []int64{entry.ID}, model.EntryStatusRead)
 		if err != nil {
-			html.ServerError(w, r, err)
+			response.HTMLServerError(w, r, err)
 			return
 		}
 
@@ -51,43 +49,51 @@ func (h *handler) showSearchEntryPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user.AlwaysOpenExternalLinks {
-		html.Redirect(w, r, entry.URL)
+		response.HTMLRedirect(w, r, entry.URL)
 		return
 	}
 
 	entryPaginationBuilder := storage.NewEntryPaginationBuilder(h.store, user.ID, entry.ID, user.EntryOrder, user.EntryDirection)
 	entryPaginationBuilder.WithSearchQuery(searchQuery)
+	if unreadOnly {
+		if entry.Status == model.EntryStatusRead {
+			entryPaginationBuilder.WithStatusOrEntryID(model.EntryStatusUnread, entry.ID)
+		} else {
+			entryPaginationBuilder.WithStatus(model.EntryStatusUnread)
+		}
+	}
+
 	prevEntry, nextEntry, err := entryPaginationBuilder.Entries()
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	nextEntryRoute := ""
 	if nextEntry != nil {
-		nextEntryRoute = route.Path(h.router, "searchEntry", "entryID", nextEntry.ID)
+		nextEntryRoute = h.routePath("/search/entry/%d", nextEntry.ID)
 	}
 
 	prevEntryRoute := ""
 	if prevEntry != nil {
-		prevEntryRoute = route.Path(h.router, "searchEntry", "entryID", prevEntry.ID)
+		prevEntryRoute = h.routePath("/search/entry/%d", prevEntry.ID)
 	}
 
 	userTags, err := h.store.UserTags(user.ID)
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	entryUserTagIDs, err := h.store.EntryUserTagIDs(user.ID, entry.ID)
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
-	sess := session.New(h.store, request.SessionID(r))
-	view := view.New(h.tpl, r, sess)
+	view := view.New(h.tpl, r)
 	view.Set("searchQuery", searchQuery)
+	view.Set("searchUnreadOnly", unreadOnly)
 	view.Set("entry", entry)
 	view.Set("prevEntry", prevEntry)
 	view.Set("nextEntry", nextEntry)
@@ -101,5 +107,5 @@ func (h *handler) showSearchEntryPage(w http.ResponseWriter, r *http.Request) {
 	view.Set("userTags", userTags)
 	view.Set("entryUserTagIDs", entryUserTagIDs)
 
-	html.OK(w, r, view.Render("entry"))
+	response.HTML(w, r, view.Render("entry"))
 }

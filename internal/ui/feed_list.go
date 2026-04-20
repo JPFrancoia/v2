@@ -7,26 +7,24 @@ import (
 	"net/http"
 
 	"miniflux.app/v2/internal/http/request"
-	"miniflux.app/v2/internal/http/response/html"
-	"miniflux.app/v2/internal/ui/session"
+	"miniflux.app/v2/internal/http/response"
 	"miniflux.app/v2/internal/ui/view"
 )
 
 func (h *handler) showFeedsPage(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.UserByID(request.UserID(r))
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	feeds, err := h.store.FeedsWithCounters(user.ID)
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
-	sess := session.New(h.store, request.SessionID(r))
-	view := view.New(h.tpl, r, sess)
+	view := view.New(h.tpl, r)
 	view.Set("feeds", feeds)
 	view.Set("total", len(feeds))
 	view.Set("menu", "feeds")
@@ -34,5 +32,5 @@ func (h *handler) showFeedsPage(w http.ResponseWriter, r *http.Request) {
 	view.Set("countUnread", h.store.CountUnreadEntries(user.ID))
 	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
 
-	html.OK(w, r, view.Render("feeds"))
+	response.HTML(w, r, view.Render("feeds"))
 }

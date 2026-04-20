@@ -9,19 +9,18 @@ import (
 	"strings"
 
 	"miniflux.app/v2/internal/http/request"
-	"miniflux.app/v2/internal/http/response/html"
-	"miniflux.app/v2/internal/http/response/json"
+	"miniflux.app/v2/internal/http/response"
 )
 
 func (h *handler) updateEntryUserTags(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	user, err := h.store.UserByID(request.UserID(r))
 	if err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
@@ -38,13 +37,13 @@ func (h *handler) updateEntryUserTags(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.store.SetEntryUserTags(user.ID, entryID, tagIDs); err != nil {
-		html.ServerError(w, r, err)
+		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	// Return JSON for AJAX requests.
 	if strings.Contains(r.Header.Get("Accept"), "application/json") {
-		json.NoContent(w, r)
+		response.NoContent(w, r)
 		return
 	}
 
@@ -57,5 +56,5 @@ func (h *handler) updateEntryUserTags(w http.ResponseWriter, r *http.Request) {
 		redirectURL = "/"
 	}
 
-	html.Redirect(w, r, redirectURL)
+	response.HTMLRedirect(w, r, redirectURL)
 }

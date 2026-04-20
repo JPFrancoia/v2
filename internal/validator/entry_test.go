@@ -35,10 +35,14 @@ func TestValidateEntriesStatusUpdateRequest(t *testing.T) {
 }
 
 func TestValidateEntryStatus(t *testing.T) {
-	for _, status := range []string{model.EntryStatusRead, model.EntryStatusUnread, model.EntryStatusRemoved} {
+	for _, status := range []string{model.EntryStatusRead, model.EntryStatusUnread} {
 		if err := ValidateEntryStatus(status); err != nil {
 			t.Error(`A valid status should not generate any error`)
 		}
+	}
+
+	if err := ValidateEntryStatus("removed"); err == nil {
+		t.Error(`The "removed" status is no longer accepted`)
 	}
 
 	if err := ValidateEntryStatus("invalid"); err == nil {
@@ -47,7 +51,7 @@ func TestValidateEntryStatus(t *testing.T) {
 }
 
 func TestValidateEntryOrder(t *testing.T) {
-	for _, status := range []string{"id", "status", "changed_at", "published_at", "created_at", "category_title", "category_id"} {
+	for _, status := range []string{"id", "status", "changed_at", "published_at", "created_at", "category_title", "category_id", "title", "author"} {
 		if err := ValidateEntryOrder(status); err != nil {
 			t.Error(`A valid order should not generate any error`)
 		}
@@ -55,5 +59,27 @@ func TestValidateEntryOrder(t *testing.T) {
 
 	if err := ValidateEntryOrder("invalid"); err == nil {
 		t.Error(`An invalid order should generate a error`)
+	}
+}
+
+func TestValidateEntryModification(t *testing.T) {
+	// Accepts no-op update.
+	if err := ValidateEntryModification(&model.EntryUpdateRequest{}); err != nil {
+		t.Errorf(`A request without changes should not generate any error: %v`, err)
+	}
+
+	empty := ""
+	if err := ValidateEntryModification(&model.EntryUpdateRequest{Title: &empty}); err == nil {
+		t.Error(`An empty title should generate an error`)
+	}
+
+	if err := ValidateEntryModification(&model.EntryUpdateRequest{Content: &empty}); err == nil {
+		t.Error(`An empty content should generate an error`)
+	}
+
+	title := "Title"
+	content := "Content"
+	if err := ValidateEntryModification(&model.EntryUpdateRequest{Title: &title, Content: &content}); err != nil {
+		t.Errorf(`A valid title and content should not generate any error: %v`, err)
 	}
 }
