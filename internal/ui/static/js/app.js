@@ -224,6 +224,22 @@ function setButtonToSavedState(buttonElement) {
 }
 
 /**
+ * Set the save-for-later button state.
+ *
+ * @param {Element} buttonElement The button element to update.
+ * @param {boolean} isSavedForLater Whether the entry is saved for later.
+ */
+function setSaveForLaterButtonState(buttonElement, isSavedForLater) {
+    if (isSavedForLater) {
+        buttonElement.dataset.completed = "true";
+        setIconAndLabelElement(buttonElement, "save-for-later", buttonElement.dataset.labelDone);
+    } else {
+        delete buttonElement.dataset.completed;
+        setIconAndLabelElement(buttonElement, "save-for-later", buttonElement.dataset.labelSave);
+    }
+}
+
+/**
  * Set the star button state.
  *
  * @param {Element} buttonElement - The button element to update.
@@ -643,6 +659,13 @@ function toggleEntryStatus(element, toasting) {
     updateEntriesStatus([entryID], newStatus, () => {
         setReadStatusButtonState(buttonElement, newStatus);
 
+        if (newStatus === "read") {
+            const saveForLaterButton = element.querySelector(":is(a, button)[data-save-for-later-entry]");
+            if (saveForLaterButton) {
+                setSaveForLaterButtonState(saveForLaterButton, false);
+            }
+        }
+
         if (toasting) {
             showToastNotification(newStatus, currentStatus === "read" ? buttonElement.dataset.toastUnread : buttonElement.dataset.toastRead);
         }
@@ -704,6 +727,38 @@ function handleSaveEntryAction(element = null) {
         if (isEntryView()) {
             showToastNotification("save", buttonElement.dataset.toastDone);
         }
+    });
+}
+
+/**
+ * Handle save-for-later from list view and entry view.
+ *
+ * @param {Element|null} element - The element that triggered the action (optional).
+ */
+function handleSaveForLaterAction(element = null) {
+    const currentEntry = findEntry(element);
+    if (!currentEntry) return;
+
+    const buttonElement = currentEntry.querySelector(":is(a, button)[data-save-for-later-entry]");
+    if (!buttonElement || buttonElement.dataset.completed) return;
+
+    setButtonToLoadingState(buttonElement);
+
+    sendPOSTRequest(buttonElement.dataset.saveForLaterUrl).then((resp) => {
+        resp.json().then((result) => {
+            const statusButton = currentEntry.querySelector(":is(a, button)[data-toggle-status]");
+            if (statusButton?.dataset.value === "read") {
+                setReadStatusButtonState(statusButton, "unread");
+                currentEntry.classList.replace("item-status-read", "item-status-unread");
+            }
+
+            updateUnreadCounterValue(result.unread_count_delta || 0);
+            setSaveForLaterButtonState(buttonElement, true);
+
+            if (isEntryView()) {
+                showToastNotification("save-for-later", buttonElement.dataset.toastDone);
+            }
+        });
     });
 }
 
@@ -1342,6 +1397,7 @@ function handleSaveUserTags(buttonElement) {
 function initializeClickHandlers() {
     // Entry actions
     onClick(":is(a, button)[data-save-entry]", (event) => handleSaveEntryAction(event.target));
+    onClick(":is(a, button)[data-save-for-later-entry]", (event) => handleSaveForLaterAction(event.target));
     onClick(":is(a, button)[data-toggle-starred]", (event) => handleStarAction(event.target));
     onClick(":is(a, button)[data-toggle-status]", (event) => handleEntryStatus("next", event.target));
     onClick(":is(a, button)[data-fetch-content-entry]", handleFetchOriginalContentAction);

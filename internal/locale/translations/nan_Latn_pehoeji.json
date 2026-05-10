@@ -22,6 +22,7 @@
     "alert.no_feed_in_category": "Bô chit ê lūi-pia̍t ê siau-sit lâi-goân",
     "alert.no_history": "Chit-má ah bô kì-lo̍k",
     "alert.no_search_result": "Bô hû-ha̍p ê chhiau-chhē kiat-kó",
+    "alert.no_saved_for_later": "There are no saved-for-later entries.",
     "alert.no_shared_entry": "Chit-má ah bô hun-hióng ê siau-sit",
     "alert.no_starred": "Chit-má ah bô siu-chông",
     "alert.no_tag_entry": "Bô kah chit ê khan-á ū hû-ha̍p ê siau-sit",
@@ -56,6 +57,10 @@
     "entry.save.completed": "Pó-chûn chò soah",
     "entry.save.label": "Pó-chûn",
     "entry.save.title": "Pó-chûn chit ê siau-sit",
+    "entry.save_for_later.completed": "Saved for later",
+    "entry.save_for_later.label": "Save for later",
+    "entry.save_for_later.title": "Save this entry for later",
+    "entry.save_for_later.toast.completed": "Entry saved for later",
     "entry.save.toast.completed": "Pó-chûn chò soah",
     "entry.score.label": "Score",
     "entry.score.title": "Entry score",
@@ -431,6 +436,7 @@
     "menu.refresh_all_feeds": "Tī pōe-āu têng lia̍h só͘-ū ê siau-sit lâi-goân",
     "menu.refresh_feed": "Têng lia̍h",
     "menu.search": "Chhiau-chhē",
+    "menu.saved_for_later": "Saved for later",
     "menu.sessions": "Ū teng-lo̍k--ê",
     "menu.settings": "Siat-tēng",
     "menu.shared_entries": "Hun-hióng kè ê siau-sit",
@@ -586,6 +592,8 @@
     "page.shared_entries_count": [
         "Í-keng hun-hióng %d ê siau-sit"
     ],
+    "page.saved_for_later.title": "Saved for later",
+    "page.saved_for_later_entry_count": "%d saved-for-later entries",
     "page.starred.title": "Siu-chông",
     "page.starred_entry_count": [
         "%d ê siu-chông ê siau-sit"

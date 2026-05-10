@@ -113,6 +113,19 @@
                         >{{ icon "save" }}<span class="icon-label">{{ t "entry.save.label" }}</span></button>
                 </li>
                 {{ end }}
+                <li>
+                    <button
+                        class="page-button"
+                        title="{{ t "entry.save_for_later.title" }}"
+                        data-save-for-later-entry="true"
+                        data-save-for-later-url="{{ routePath "/entry/save-for-later/%d" .entry.ID }}"
+                        data-label-loading="{{ t "entry.state.saving" }}"
+                        data-label-save="{{ t "entry.save_for_later.label" }}"
+                        data-label-done="{{ t "entry.save_for_later.completed" }}"
+                        data-toast-done="{{ t "entry.save_for_later.toast.completed" }}"
+                        {{ if .entry.SavedForLater }}data-completed="true"{{ end }}
+                        >{{ icon "save-for-later" }}<span class="icon-label">{{ if .entry.SavedForLater }}{{ t "entry.save_for_later.completed" }}{{ else }}{{ t "entry.save_for_later.label" }}{{ end }}</span></button>
+                </li>
                 {{ if .entry.ShareCode }}
                 <li>
                     <a href="{{ routePath "/share/%s" .entry.ShareCode }}"

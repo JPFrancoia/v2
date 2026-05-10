@@ -65,6 +65,25 @@ func (s *Storage) CountUnreadEntries(userID int64) int {
 	return n
 }
 
+// CountSavedForLaterEntries returns the number of saved-for-later entries.
+func (s *Storage) CountSavedForLaterEntries(userID int64) int {
+	builder := s.NewEntryQueryBuilder(userID)
+	builder.WithSavedForLater(true)
+	builder.WithStatus(model.EntryStatusUnread)
+	builder.WithGloballyVisible()
+
+	n, err := builder.CountEntries()
+	if err != nil {
+		slog.Error("Unable to count saved-for-later entries",
+			slog.Int64("user_id", userID),
+			slog.Any("error", err),
+		)
+		return 0
+	}
+
+	return n
+}
+
 // NewEntryQueryBuilder returns a new EntryQueryBuilder
 func (s *Storage) NewEntryQueryBuilder(userID int64) *EntryQueryBuilder {
 	return NewEntryQueryBuilder(s, userID)
@@ -395,6 +414,7 @@ func (s *Storage) ArchiveEntries(status string, interval time.Duration, limit in
 			WHERE
 				status=$1 AND
 				starred is false AND
+				saved_for_later is false AND
 				share_code='' AND
 				created_at < now() - $2::interval
 			ORDER BY created_at ASC
@@ -428,17 +448,19 @@ func (s *Storage) ArchiveEntries(status string, interval time.Duration, limit in
 
 // SetEntriesStatus update the status of the given list of entries.
 func (s *Storage) SetEntriesStatus(userID int64, entryIDs []int64, status string) error {
+	clearSavedForLater := status == model.EntryStatusRead
 	query := `
 		UPDATE
 			entries
 		SET
-			status=$1,
+			status=$1::entry_status,
+			saved_for_later=CASE WHEN $4 THEN false ELSE saved_for_later END,
 			changed_at=now()
 		WHERE
 			user_id=$2 AND
 			id=ANY($3)
 		`
-	if _, err := s.db.Exec(query, status, userID, pq.Array(entryIDs)); err != nil {
+	if _, err := s.db.Exec(query, status, userID, pq.Array(entryIDs), clearSavedForLater); err != nil {
 		return fmt.Errorf(`store: unable to update entries statuses %v: %v`, entryIDs, err)
 	}
 
@@ -447,11 +469,13 @@ func (s *Storage) SetEntriesStatus(userID int64, entryIDs []int64, status string
 
 // SetEntriesStatusAndCountVisible updates the status of the given entries and returns how many are visible in global views.
 func (s *Storage) SetEntriesStatusAndCountVisible(userID int64, entryIDs []int64, status string) (int, error) {
+	clearSavedForLater := status == model.EntryStatusRead
 	query := `
 		WITH updated AS (
 			UPDATE entries
 			SET
-				status=$1,
+				status=$1::entry_status,
+				saved_for_later=CASE WHEN $4 THEN false ELSE saved_for_later END,
 				changed_at=now()
 			WHERE
 				user_id=$2 AND
@@ -465,9 +489,51 @@ func (s *Storage) SetEntriesStatusAndCountVisible(userID int64, entryIDs []int64
 		WHERE NOT f.hide_globally AND NOT c.hide_globally
 	`
 	var visible int
-	if err := s.db.QueryRow(query, status, userID, pq.Array(entryIDs)).Scan(&visible); err != nil {
+	if err := s.db.QueryRow(query, status, userID, pq.Array(entryIDs), clearSavedForLater).Scan(&visible); err != nil {
 		return 0, fmt.Errorf(`store: unable to update entries status %v: %v`, entryIDs, err)
 	}
+	return visible, nil
+}
+
+// SaveEntryForLater marks an entry as saved for later and unread.
+func (s *Storage) SaveEntryForLater(userID int64, entryID int64) (int, error) {
+	query := `
+		WITH target AS (
+			SELECT
+				id,
+				feed_id,
+				status
+			FROM entries
+			WHERE user_id=$2 AND id=$3
+		), updated AS (
+			UPDATE entries e
+			SET
+				saved_for_later=true,
+				status=$1::entry_status,
+				changed_at=now()
+			FROM target t
+			WHERE e.id=t.id
+			RETURNING
+				t.feed_id,
+				t.status <> $1::entry_status AS became_unread
+		)
+		SELECT
+			count(*),
+			count(*) FILTER (WHERE u.became_unread AND NOT f.hide_globally AND NOT c.hide_globally)
+		FROM updated u
+			JOIN feeds f ON (f.id = u.feed_id)
+			JOIN categories c ON (c.id = f.category_id)
+	`
+
+	var count, visible int
+	if err := s.db.QueryRow(query, model.EntryStatusUnread, userID, entryID).Scan(&count, &visible); err != nil {
+		return 0, fmt.Errorf(`store: unable to save entry #%d for later: %v`, entryID, err)
+	}
+
+	if count == 0 {
+		return 0, errors.New(`store: nothing has been updated`)
+	}
+
 	return visible, nil
 }
 
@@ -531,12 +597,12 @@ func (s *Storage) UpdateEntryVote(userID int64, entryID int64, vote int) error {
 	return nil
 }
 
-// FlushHistory deletes all read entries (non-starred, non-shared) and records tombstones to prevent re-ingestion.
+// FlushHistory deletes all read entries (non-starred, non-saved, non-shared) and records tombstones to prevent re-ingestion.
 func (s *Storage) FlushHistory(userID int64) error {
 	query := `
 		WITH deleted AS (
 			DELETE FROM entries
-			WHERE user_id=$1 AND status=$2 AND starred is false AND share_code=''
+			WHERE user_id=$1 AND status=$2 AND starred is false AND saved_for_later is false AND share_code=''
 			RETURNING feed_id, hash
 		)
 		INSERT INTO entry_tombstones (feed_id, hash)
@@ -552,7 +618,7 @@ func (s *Storage) FlushHistory(userID int64) error {
 
 // MarkAllAsRead updates all user entries to the read status.
 func (s *Storage) MarkAllAsRead(userID int64) error {
-	query := `UPDATE entries SET status=$1, changed_at=now() WHERE user_id=$2 AND status=$3`
+	query := `UPDATE entries SET status=$1, saved_for_later=false, changed_at=now() WHERE user_id=$2 AND status=$3`
 	result, err := s.db.Exec(query, model.EntryStatusRead, userID, model.EntryStatusUnread)
 	if err != nil {
 		return fmt.Errorf(`store: unable to mark all entries as read: %v`, err)
@@ -574,6 +640,7 @@ func (s *Storage) MarkAllAsReadBeforeDate(userID int64, before time.Time) error 
 			entries
 		SET
 			status=$1,
+			saved_for_later=false,
 			changed_at=now()
 		WHERE
 			user_id=$2 AND status=$3 AND published_at < $4
@@ -598,6 +665,7 @@ func (s *Storage) MarkGloballyVisibleFeedsAsRead(userID int64) error {
 			entries
 		SET
 			status=$1,
+			saved_for_later=false,
 			changed_at=now()
 		FROM
 			feeds
@@ -628,6 +696,7 @@ func (s *Storage) MarkFeedAsRead(userID, feedID int64, before time.Time) error {
 			entries
 		SET
 			status=$1,
+			saved_for_later=false,
 			changed_at=now()
 		WHERE
 			user_id=$2 AND feed_id=$3 AND status=$4 AND published_at < $5
@@ -655,6 +724,7 @@ func (s *Storage) MarkCategoryAsRead(userID, categoryID int64, before time.Time)
 			entries
 		SET
 			status=$1,
+			saved_for_later=false,
 			changed_at=now()
 		FROM
 			feeds

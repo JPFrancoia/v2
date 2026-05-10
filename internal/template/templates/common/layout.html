@@ -80,6 +80,9 @@
                         {{ end }}
                     </a>
                 </li>
+                <li {{ if eq .menu "saved_for_later" }}class="active"{{ end }}>
+                    <a href="{{ routePath "/saved-for-later" }}" data-page="saved-for-later">{{ icon "save-for-later" }}{{ t "menu.saved_for_later" }}</a>
+                </li>
                 <li {{ if eq .menu "starred" }}class="active"{{ end }} title="{{ t "tooltip.keyboard_shortcuts" "g b" }}">
                     <a href="{{ routePath "/starred" }}" data-page="starred">{{ icon "star" }}{{ t "menu.starred" }}</a>
                 </li>
@@ -191,6 +194,7 @@
     <template id="icon-star">{{ icon "star" }}</template>
     <template id="icon-unstar">{{ icon "unstar" }}</template>
     <template id="icon-save">{{ icon "save" }}</template>
+    <template id="icon-save-for-later">{{ icon "save-for-later" }}</template>
 </body>
 </html>
 {{ end }}

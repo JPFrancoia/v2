@@ -906,6 +906,8 @@ dialog {
     border: none;
     background-color: transparent;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
 }
 
 .item-meta-icons a span {
@@ -1046,6 +1048,11 @@ article.category-has-unread {
 
 .entry-actions a span {
     text-decoration: underline;
+}
+
+.entry-actions li > :is(a, button) {
+    display: inline-flex;
+    align-items: center;
 }
 
 .entry-actions li {

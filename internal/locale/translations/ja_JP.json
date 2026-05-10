@@ -22,6 +22,7 @@
     "alert.no_feed_in_category": "このカテゴリには購読中のフィードがありません。",
     "alert.no_history": "現在履歴はありません。",
     "alert.no_search_result": "検索で何も見つかりませんでした。",
+    "alert.no_saved_for_later": "There are no saved-for-later entries.",
     "alert.no_shared_entry": "共有エントリはありません。",
     "alert.no_starred": "現在星付きはありません。",
     "alert.no_tag_entry": "このタグに一致するエントリーはありません。",
@@ -56,6 +57,10 @@
     "entry.save.completed": "完了!",
     "entry.save.label": "保存",
     "entry.save.title": "この記事を保存",
+    "entry.save_for_later.completed": "Saved for later",
+    "entry.save_for_later.label": "Save for later",
+    "entry.save_for_later.title": "Save this entry for later",
+    "entry.save_for_later.toast.completed": "Entry saved for later",
     "entry.save.toast.completed": "記事は保存されました",
     "entry.score.label": "Score",
     "entry.score.title": "Entry score",
@@ -431,6 +436,7 @@
     "menu.refresh_all_feeds": "すべてのフィードをバックグラウンドで更新",
     "menu.refresh_feed": "更新",
     "menu.search": "検索",
+    "menu.saved_for_later": "Saved for later",
     "menu.sessions": "セッション",
     "menu.settings": "設定",
     "menu.shared_entries": "共有エントリ",
@@ -586,6 +592,8 @@
     "page.shared_entries_count": [
         "%d 件の共有エントリ"
     ],
+    "page.saved_for_later.title": "Saved for later",
+    "page.saved_for_later_entry_count": "%d saved-for-later entries",
     "page.starred.title": "星付き",
     "page.starred_entry_count": [
         "%d 件の星付きエントリ"

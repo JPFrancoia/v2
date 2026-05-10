@@ -35,6 +35,11 @@ func (e *entryPaginationBuilder) WithStarred() {
 	e.conditions = append(e.conditions, "e.starred is true")
 }
 
+// WithSavedForLater adds saved-for-later to the condition.
+func (e *entryPaginationBuilder) WithSavedForLater() {
+	e.conditions = append(e.conditions, "e.saved_for_later is true")
+}
+
 // WithFeedID adds feed_id to the condition.
 func (e *entryPaginationBuilder) WithFeedID(feedID int64) {
 	if feedID != 0 {

@@ -1538,4 +1538,11 @@ var migrations = [...]func(tx *sql.Tx) error{
 		`)
 		return err
 	},
+	func(tx *sql.Tx) (err error) {
+		_, err = tx.Exec(`
+			ALTER TABLE entries ADD COLUMN saved_for_later bool not null default 'f';
+			CREATE INDEX entries_user_saved_for_later_idx ON entries(user_id, saved_for_later);
+		`)
+		return err
+	},
 }

@@ -45,6 +45,10 @@ func Serve(store *storage.Storage, pool *worker.Pool) http.Handler {
 	mux.HandleFunc("GET /unread", handler.showUnreadPage)
 	mux.HandleFunc("GET /unread/entry/{entryID}", handler.showUnreadEntryPage)
 
+	// Saved for later pages.
+	mux.HandleFunc("GET /saved-for-later", handler.showSavedForLaterPage)
+	mux.HandleFunc("GET /saved-for-later/entry/{entryID}", handler.showSavedForLaterEntryPage)
+
 	// History pages.
 	mux.HandleFunc("GET /history", handler.showHistoryPage)
 	mux.HandleFunc("GET /history/entry/{entryID}", handler.showReadEntryPage)
@@ -113,6 +117,7 @@ func Serve(store *storage.Storage, pool *worker.Pool) http.Handler {
 	// Entry pages.
 	mux.HandleFunc("POST /entry/status", handler.updateEntriesStatus)
 	mux.HandleFunc("POST /entry/save/{entryID}", handler.saveEntry)
+	mux.HandleFunc("POST /entry/save-for-later/{entryID}", handler.saveEntryForLater)
 	mux.HandleFunc("POST /entry/enclosure/{enclosureID}/save-progression", handler.saveEnclosureProgression)
 	mux.HandleFunc("POST /entry/download/{entryID}", handler.fetchContent)
 	mux.HandleFunc("POST /entry/star/{entryID}", handler.toggleStarred)

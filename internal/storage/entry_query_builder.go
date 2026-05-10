@@ -68,6 +68,16 @@ func (e *EntryQueryBuilder) WithStarred(starred bool) *EntryQueryBuilder {
 	return e
 }
 
+// WithSavedForLater adds saved-for-later filter.
+func (e *EntryQueryBuilder) WithSavedForLater(savedForLater bool) *EntryQueryBuilder {
+	if savedForLater {
+		e.conditions = append(e.conditions, "e.saved_for_later is true")
+	} else {
+		e.conditions = append(e.conditions, "e.saved_for_later is false")
+	}
+	return e
+}
+
 // BeforeChangedDate adds a condition < changed_at
 func (e *EntryQueryBuilder) BeforeChangedDate(date time.Time) *EntryQueryBuilder {
 	e.conditions = append(e.conditions, "e.changed_at < $"+strconv.Itoa(len(e.args)+1))
@@ -319,6 +329,7 @@ func (e *EntryQueryBuilder) fetchEntries(withCount bool) (model.Entries, int, er
 			` + e.contentColumn() + `,
 			e.status,
 			e.starred,
+			e.saved_for_later,
 			e.reading_time,
 			e.created_at,
 			e.changed_at,
@@ -390,6 +401,7 @@ func (e *EntryQueryBuilder) fetchEntries(withCount bool) (model.Entries, int, er
 			&entry.Content,
 			&entry.Status,
 			&entry.Starred,
+			&entry.SavedForLater,
 			&entry.ReadingTime,
 			&entry.CreatedAt,
 			&entry.ChangedAt,

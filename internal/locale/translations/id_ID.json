@@ -22,6 +22,7 @@
     "alert.no_feed_in_category": "Tidak ada langganan untuk kategori ini.",
     "alert.no_history": "Tidak ada riwayat untuk saat ini.",
     "alert.no_search_result": "Tidak ada hasil untuk pencarian ini.",
+    "alert.no_saved_for_later": "There are no saved-for-later entries.",
     "alert.no_shared_entry": "Tidak ada entri yang dibagikan.",
     "alert.no_starred": "Tidak ada markah.",
     "alert.no_tag_entry": "Tidak ada entri yang cocok dengan tag ini.",
@@ -56,6 +57,10 @@
     "entry.save.completed": "Selesai!",
     "entry.save.label": "Simpan",
     "entry.save.title": "Simpan artikel ini",
+    "entry.save_for_later.completed": "Saved for later",
+    "entry.save_for_later.label": "Save for later",
+    "entry.save_for_later.title": "Save this entry for later",
+    "entry.save_for_later.toast.completed": "Entry saved for later",
     "entry.save.toast.completed": "Artikel tersimpan",
     "entry.score.label": "Score",
     "entry.score.title": "Entry score",
@@ -431,6 +436,7 @@
     "menu.refresh_all_feeds": "Muat ulang semua umpan di latar belakang",
     "menu.refresh_feed": "Muat ulang",
     "menu.search": "Cari",
+    "menu.saved_for_later": "Saved for later",
     "menu.sessions": "Sesi",
     "menu.settings": "Pengaturan",
     "menu.shared_entries": "Entri yang Dibagikan",
@@ -586,6 +592,8 @@
     "page.shared_entries_count": [
         "%d entri yang dibagikan"
     ],
+    "page.saved_for_later.title": "Saved for later",
+    "page.saved_for_later_entry_count": "%d saved-for-later entries",
     "page.starred.title": "Markah",
     "page.starred_entry_count": [
         "%d entri dimarkahi"

@@ -22,6 +22,7 @@
     "alert.no_feed_in_category": "沒有該類別的 Feed。",
     "alert.no_history": "目前沒有歷史",
     "alert.no_search_result": "沒有符合搜尋的結果",
+    "alert.no_saved_for_later": "There are no saved-for-later entries.",
     "alert.no_shared_entry": "沒有分享文章。",
     "alert.no_starred": "目前沒有收藏",
     "alert.no_tag_entry": "沒有與此標籤相符的文章。",
@@ -56,6 +57,10 @@
     "entry.save.completed": "完成",
     "entry.save.label": "儲存",
     "entry.save.title": "儲存這篇文章",
+    "entry.save_for_later.completed": "Saved for later",
+    "entry.save_for_later.label": "Save for later",
+    "entry.save_for_later.title": "Save this entry for later",
+    "entry.save_for_later.toast.completed": "Entry saved for later",
     "entry.save.toast.completed": "已儲存文章",
     "entry.score.label": "Score",
     "entry.score.title": "Entry score",
@@ -431,6 +436,7 @@
     "menu.refresh_all_feeds": "在背景更新所有 Feed",
     "menu.refresh_feed": "更新",
     "menu.search": "搜尋",
+    "menu.saved_for_later": "Saved for later",
     "menu.sessions": "工作階段",
     "menu.settings": "設定",
     "menu.shared_entries": "已分享的文章",
@@ -586,6 +592,8 @@
     "page.shared_entries_count": [
         "已分享 %d 篇文章"
     ],
+    "page.saved_for_later.title": "Saved for later",
+    "page.saved_for_later_entry_count": "%d saved-for-later entries",
     "page.starred.title": "收藏",
     "page.starred_entry_count": [
         "%d 篇收藏文章"

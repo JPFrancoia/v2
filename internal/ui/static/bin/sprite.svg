@@ -32,6 +32,12 @@ Source: https://github.com/tabler/tabler-icons
         <circle cx="12" cy="14" r="2"></circle>
         <polyline points="14 4 14 8 8 8 8 4"></polyline>
     </symbol>
+    <symbol id="icon-save-for-later" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+        <path d="M6 4h12a1 1 0 0 1 1 1v16l-7 -4l-7 4v-16a1 1 0 0 1 1 -1"></path>
+        <line x1="12" y1="8" x2="12" y2="13"></line>
+        <line x1="9.5" y1="10.5" x2="14.5" y2="10.5"></line>
+    </symbol>
     <symbol id="icon-scraper" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
         <path stroke="none" d="M0 0h24v24H0z"/>
         <path d="M19 18a3.5 3.5 0 0 0 0 -7h-1a5 4.5 0 0 0 -11 -2a4.6 4.4 0 0 0 -2.1 8.4"/>

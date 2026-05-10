@@ -22,6 +22,7 @@
     "alert.no_feed_in_category": "此分类中没有订阅源。",
     "alert.no_history": "当前没有历史记录。",
     "alert.no_search_result": "此搜索没有结果。",
+    "alert.no_saved_for_later": "There are no saved-for-later entries.",
     "alert.no_shared_entry": "没有已分享条目。",
     "alert.no_starred": "没有收藏的条目。",
     "alert.no_tag_entry": "没有匹配此标签的条目。",
@@ -56,6 +57,10 @@
     "entry.save.completed": "完成！",
     "entry.save.label": "保存",
     "entry.save.title": "保存此条目",
+    "entry.save_for_later.completed": "Saved for later",
+    "entry.save_for_later.label": "Save for later",
+    "entry.save_for_later.title": "Save this entry for later",
+    "entry.save_for_later.toast.completed": "Entry saved for later",
     "entry.save.toast.completed": "条目已保存",
     "entry.score.label": "Score",
     "entry.score.title": "Entry score",
@@ -431,6 +436,7 @@
     "menu.refresh_all_feeds": "后台刷新所有订阅源",
     "menu.refresh_feed": "刷新",
     "menu.search": "搜索",
+    "menu.saved_for_later": "Saved for later",
     "menu.sessions": "会话",
     "menu.settings": "设置",
     "menu.shared_entries": "已共享的条目",
@@ -586,6 +592,8 @@
     "page.shared_entries_count": [
         "%d 个共享条目"
     ],
+    "page.saved_for_later.title": "Saved for later",
+    "page.saved_for_later_entry_count": "%d saved-for-later entries",
     "page.starred.title": "收藏",
     "page.starred_entry_count": [
         "%d 个收藏条目"
