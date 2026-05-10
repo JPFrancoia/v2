@@ -45,6 +45,10 @@ func Serve(store *storage.Storage, pool *worker.Pool) http.Handler {
 	mux.HandleFunc("GET /unread", handler.showUnreadPage)
 	mux.HandleFunc("GET /unread/entry/{entryID}", handler.showUnreadEntryPage)
 
+	// To review pages.
+	mux.HandleFunc("GET /to-review", handler.showToReviewPage)
+	mux.HandleFunc("GET /to-review/entry/{entryID}", handler.showToReviewEntryPage)
+
 	// Saved for later pages.
 	mux.HandleFunc("GET /saved-for-later", handler.showSavedForLaterPage)
 	mux.HandleFunc("GET /saved-for-later/entry/{entryID}", handler.showSavedForLaterEntryPage)

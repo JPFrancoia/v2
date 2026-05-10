@@ -63,6 +63,7 @@ func (e *Engine) ParseTemplates() {
 		"settings.html":                {"layout.html", "settings_menu.html"},
 		"shared_entries.html":          {"layout.html", "pagination.html"},
 		"tag_entries.html":             {"item_meta.html", "layout.html", "pagination.html"},
+		"to_review_entries.html":       {"item_meta.html", "layout.html", "pagination.html"},
 		"user_tags.html":               {"layout.html"},
 		"user_tag_entries.html":        {"item_meta.html", "layout.html", "pagination.html"},
 		"create_user_tag.html":         {"layout.html", "settings_menu.html"},

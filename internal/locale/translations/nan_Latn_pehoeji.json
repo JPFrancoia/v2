@@ -23,6 +23,7 @@
     "alert.no_history": "Chit-má ah bô kì-lo̍k",
     "alert.no_search_result": "Bô hû-ha̍p ê chhiau-chhē kiat-kó",
     "alert.no_saved_for_later": "There are no saved-for-later entries.",
+    "alert.no_to_review": "There are no entries to review.",
     "alert.no_shared_entry": "Chit-má ah bô hun-hióng ê siau-sit",
     "alert.no_starred": "Chit-má ah bô siu-chông",
     "alert.no_tag_entry": "Bô kah chit ê khan-á ū hû-ha̍p ê siau-sit",
@@ -437,6 +438,7 @@
     "menu.refresh_feed": "Têng lia̍h",
     "menu.search": "Chhiau-chhē",
     "menu.saved_for_later": "Saved for later",
+    "menu.to_review": "To review",
     "menu.sessions": "Ū teng-lo̍k--ê",
     "menu.settings": "Siat-tēng",
     "menu.shared_entries": "Hun-hióng kè ê siau-sit",
@@ -594,6 +596,8 @@
     ],
     "page.saved_for_later.title": "Saved for later",
     "page.saved_for_later_entry_count": "%d saved-for-later entries",
+    "page.to_review.title": "To review",
+    "page.to_review_entry_count": "%d entries to review",
     "page.starred.title": "Siu-chông",
     "page.starred_entry_count": [
         "%d ê siu-chông ê siau-sit"

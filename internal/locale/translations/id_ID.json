@@ -23,6 +23,7 @@
     "alert.no_history": "Tidak ada riwayat untuk saat ini.",
     "alert.no_search_result": "Tidak ada hasil untuk pencarian ini.",
     "alert.no_saved_for_later": "There are no saved-for-later entries.",
+    "alert.no_to_review": "There are no entries to review.",
     "alert.no_shared_entry": "Tidak ada entri yang dibagikan.",
     "alert.no_starred": "Tidak ada markah.",
     "alert.no_tag_entry": "Tidak ada entri yang cocok dengan tag ini.",
@@ -437,6 +438,7 @@
     "menu.refresh_feed": "Muat ulang",
     "menu.search": "Cari",
     "menu.saved_for_later": "Saved for later",
+    "menu.to_review": "To review",
     "menu.sessions": "Sesi",
     "menu.settings": "Pengaturan",
     "menu.shared_entries": "Entri yang Dibagikan",
@@ -594,6 +596,8 @@
     ],
     "page.saved_for_later.title": "Saved for later",
     "page.saved_for_later_entry_count": "%d saved-for-later entries",
+    "page.to_review.title": "To review",
+    "page.to_review_entry_count": "%d entries to review",
     "page.starred.title": "Markah",
     "page.starred_entry_count": [
         "%d entri dimarkahi"

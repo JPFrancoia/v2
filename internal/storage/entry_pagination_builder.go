@@ -14,12 +14,13 @@ import (
 
 // entryPaginationBuilder is a builder for entry prev/next queries.
 type entryPaginationBuilder struct {
-	store      *Storage
-	conditions []string
-	args       []any
-	entryID    int64
-	order      string
-	direction  string
+	store           *Storage
+	conditions      []string
+	sortExpressions []string
+	args            []any
+	entryID         int64
+	order           string
+	direction       string
 }
 
 // WithSearchQuery adds full-text search query to the condition.
@@ -38,6 +39,12 @@ func (e *entryPaginationBuilder) WithStarred() {
 // WithSavedForLater adds saved-for-later to the condition.
 func (e *entryPaginationBuilder) WithSavedForLater() {
 	e.conditions = append(e.conditions, "e.saved_for_later is true")
+}
+
+// WithVote adds vote to the condition.
+func (e *entryPaginationBuilder) WithVote(vote int) {
+	e.conditions = append(e.conditions, "e.vote = $"+strconv.Itoa(len(e.args)+1))
+	e.args = append(e.args, vote)
 }
 
 // WithFeedID adds feed_id to the condition.
@@ -104,6 +111,16 @@ func (e *entryPaginationBuilder) WithGloballyVisible() {
 	e.conditions = append(e.conditions, "not f.hide_globally")
 }
 
+// WithScoreDistanceSorting sorts entries by absolute distance from a target score.
+func (e *entryPaginationBuilder) WithScoreDistanceSorting(score int64) {
+	e.sortExpressions = []string{
+		fmt.Sprintf("ABS(e.score - %d) ASC", score),
+		"e.published_at DESC",
+		"e.id DESC",
+	}
+	e.direction = "asc"
+}
+
 // Entries returns previous and next entries.
 func (e *entryPaginationBuilder) Entries() (*model.Entry, *model.Entry, error) {
 	tx, err := e.store.db.Begin()
@@ -143,20 +160,20 @@ func (e *entryPaginationBuilder) getPrevNextID(tx *sql.Tx) (prevID int64, nextID
 		WITH entry_pagination AS (
 			SELECT
 				e.id,
-				lag(e.id) over (order by e.%[1]s asc, e.created_at asc, e.id desc) as prev_id,
-				lead(e.id) over (order by e.%[1]s asc, e.created_at asc, e.id desc) as next_id
+				lag(e.id) over (order by %[1]s) as prev_id,
+				lead(e.id) over (order by %[1]s) as next_id
 			FROM entries AS e
 			JOIN feeds AS f ON f.id=e.feed_id
 			JOIN categories c ON c.id = f.category_id
 			WHERE %[2]s
-			ORDER BY e.%[1]s asc, e.created_at asc, e.id desc
+			ORDER BY %[1]s
 		)
 		SELECT prev_id, next_id FROM entry_pagination AS ep WHERE %[3]s;
 	`
 
 	subCondition := strings.Join(e.conditions, " AND ")
 	finalCondition := "ep.id = $" + strconv.Itoa(len(e.args)+1)
-	query := fmt.Sprintf(cte, e.order, subCondition, finalCondition)
+	query := fmt.Sprintf(cte, e.buildSorting(), subCondition, finalCondition)
 	e.args = append(e.args, e.entryID)
 
 	var pID, nID sql.NullInt64
@@ -177,6 +194,14 @@ func (e *entryPaginationBuilder) getPrevNextID(tx *sql.Tx) (prevID int64, nextID
 	}
 
 	return prevID, nextID, nil
+}
+
+func (e *entryPaginationBuilder) buildSorting() string {
+	if len(e.sortExpressions) > 0 {
+		return strings.Join(e.sortExpressions, ", ")
+	}
+
+	return fmt.Sprintf("e.%s asc, e.created_at asc, e.id desc", e.order)
 }
 
 func (e *entryPaginationBuilder) getEntry(tx *sql.Tx, entryID int64) (*model.Entry, error) {

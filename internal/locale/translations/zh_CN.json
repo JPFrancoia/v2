@@ -23,6 +23,7 @@
     "alert.no_history": "当前没有历史记录。",
     "alert.no_search_result": "此搜索没有结果。",
     "alert.no_saved_for_later": "There are no saved-for-later entries.",
+    "alert.no_to_review": "There are no entries to review.",
     "alert.no_shared_entry": "没有已分享条目。",
     "alert.no_starred": "没有收藏的条目。",
     "alert.no_tag_entry": "没有匹配此标签的条目。",
@@ -437,6 +438,7 @@
     "menu.refresh_feed": "刷新",
     "menu.search": "搜索",
     "menu.saved_for_later": "Saved for later",
+    "menu.to_review": "To review",
     "menu.sessions": "会话",
     "menu.settings": "设置",
     "menu.shared_entries": "已共享的条目",
@@ -594,6 +596,8 @@
     ],
     "page.saved_for_later.title": "Saved for later",
     "page.saved_for_later_entry_count": "%d saved-for-later entries",
+    "page.to_review.title": "To review",
+    "page.to_review_entry_count": "%d entries to review",
     "page.starred.title": "收藏",
     "page.starred_entry_count": [
         "%d 个收藏条目"

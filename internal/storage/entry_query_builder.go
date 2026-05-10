@@ -78,6 +78,13 @@ func (e *EntryQueryBuilder) WithSavedForLater(savedForLater bool) *EntryQueryBui
 	return e
 }
 
+// WithVote adds vote filter.
+func (e *EntryQueryBuilder) WithVote(vote int) *EntryQueryBuilder {
+	e.conditions = append(e.conditions, "e.vote = $"+strconv.Itoa(len(e.args)+1))
+	e.args = append(e.args, vote)
+	return e
+}
+
 // BeforeChangedDate adds a condition < changed_at
 func (e *EntryQueryBuilder) BeforeChangedDate(date time.Time) *EntryQueryBuilder {
 	e.conditions = append(e.conditions, "e.changed_at < $"+strconv.Itoa(len(e.args)+1))
@@ -229,6 +236,12 @@ func (e *EntryQueryBuilder) WithShareCodeNotEmpty() *EntryQueryBuilder {
 // WithSorting add a sort expression.
 func (e *EntryQueryBuilder) WithSorting(column, direction string) *EntryQueryBuilder {
 	e.sortExpressions = append(e.sortExpressions, column+" "+direction)
+	return e
+}
+
+// WithScoreDistanceSorting sorts entries by absolute distance from a target score.
+func (e *EntryQueryBuilder) WithScoreDistanceSorting(score int64) *EntryQueryBuilder {
+	e.sortExpressions = append(e.sortExpressions, fmt.Sprintf("ABS(e.score - %d) ASC", score))
 	return e
 }
 

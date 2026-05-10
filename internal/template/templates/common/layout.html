@@ -80,6 +80,9 @@
                         {{ end }}
                     </a>
                 </li>
+                <li {{ if eq .menu "to_review" }}class="active"{{ end }}>
+                    <a href="{{ routePath "/to-review" }}" data-page="to-review">{{ icon "entries" }}{{ t "menu.to_review" }}</a>
+                </li>
                 <li {{ if eq .menu "saved_for_later" }}class="active"{{ end }}>
                     <a href="{{ routePath "/saved-for-later" }}" data-page="saved-for-later">{{ icon "save-for-later" }}{{ t "menu.saved_for_later" }}</a>
                 </li>
