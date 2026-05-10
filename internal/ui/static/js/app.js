@@ -453,29 +453,28 @@ function goToListItem(offset) {
 /**
  * Handle the share action for the entry.
  *
- * If the share status is "shared", it will trigger the Web Share API.
- * If the share status is "share", it will send an Ajax request to fetch the share URL and then trigger the Web Share API.
- * If the Web Share API is not supported, it will redirect to the entry URL.
+ * If the Web Share API is not supported, it will open the original entry URL.
+ *
+ * @param {Event} event - The click event.
  */
-async function handleEntryShareAction() {
-    const link = document.querySelector(':is(a, button)[data-share-status]');
-    if (link.dataset.shareStatus === "shared") {
-        const title = document.querySelector(".entry-header > h1 > a");
-        const url = link.href;
+async function handleEntryShareAction(event) {
+    const link = event.currentTarget;
+    const url = link.dataset.shareUrl || link.href;
+    const title = link.dataset.shareTitle || url;
 
-        if (!navigator.canShare) {
-            console.error("Your browser doesn't support the Web Share API.");
-            window.location = url;
-            return;
-        }
-        try {
-            await navigator.share({
-                title: title ? title.textContent : url,
-                url: url
-            });
-        } catch (err) {
-            console.error(err);
-        }
+    if (typeof navigator.share !== "function") {
+        console.error("Your browser doesn't support the Web Share API.");
+        window.location = url;
+        return;
+    }
+
+    try {
+        await navigator.share({
+            title: title,
+            url: url
+        });
+    } catch (err) {
+        console.error(err);
     }
 }
 

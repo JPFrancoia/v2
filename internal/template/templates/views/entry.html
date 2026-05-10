@@ -126,13 +126,15 @@
                         {{ if .entry.SavedForLater }}data-completed="true"{{ end }}
                         >{{ icon "save-for-later" }}<span class="icon-label">{{ if .entry.SavedForLater }}{{ t "entry.save_for_later.completed" }}{{ else }}{{ t "entry.save_for_later.label" }}{{ end }}</span></button>
                 </li>
-                {{ if .entry.ShareCode }}
                 <li>
-                    <a href="{{ routePath "/share/%s" .entry.ShareCode }}"
-                        title="{{ t "entry.shared_entry.title" }}"
-                        data-share-status="shared"
-                        {{ if $.user.OpenExternalLinksInNewTab }}target="_blank"{{ end }}>{{ icon "share" }}<span class="icon-label">{{ t "entry.shared_entry.label" }}</span></a>
+                    <a href="{{ .entry.URL | safeURL }}"
+                        title="{{ t "entry.share.title" }}"
+                        data-share-status="{{ if .entry.ShareCode }}shared{{ else }}share{{ end }}"
+                        data-share-url="{{ .entry.URL | safeURL }}"
+                        data-share-title="{{ .entry.Title }}"
+                        {{ if $.user.OpenExternalLinksInNewTab }}target="_blank"{{ else }}rel="noopener"{{ end }}>{{ icon "share" }}<span class="icon-label">{{ t "entry.share.label" }}</span></a>
                 </li>
+                {{ if .entry.ShareCode }}
                 <li>
                     <button
                         class="page-button"
@@ -142,15 +144,6 @@
                         data-label-yes="{{ t "confirm.yes" }}"
                         data-label-no="{{ t "confirm.no" }}"
                         data-label-loading="{{ t "confirm.loading" }}">{{ icon "delete" }}<span class="icon-label">{{ t "entry.unshare.label" }}</span></button>
-                </li>
-                {{ else }}
-                <li>
-                    <form method="post" action="{{ routePath "/entry/share/%d" .entry.ID }}">
-                        <input type="hidden" name="csrf" value="{{ .csrf }}">
-                        <button type="submit" class="page-button">
-                            {{ icon "share" }}<span class="icon-label">{{ t "entry.share.label" }}</span>
-                        </button>
-                    </form>
                 </li>
                 {{ end }}
                 <li>
