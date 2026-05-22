@@ -1545,4 +1545,27 @@ var migrations = [...]func(tx *sql.Tx) error{
 		`)
 		return err
 	},
+	func(tx *sql.Tx) (err error) {
+		_, err = tx.Exec(`
+			CREATE TABLE model_evals (
+				id bigserial PRIMARY KEY,
+				eval_date date NOT NULL,
+				model text NOT NULL CHECK (model <> ''),
+				training jsonb NOT NULL CHECK (jsonb_typeof(training) = 'object'),
+				eval jsonb NOT NULL CHECK (jsonb_typeof(eval) = 'object'),
+				metrics_accuracy double precision NOT NULL,
+				metrics_precision double precision NOT NULL,
+				metrics_recall double precision NOT NULL,
+				metrics_f1 double precision NOT NULL,
+				metrics_roc_auc double precision NOT NULL,
+				metrics_average_precision double precision NOT NULL,
+				metrics_log_loss double precision NOT NULL,
+				created_at timestamp with time zone NOT NULL DEFAULT now()
+			);
+
+			CREATE INDEX model_evals_eval_date_model_idx
+				ON model_evals (eval_date DESC, model);
+		`)
+		return err
+	},
 }
