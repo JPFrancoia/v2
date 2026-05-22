@@ -53,6 +53,9 @@ func Serve(store *storage.Storage, pool *worker.Pool) http.Handler {
 	mux.HandleFunc("GET /saved-for-later", handler.showSavedForLaterPage)
 	mux.HandleFunc("GET /saved-for-later/entry/{entryID}", handler.showSavedForLaterEntryPage)
 
+	// AI metrics page.
+	mux.HandleFunc("GET /ai-metrics", handler.showAIMetricsPage)
+
 	// History pages.
 	mux.HandleFunc("GET /history", handler.showHistoryPage)
 	mux.HandleFunc("GET /history/entry/{entryID}", handler.showReadEntryPage)

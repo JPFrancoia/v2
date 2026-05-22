@@ -1480,6 +1480,228 @@ function initializeUserTagsDropdown() {
     });
 }
 
+/**
+ * Render AI metrics charts using the same lightweight chart-panel pattern as
+ * Green Slope: canvas lines, latest value in the title bar, and hover tooltip.
+ */
+function initializeAIMetricsCharts() {
+    document.querySelectorAll("[data-ai-metrics-chart]").forEach((chartElement) => {
+        renderAIMetricsChart(chartElement);
+    });
+}
+
+function renderAIMetricsChart(chartElement) {
+    let points = [];
+    try {
+        points = JSON.parse(chartElement.dataset.points || "[]");
+    } catch (_) {
+        points = [];
+    }
+
+    chartElement.textContent = "";
+
+    if (points.length === 0) {
+        const placeholder = document.createElement("div");
+        placeholder.className = "chart-placeholder";
+        placeholder.textContent = "No chart data yet.";
+        chartElement.appendChild(placeholder);
+        return;
+    }
+
+    const canvas = document.createElement("canvas");
+    chartElement.appendChild(canvas);
+
+    const tooltip = chartElement.parentElement.querySelector(".chart-tooltip");
+    const series = [
+        {
+            key: "f1",
+            label: chartElement.dataset.labelF1 || "F1",
+            color: "#16a34a",
+            visible: true,
+        },
+        {
+            key: "roc_auc",
+            label: chartElement.dataset.labelRocAuc || "ROC AUC",
+            color: "#2563eb",
+            visible: true,
+        },
+        {
+            key: "average_precision",
+            label: chartElement.dataset.labelAveragePrecision || "Average precision",
+            color: "#ea580c",
+            visible: true,
+        },
+    ];
+
+    const chartWrapper = chartElement.closest(".ai-metrics-chart-wrapper");
+    const legendButtons = chartWrapper ? chartWrapper.querySelectorAll("[data-ai-metrics-series-toggle]") : [];
+    legendButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const item = series.find((seriesItem) => seriesItem.key === button.dataset.aiMetricsSeriesToggle);
+            if (!item) return;
+
+            item.visible = !item.visible;
+            button.setAttribute("aria-pressed", item.visible ? "true" : "false");
+            button.classList.toggle("ai-metrics-legend-toggle-off", !item.visible);
+            if (tooltip) tooltip.style.display = "none";
+            draw();
+        });
+    });
+
+    let hitTargets = [];
+
+    const draw = () => {
+        const width = Math.max(320, Math.floor(chartElement.clientWidth || chartElement.getBoundingClientRect().width || 320));
+        const height = 220;
+        const dpr = window.devicePixelRatio || 1;
+
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        canvas.style.width = "100%";
+        canvas.style.height = `${height}px`;
+
+        const ctx = canvas.getContext("2d");
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, width, height);
+
+        const styles = getComputedStyle(document.documentElement);
+        const borderColor = styles.getPropertyValue("--table-border-color").trim() || "#e0e0e0";
+        const mutedColor = styles.getPropertyValue("--counter-color").trim() || "#666";
+        const textColor = styles.getPropertyValue("--body-color").trim() || "#333";
+
+        const plot = {
+            left: 48,
+            top: 12,
+            right: 12,
+            bottom: 30,
+        };
+        const plotWidth = width - plot.left - plot.right;
+        const plotHeight = height - plot.top - plot.bottom;
+
+        const xForIndex = (index) => {
+            if (points.length === 1) return plot.left + plotWidth / 2;
+            return plot.left + (index * plotWidth / (points.length - 1));
+        };
+
+        const yForValue = (value) => {
+            const clamped = Math.max(0, Math.min(1, Number(value) || 0));
+            return plot.top + ((1 - clamped) * plotHeight);
+        };
+
+        ctx.font = "12px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+        ctx.lineWidth = 1;
+        ctx.textBaseline = "middle";
+
+        [0, 0.25, 0.5, 0.75, 1].forEach((tick) => {
+            const y = yForValue(tick);
+            ctx.strokeStyle = borderColor;
+            ctx.beginPath();
+            ctx.moveTo(plot.left, y);
+            ctx.lineTo(width - plot.right, y);
+            ctx.stroke();
+
+            ctx.fillStyle = mutedColor;
+            ctx.textAlign = "right";
+            ctx.fillText(tick.toFixed(2), plot.left - 8, y);
+        });
+
+        ctx.strokeStyle = textColor;
+        ctx.beginPath();
+        ctx.moveTo(plot.left, plot.top);
+        ctx.lineTo(plot.left, height - plot.bottom);
+        ctx.lineTo(width - plot.right, height - plot.bottom);
+        ctx.stroke();
+
+        ctx.fillStyle = mutedColor;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        ctx.fillText(points[0].date, plot.left, height - 20);
+        if (points.length > 1) {
+            ctx.textAlign = "right";
+            ctx.fillText(points[points.length - 1].date, width - plot.right, height - 20);
+        }
+
+        const firstVisibleSeries = series.find((item) => item.visible);
+        hitTargets = points.map((point, index) => ({
+            index,
+            x: xForIndex(index),
+            y: yForValue(firstVisibleSeries ? point[firstVisibleSeries.key] : 0.5),
+        }));
+
+        series.filter((item) => item.visible).forEach((item) => {
+            ctx.strokeStyle = item.color;
+            ctx.fillStyle = item.color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+
+            points.forEach((point, index) => {
+                const x = xForIndex(index);
+                const y = yForValue(point[item.key]);
+                if (index === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+
+            ctx.stroke();
+
+            points.forEach((point, index) => {
+                const x = xForIndex(index);
+                const y = yForValue(point[item.key]);
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        });
+    };
+
+    chartElement.addEventListener("mousemove", (event) => {
+        if (!tooltip || hitTargets.length === 0) return;
+
+        const visibleSeries = series.filter((item) => item.visible);
+        if (visibleSeries.length === 0) {
+            tooltip.style.display = "none";
+            return;
+        }
+
+        const rect = canvas.getBoundingClientRect();
+        const cursorX = event.clientX - rect.left;
+        let nearest = hitTargets[0];
+        let nearestDistance = Math.abs(cursorX - nearest.x);
+
+        for (const target of hitTargets) {
+            const distance = Math.abs(cursorX - target.x);
+            if (distance < nearestDistance) {
+                nearest = target;
+                nearestDistance = distance;
+            }
+        }
+
+        const point = points[nearest.index];
+        tooltip.textContent = point.date + "  " + visibleSeries.map((item) => `${item.label}: ${Number(point[item.key]).toFixed(3)}`).join("  ");
+        tooltip.style.display = "block";
+
+        const tooltipWidth = tooltip.offsetWidth || 220;
+        const left = nearest.x + 12 + tooltipWidth > rect.width ? nearest.x - tooltipWidth - 8 : nearest.x + 12;
+        tooltip.style.left = `${Math.max(4, left)}px`;
+        tooltip.style.top = `${Math.max(4, nearest.y - 10)}px`;
+    });
+
+    chartElement.addEventListener("mouseleave", () => {
+        if (tooltip) tooltip.style.display = "none";
+    });
+
+    draw();
+
+    if ("ResizeObserver" in window) {
+        const resizeObserver = new ResizeObserver(draw);
+        resizeObserver.observe(chartElement);
+    } else {
+        window.addEventListener("resize", draw);
+    }
+}
+
 // Initialize application handlers
 initializeMainMenuHandlers();
 initializeFormHandlers();
@@ -1489,6 +1711,7 @@ initializeKeyboardShortcuts();
 initializeTouchHandler();
 initializeClickHandlers();
 initializeUserTagsDropdown();
+initializeAIMetricsCharts();
 initializeServiceWorker();
 
 // Reload the page if it was restored from the back-forward cache and mark entries as read is enabled.

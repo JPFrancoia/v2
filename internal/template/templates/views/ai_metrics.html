@@ -1,0 +1,145 @@
+{{ define "title"}}{{ t "page.ai_metrics.title" }}{{ end }}
+
+{{ define "page_header"}}
+<section class="page-header" aria-labelledby="page-header-title">
+    <h1 id="page-header-title">{{ t "page.ai_metrics.title" }}</h1>
+</section>
+{{ end }}
+
+{{ define "content"}}
+{{ if eq .total 0 }}
+    <p role="alert" class="alert alert-info">{{ t "alert.no_ai_metrics" }}</p>
+{{ else }}
+    <div class="ai-metrics">
+        <div class="ai-metrics-dashboard">
+        {{ range .models }}
+            <section class="ai-metrics-summary-card" aria-labelledby="ai-metrics-summary-{{ .Name }}">
+                <div class="ai-metrics-card-header">
+                    <h2 id="ai-metrics-summary-{{ .Name }}" class="ai-metrics-card-name">
+                        <a href="#ai-metrics-{{ .Name }}">{{ .Name }}</a>
+                    </h2>
+                    <span class="ai-metrics-badge">{{ .Latest.EvalDate }}</span>
+                </div>
+                <div class="ai-metrics-card-stats">
+                    <div>
+                        <span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.f1" }}</span>
+                        <span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsF1 }}</span>
+                    </div>
+                    <div>
+                        <span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.roc_auc" }}</span>
+                        <span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsROCAUC }}</span>
+                    </div>
+                    <div>
+                        <span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.average_precision" }}</span>
+                        <span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsAveragePrecision }}</span>
+                    </div>
+                </div>
+            </section>
+        {{ end }}
+        </div>
+
+    {{ range .models }}
+        <section class="ai-metrics-detail-card" aria-labelledby="ai-metrics-{{ .Name }}">
+            <div class="ai-metrics-detail-header">
+                <h2 id="ai-metrics-{{ .Name }}" class="ai-metrics-section-title">{{ .Name }}</h2>
+                <span class="ai-metrics-badge ai-metrics-badge-muted">{{ t "page.ai_metrics.latest" }} {{ .Latest.EvalDate }}</span>
+            </div>
+
+            <div class="ai-metrics-latest-grid" aria-label="{{ t "page.ai_metrics.latest" }}">
+                <div class="ai-metrics-latest-stat">
+                    <span>{{ t "page.ai_metrics.metric.f1" }}</span>
+                    <strong>{{ printf "%.3f" .Latest.MetricsF1 }}</strong>
+                </div>
+                <div class="ai-metrics-latest-stat">
+                    <span>{{ t "page.ai_metrics.metric.roc_auc" }}</span>
+                    <strong>{{ printf "%.3f" .Latest.MetricsROCAUC }}</strong>
+                </div>
+                <div class="ai-metrics-latest-stat">
+                    <span>{{ t "page.ai_metrics.metric.average_precision" }}</span>
+                    <strong>{{ printf "%.3f" .Latest.MetricsAveragePrecision }}</strong>
+                </div>
+                <div class="ai-metrics-latest-stat">
+                    <span>{{ t "page.ai_metrics.metric.log_loss" }}</span>
+                    <strong>{{ printf "%.3f" .Latest.MetricsLogLoss }}</strong>
+                </div>
+            </div>
+
+            <div class="chart-wrap ai-metrics-chart-wrapper">
+                <div class="chart-title-bar ai-metrics-chart-title-bar">
+                    <span class="chart-title-text ai-metrics-chart-title-text">{{ t "page.ai_metrics.graph" }}</span>
+                    <span class="chart-current ai-metrics-chart-current">{{ t "page.ai_metrics.metric.f1" }} {{ printf "%.3f" .Latest.MetricsF1 }}</span>
+                </div>
+                <div class="chart-inner">
+                    <div class="chart-tooltip"></div>
+                    <div
+                        class="ai-metrics-chart"
+                        data-ai-metrics-chart="true"
+                        data-points="{{ .ChartData }}"
+                        data-label-f1="{{ t "page.ai_metrics.metric.f1" }}"
+                        data-label-roc-auc="{{ t "page.ai_metrics.metric.roc_auc" }}"
+                        data-label-average-precision="{{ t "page.ai_metrics.metric.average_precision" }}"
+                    ></div>
+                </div>
+                <ul class="u-legend ai-metrics-legend" aria-label="{{ t "page.ai_metrics.graph" }}">
+                    <li>
+                        <button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="f1" aria-pressed="true">
+                            <span class="ai-metrics-legend-color ai-metrics-series-f1"></span>{{ t "page.ai_metrics.metric.f1" }}
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="roc_auc" aria-pressed="true">
+                            <span class="ai-metrics-legend-color ai-metrics-series-roc-auc"></span>{{ t "page.ai_metrics.metric.roc_auc" }}
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="average_precision" aria-pressed="true">
+                            <span class="ai-metrics-legend-color ai-metrics-series-average-precision"></span>{{ t "page.ai_metrics.metric.average_precision" }}
+                        </button>
+                    </li>
+                </ul>
+                {{ if not .HasMultiplePoints }}
+                    <p class="ai-metrics-note">{{ t "page.ai_metrics.more_data_needed" }}</p>
+                {{ end }}
+            </div>
+
+            <div class="ai-metrics-table-wrapper">
+                <table class="ai-metrics-table">
+                    <thead>
+                    <tr>
+                        <th>{{ t "page.ai_metrics.table.date" }}</th>
+                        <th>{{ t "page.ai_metrics.table.training" }}</th>
+                        <th>{{ t "page.ai_metrics.table.eval" }}</th>
+                        <th>{{ t "page.ai_metrics.metric.accuracy" }}</th>
+                        <th>{{ t "page.ai_metrics.metric.precision" }}</th>
+                        <th>{{ t "page.ai_metrics.metric.recall" }}</th>
+                        <th>{{ t "page.ai_metrics.metric.f1" }}</th>
+                        <th>{{ t "page.ai_metrics.metric.roc_auc" }}</th>
+                        <th>{{ t "page.ai_metrics.metric.average_precision" }}</th>
+                        <th>{{ t "page.ai_metrics.metric.log_loss" }}</th>
+                        <th>{{ t "page.ai_metrics.table.created_at" }}</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {{ range .Rows }}
+                    <tr>
+                        <td>{{ .EvalDate }}</td>
+                        <td>{{ .Training }}</td>
+                        <td>{{ .Eval }}</td>
+                        <td>{{ printf "%.3f" .MetricsAccuracy }}</td>
+                        <td>{{ printf "%.3f" .MetricsPrecision }}</td>
+                        <td>{{ printf "%.3f" .MetricsRecall }}</td>
+                        <td>{{ printf "%.3f" .MetricsF1 }}</td>
+                        <td>{{ printf "%.3f" .MetricsROCAUC }}</td>
+                        <td>{{ printf "%.3f" .MetricsAveragePrecision }}</td>
+                        <td>{{ printf "%.3f" .MetricsLogLoss }}</td>
+                        <td>{{ .CreatedAt }}</td>
+                    </tr>
+                    {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    {{ end }}
+    </div>
+{{ end }}
+{{ end }}

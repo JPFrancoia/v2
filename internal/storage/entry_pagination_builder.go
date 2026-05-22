@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"miniflux.app/v2/internal/model"
 )
@@ -39,6 +40,12 @@ func (e *entryPaginationBuilder) WithStarred() {
 // WithSavedForLater adds saved-for-later to the condition.
 func (e *entryPaginationBuilder) WithSavedForLater() {
 	e.conditions = append(e.conditions, "e.saved_for_later is true")
+}
+
+// AfterPublishedDate adds published_at > date to the condition.
+func (e *entryPaginationBuilder) AfterPublishedDate(date time.Time) {
+	e.conditions = append(e.conditions, "e.published_at > $"+strconv.Itoa(len(e.args)+1))
+	e.args = append(e.args, date)
 }
 
 // WithVote adds vote to the condition.

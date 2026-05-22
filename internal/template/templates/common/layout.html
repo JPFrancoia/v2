@@ -86,6 +86,11 @@
                 <li {{ if eq .menu "saved_for_later" }}class="active"{{ end }}>
                     <a href="{{ routePath "/saved-for-later" }}" data-page="saved-for-later">{{ icon "save-for-later" }}{{ t "menu.saved_for_later" }}</a>
                 </li>
+                {{ if .user.IsAdmin }}
+                <li {{ if eq .menu "ai_metrics" }}class="active"{{ end }}>
+                    <a href="{{ routePath "/ai-metrics" }}" data-page="ai-metrics">{{ icon "history" }}{{ t "menu.ai_metrics" }}</a>
+                </li>
+                {{ end }}
                 <li {{ if eq .menu "starred" }}class="active"{{ end }} title="{{ t "tooltip.keyboard_shortcuts" "g b" }}">
                     <a href="{{ routePath "/starred" }}" data-page="starred">{{ icon "star" }}{{ t "menu.starred" }}</a>
                 </li>

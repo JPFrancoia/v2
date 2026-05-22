@@ -5,6 +5,7 @@ package ui // import "miniflux.app/v2/internal/ui"
 
 import (
 	"net/http"
+	"time"
 
 	"miniflux.app/v2/internal/http/request"
 	"miniflux.app/v2/internal/http/response"
@@ -12,7 +13,14 @@ import (
 	"miniflux.app/v2/internal/ui/view"
 )
 
-const toReviewScoreTarget int64 = 50
+const (
+	toReviewScoreTarget int64 = 50
+	toReviewMaxAge            = 5 * 24 * time.Hour
+)
+
+func toReviewPublishedAfter() time.Time {
+	return time.Now().Add(-toReviewMaxAge)
+}
 
 func (h *handler) showToReviewPage(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.UserByID(request.UserID(r))
@@ -22,9 +30,11 @@ func (h *handler) showToReviewPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	offset := request.QueryIntParam(r, "offset", 0)
+	publishedAfter := toReviewPublishedAfter()
 	builder := h.store.NewEntryQueryBuilder(user.ID)
 	builder.WithStatus(model.EntryStatusUnread)
 	builder.WithVote(0)
+	builder.AfterPublishedDate(publishedAfter)
 	builder.WithScoreDistanceSorting(toReviewScoreTarget)
 	builder.WithSorting("published_at", "DESC")
 	builder.WithSorting("id", "DESC")
@@ -44,6 +54,7 @@ func (h *handler) showToReviewPage(w http.ResponseWriter, r *http.Request) {
 		builder = h.store.NewEntryQueryBuilder(user.ID)
 		builder.WithStatus(model.EntryStatusUnread)
 		builder.WithVote(0)
+		builder.AfterPublishedDate(publishedAfter)
 		builder.WithScoreDistanceSorting(toReviewScoreTarget)
 		builder.WithSorting("published_at", "DESC")
 		builder.WithSorting("id", "DESC")
