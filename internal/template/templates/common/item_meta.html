@@ -98,14 +98,18 @@
         <li>
             <button
                 aria-describedby="entry-title-{{ .entry.ID }}"
-                title="{{ t "entry.save_for_later.title" }}"
+                title="{{ if .entry.SavedForLater }}{{ t "entry.save_for_later.remove.title" }}{{ else }}{{ t "entry.save_for_later.title" }}{{ end }}"
                 data-save-for-later-entry="true"
                 data-save-for-later-url="{{ routePath "/entry/save-for-later/%d" .entry.ID }}"
+                data-title-save="{{ t "entry.save_for_later.title" }}"
+                data-title-remove="{{ t "entry.save_for_later.remove.title" }}"
                 data-label-loading="{{ t "entry.state.saving" }}"
                 data-label-save="{{ t "entry.save_for_later.label" }}"
                 data-label-done="{{ t "entry.save_for_later.completed" }}"
+                data-label-remove="{{ t "entry.save_for_later.remove" }}"
+                data-toast-removed="{{ t "entry.save_for_later.toast.removed" }}"
                 {{ if .entry.SavedForLater }}data-completed="true"{{ end }}
-                >{{ icon "save-for-later" }}<span class="icon-label">{{ if .entry.SavedForLater }}{{ t "entry.save_for_later.completed" }}{{ else }}{{ t "entry.save_for_later.label" }}{{ end }}</span></button>
+                >{{ icon "save-for-later" }}<span class="icon-label">{{ if .entry.SavedForLater }}{{ t "entry.save_for_later.remove" }}{{ else }}{{ t "entry.save_for_later.label" }}{{ end }}</span></button>
         </li>
         <li class="item-meta-icons-external-url">
             <a href="{{ .entry.URL | safeURL  }}"

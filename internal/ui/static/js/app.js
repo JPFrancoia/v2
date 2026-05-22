@@ -138,6 +138,19 @@ function isEntryView() {
 }
 
 /**
+ * Check if the current view is the saved-for-later list or entry view.
+ *
+ * @return {boolean}
+ */
+function isSavedForLaterView() {
+    const element = document.querySelector(":is(a, button)[data-page=\"saved-for-later\"]");
+    if (!element) return false;
+
+    const savedForLaterPath = new URL(element.href).pathname;
+    return document.location.pathname === savedForLaterPath || document.location.pathname.startsWith(`${savedForLaterPath}/entry/`);
+}
+
+/**
  * Find the entry element for the given element.
  *
  * @returns {Element|null}
@@ -232,10 +245,16 @@ function setButtonToSavedState(buttonElement) {
 function setSaveForLaterButtonState(buttonElement, isSavedForLater) {
     if (isSavedForLater) {
         buttonElement.dataset.completed = "true";
-        setIconAndLabelElement(buttonElement, "save-for-later", buttonElement.dataset.labelDone);
+        setIconAndLabelElement(buttonElement, "save-for-later", buttonElement.dataset.labelRemove || buttonElement.dataset.labelDone);
+        if (buttonElement.dataset.titleRemove) {
+            buttonElement.title = buttonElement.dataset.titleRemove;
+        }
     } else {
         delete buttonElement.dataset.completed;
         setIconAndLabelElement(buttonElement, "save-for-later", buttonElement.dataset.labelSave);
+        if (buttonElement.dataset.titleSave) {
+            buttonElement.title = buttonElement.dataset.titleSave;
+        }
     }
 }
 
@@ -739,23 +758,29 @@ function handleSaveForLaterAction(element = null) {
     if (!currentEntry) return;
 
     const buttonElement = currentEntry.querySelector(":is(a, button)[data-save-for-later-entry]");
-    if (!buttonElement || buttonElement.dataset.completed) return;
+    if (!buttonElement) return;
 
     setButtonToLoadingState(buttonElement);
 
     sendPOSTRequest(buttonElement.dataset.saveForLaterUrl).then((resp) => {
         resp.json().then((result) => {
+            const savedForLater = result.saved_for_later === true;
             const statusButton = currentEntry.querySelector(":is(a, button)[data-toggle-status]");
-            if (statusButton?.dataset.value === "read") {
+            if (savedForLater && statusButton?.dataset.value === "read") {
                 setReadStatusButtonState(statusButton, "unread");
                 currentEntry.classList.replace("item-status-read", "item-status-unread");
             }
 
             updateUnreadCounterValue(result.unread_count_delta || 0);
-            setSaveForLaterButtonState(buttonElement, true);
+            setSaveForLaterButtonState(buttonElement, savedForLater);
+
+            if (!savedForLater && isSavedForLaterView()) {
+                window.location.reload();
+                return;
+            }
 
             if (isEntryView()) {
-                showToastNotification("save-for-later", buttonElement.dataset.toastDone);
+                showToastNotification("save-for-later", savedForLater ? buttonElement.dataset.toastDone : buttonElement.dataset.toastRemoved);
             }
         });
     });

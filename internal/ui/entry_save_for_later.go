@@ -12,11 +12,17 @@ import (
 
 func (h *handler) saveEntryForLater(w http.ResponseWriter, r *http.Request) {
 	entryID := request.RouteInt64Param(r, "entryID")
-	unreadCountDelta, err := h.store.SaveEntryForLater(request.UserID(r), entryID)
+	unreadCountDelta, savedForLater, err := h.store.ToggleEntrySavedForLater(request.UserID(r), entryID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}
 
-	response.JSONCreated(w, r, map[string]int{"unread_count_delta": unreadCountDelta})
+	response.JSONCreated(w, r, struct {
+		UnreadCountDelta int  `json:"unread_count_delta"`
+		SavedForLater    bool `json:"saved_for_later"`
+	}{
+		UnreadCountDelta: unreadCountDelta,
+		SavedForLater:    savedForLater,
+	})
 }

@@ -495,46 +495,50 @@ func (s *Storage) SetEntriesStatusAndCountVisible(userID int64, entryIDs []int64
 	return visible, nil
 }
 
-// SaveEntryForLater marks an entry as saved for later and unread.
-func (s *Storage) SaveEntryForLater(userID int64, entryID int64) (int, error) {
+// ToggleEntrySavedForLater toggles the saved-for-later state of an entry.
+func (s *Storage) ToggleEntrySavedForLater(userID int64, entryID int64) (int, bool, error) {
 	query := `
 		WITH target AS (
 			SELECT
 				id,
 				feed_id,
-				status
+				status,
+				saved_for_later
 			FROM entries
 			WHERE user_id=$2 AND id=$3
 		), updated AS (
 			UPDATE entries e
 			SET
-				saved_for_later=true,
-				status=$1::entry_status,
+				saved_for_later=NOT t.saved_for_later,
+				status=CASE WHEN t.saved_for_later THEN e.status ELSE $1::entry_status END,
 				changed_at=now()
 			FROM target t
 			WHERE e.id=t.id
 			RETURNING
 				t.feed_id,
-				t.status <> $1::entry_status AS became_unread
+				NOT t.saved_for_later AS saved_for_later,
+				t.status <> $1::entry_status AND NOT t.saved_for_later AS became_unread
 		)
 		SELECT
 			count(*),
-			count(*) FILTER (WHERE u.became_unread AND NOT f.hide_globally AND NOT c.hide_globally)
+			count(*) FILTER (WHERE u.became_unread AND NOT f.hide_globally AND NOT c.hide_globally),
+			coalesce(bool_or(u.saved_for_later), false)
 		FROM updated u
 			JOIN feeds f ON (f.id = u.feed_id)
 			JOIN categories c ON (c.id = f.category_id)
 	`
 
 	var count, visible int
-	if err := s.db.QueryRow(query, model.EntryStatusUnread, userID, entryID).Scan(&count, &visible); err != nil {
-		return 0, fmt.Errorf(`store: unable to save entry #%d for later: %v`, entryID, err)
+	var savedForLater bool
+	if err := s.db.QueryRow(query, model.EntryStatusUnread, userID, entryID).Scan(&count, &visible, &savedForLater); err != nil {
+		return 0, false, fmt.Errorf(`store: unable to toggle saved-for-later state for entry #%d: %v`, entryID, err)
 	}
 
 	if count == 0 {
-		return 0, errors.New(`store: nothing has been updated`)
+		return 0, false, errors.New(`store: nothing has been updated`)
 	}
 
-	return visible, nil
+	return visible, savedForLater, nil
 }
 
 // SetEntriesStarredState updates the starred state for the given list of entries.
