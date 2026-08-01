@@ -58,6 +58,16 @@
                 {{ end }}
             </div>
 
+            {{ if .IsFreshness }}
+            <dl class="ai-metrics-freshness-help">
+                <div><dt>{{ t "page.ai_metrics.metric.rps" }}</dt><dd>{{ t "page.ai_metrics.freshness_help.rps" }}</dd></div>
+                <div><dt>{{ t "page.ai_metrics.metric.macro_f1" }}</dt><dd>{{ t "page.ai_metrics.freshness_help.macro_f1" }}</dd></div>
+                <div><dt>{{ t "page.ai_metrics.metric.weighted_kappa" }}</dt><dd>{{ t "page.ai_metrics.freshness_help.weighted_kappa" }}</dd></div>
+                <div><dt>{{ t "page.ai_metrics.metric.log_duration_mae" }}</dt><dd>{{ t "page.ai_metrics.freshness_help.log_duration_mae" }}</dd></div>
+                <div><dt>{{ t "page.ai_metrics.metric.long_lived_auc" }}</dt><dd>{{ t "page.ai_metrics.freshness_help.long_lived_auc" }}</dd></div>
+            </dl>
+            {{ end }}
+
             <div class="chart-wrap ai-metrics-chart-wrapper">
                 <div class="chart-title-bar ai-metrics-chart-title-bar">
                     <span class="chart-title-text ai-metrics-chart-title-text">{{ t "page.ai_metrics.graph" }}</span>

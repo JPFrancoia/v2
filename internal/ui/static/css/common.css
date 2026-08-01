@@ -778,6 +778,33 @@ fieldset .buttons {
     padding: 10px;
 }
 
+.ai-metrics-freshness-help {
+    margin: -4px 0 20px;
+    padding: 12px 14px;
+    border: 1px solid var(--panel-border-color);
+    border-radius: 6px;
+    background: var(--table-th-background);
+    font-size: .88rem;
+}
+
+.ai-metrics-freshness-help div {
+    display: grid;
+    grid-template-columns: minmax(120px, 165px) 1fr;
+    gap: 10px;
+}
+
+.ai-metrics-freshness-help div + div {
+    margin-top: 8px;
+}
+
+.ai-metrics-freshness-help dt {
+    font-weight: 600;
+}
+
+.ai-metrics-freshness-help dd {
+    margin: 0;
+}
+
 .chart-wrap {
     background: var(--panel-background);
     border: 1px solid var(--panel-border-color);
@@ -933,7 +960,8 @@ fieldset .buttons {
 }
 
 @media (max-width: 640px) {
-    .ai-metrics-card-stats {
+    .ai-metrics-card-stats,
+    .ai-metrics-freshness-help div {
         grid-template-columns: 1fr;
     }
 
