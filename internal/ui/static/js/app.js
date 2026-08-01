@@ -1534,6 +1534,28 @@ function calculateAIMetricsYAxis(points, visibleSeries, pointValue, isFreshness)
     return { minimum, maximum, ticks };
 }
 
+function aiMetricsChartSeries(chartElement) {
+    if (chartElement.dataset.isFreshness === "true") {
+        return [
+            { key: "rps", label: chartElement.dataset.labelRps || "RPS", color: "#ea580c", visible: true },
+            { key: "f1", label: chartElement.dataset.labelMacroF1 || "Macro F1", color: "#16a34a", visible: true },
+            { key: "weighted_kappa", label: chartElement.dataset.labelWeightedKappa || "Weighted kappa", color: "#2563eb", visible: true },
+        ];
+    }
+    if (chartElement.dataset.isSuperImportant === "true") {
+        return [
+            { key: "super_important_average_precision", label: chartElement.dataset.labelPreferenceAp || "Preference AP", color: "#16a34a", visible: true },
+            { key: "relevance_average_precision", label: chartElement.dataset.labelRelevanceAp || "Relevance AP", color: "#2563eb", visible: true },
+            { key: "recall_at_50", label: chartElement.dataset.labelRecallAt50 || "Recall@50", color: "#ea580c", visible: true },
+        ];
+    }
+    return [
+        { key: "f1", label: chartElement.dataset.labelF1 || "F1", color: "#16a34a", visible: true },
+        { key: "roc_auc", label: chartElement.dataset.labelRocAuc || "ROC AUC", color: "#2563eb", visible: true },
+        { key: "average_precision", label: chartElement.dataset.labelAveragePrecision || "Average precision", color: "#ea580c", visible: true },
+    ];
+}
+
 function renderAIMetricsChart(chartElement) {
     let points = [];
     try {
@@ -1556,15 +1578,7 @@ function renderAIMetricsChart(chartElement) {
     chartElement.appendChild(canvas);
 
     const tooltip = chartElement.parentElement.querySelector(".chart-tooltip");
-    const series = chartElement.dataset.isFreshness === "true" ? [
-        { key: "rps", label: chartElement.dataset.labelRps || "RPS", color: "#ea580c", visible: true },
-        { key: "f1", label: chartElement.dataset.labelMacroF1 || "Macro F1", color: "#16a34a", visible: true },
-        { key: "weighted_kappa", label: chartElement.dataset.labelWeightedKappa || "Weighted kappa", color: "#2563eb", visible: true },
-    ] : [
-        { key: "f1", label: chartElement.dataset.labelF1 || "F1", color: "#16a34a", visible: true },
-        { key: "roc_auc", label: chartElement.dataset.labelRocAuc || "ROC AUC", color: "#2563eb", visible: true },
-        { key: "average_precision", label: chartElement.dataset.labelAveragePrecision || "Average precision", color: "#ea580c", visible: true },
-    ];
+    const series = aiMetricsChartSeries(chartElement);
 
     const chartWrapper = chartElement.closest(".ai-metrics-chart-wrapper");
     const legendButtons = chartWrapper ? chartWrapper.querySelectorAll("[data-ai-metrics-series-toggle]") : [];

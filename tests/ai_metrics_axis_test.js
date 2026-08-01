@@ -8,7 +8,22 @@ const end = app.indexOf("\nfunction renderAIMetricsChart", start);
 const calculateAIMetricsYAxis = Function(
     `${app.slice(start, end)}; return calculateAIMetricsYAxis;`,
 )();
+const seriesStart = app.indexOf("function aiMetricsChartSeries");
+const seriesEnd = app.indexOf("\nfunction renderAIMetricsChart", seriesStart);
+const aiMetricsChartSeries = Function(
+    `${app.slice(seriesStart, seriesEnd)}; return aiMetricsChartSeries;`,
+)();
 const pointValue = (point, key) => point[key] ?? null;
+
+test("selects the Super-important chart series", () => {
+    const series = aiMetricsChartSeries({ dataset: { isSuperImportant: "true" } });
+
+    assert.deepEqual(series.map((item) => item.key), [
+        "super_important_average_precision",
+        "relevance_average_precision",
+        "recall_at_50",
+    ]);
+});
 
 test("zooms binary metrics near their data", () => {
     const axis = calculateAIMetricsYAxis(

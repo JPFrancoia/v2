@@ -25,6 +25,10 @@
                     <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.rps" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsRPS }}</span></div>
                     <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.macro_f1" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsF1 }}</span></div>
                     <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.weighted_kappa" }}</span><span class="ai-metrics-stat-value">{{ if .Latest.HasMetricsWeightedKappa }}{{ printf "%.3f" .Latest.MetricsWeightedKappa }}{{ else }}-{{ end }}</span></div>
+                    {{ else if .IsSuperImportant }}
+                    <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.preference_ap" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsSuperImportantAveragePrecision }}</span></div>
+                    <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.relevance_ap" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsRelevanceAveragePrecision }}</span></div>
+                    <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.recall_at_50" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsRecallAt50 }}</span></div>
                     {{ else }}
                     <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.f1" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsF1 }}</span></div>
                     <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.roc_auc" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsROCAUC }}</span></div>
@@ -50,6 +54,13 @@
                 <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.weighted_kappa" }}</span><strong>{{ if .Latest.HasMetricsWeightedKappa }}{{ printf "%.3f" .Latest.MetricsWeightedKappa }}{{ else }}-{{ end }}</strong></div>
                 <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.log_duration_mae" }}</span><strong>{{ printf "%.3f" .Latest.MetricsLogDurationMAE }}</strong></div>
                 <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.long_lived_auc" }}</span><strong>{{ if .Latest.HasMetricsROCAUC }}{{ printf "%.3f" .Latest.MetricsROCAUC }}{{ else }}-{{ end }}</strong></div>
+                {{ else if .IsSuperImportant }}
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.preference_ap" }}</span><strong>{{ printf "%.3f" .Latest.MetricsSuperImportantAveragePrecision }}</strong></div>
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.relevance_ap" }}</span><strong>{{ printf "%.3f" .Latest.MetricsRelevanceAveragePrecision }}</strong></div>
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.recall_at_50" }}</span><strong>{{ printf "%.3f" .Latest.MetricsRecallAt50 }}</strong></div>
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.recall_at_10" }}</span><strong>{{ printf "%.3f" .Latest.MetricsRecallAt10 }}</strong></div>
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.recall_at_25" }}</span><strong>{{ printf "%.3f" .Latest.MetricsRecallAt25 }}</strong></div>
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.super_important_bonus" }}</span><strong>{{ printf "%.3f" .Latest.MetricsSuperImportantBonus }}</strong></div>
                 {{ else }}
                 <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.f1" }}</span><strong>{{ printf "%.3f" .Latest.MetricsF1 }}</strong></div>
                 <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.roc_auc" }}</span><strong>{{ printf "%.3f" .Latest.MetricsROCAUC }}</strong></div>
@@ -66,12 +77,21 @@
                 <div><dt>{{ t "page.ai_metrics.metric.log_duration_mae" }}</dt><dd>{{ t "page.ai_metrics.freshness_help.log_duration_mae" }}</dd></div>
                 <div><dt>{{ t "page.ai_metrics.metric.long_lived_auc" }}</dt><dd>{{ t "page.ai_metrics.freshness_help.long_lived_auc" }}</dd></div>
             </dl>
+            {{ else if .IsSuperImportant }}
+            <dl class="ai-metrics-freshness-help">
+                <div><dt>{{ t "page.ai_metrics.metric.preference_ap" }}</dt><dd>{{ t "page.ai_metrics.super_important_help.preference_ap" }}</dd></div>
+                <div><dt>{{ t "page.ai_metrics.metric.relevance_ap" }}</dt><dd>{{ t "page.ai_metrics.super_important_help.relevance_ap" }}</dd></div>
+                <div><dt>{{ t "page.ai_metrics.metric.recall_at_10" }}</dt><dd>{{ t "page.ai_metrics.super_important_help.recall_at_10" }}</dd></div>
+                <div><dt>{{ t "page.ai_metrics.metric.recall_at_25" }}</dt><dd>{{ t "page.ai_metrics.super_important_help.recall_at_25" }}</dd></div>
+                <div><dt>{{ t "page.ai_metrics.metric.recall_at_50" }}</dt><dd>{{ t "page.ai_metrics.super_important_help.recall_at_50" }}</dd></div>
+                <div><dt>{{ t "page.ai_metrics.metric.super_important_bonus" }}</dt><dd>{{ t "page.ai_metrics.super_important_help.bonus" }}</dd></div>
+            </dl>
             {{ end }}
 
             <div class="chart-wrap ai-metrics-chart-wrapper">
                 <div class="chart-title-bar ai-metrics-chart-title-bar">
                     <span class="chart-title-text ai-metrics-chart-title-text">{{ t "page.ai_metrics.graph" }}</span>
-                    <span class="chart-current ai-metrics-chart-current">{{ if .IsFreshness }}{{ t "page.ai_metrics.metric.rps" }} {{ printf "%.3f" .Latest.MetricsRPS }}{{ else }}{{ t "page.ai_metrics.metric.f1" }} {{ printf "%.3f" .Latest.MetricsF1 }}{{ end }}</span>
+                    <span class="chart-current ai-metrics-chart-current">{{ if .IsFreshness }}{{ t "page.ai_metrics.metric.rps" }} {{ printf "%.3f" .Latest.MetricsRPS }}{{ else if .IsSuperImportant }}{{ t "page.ai_metrics.metric.preference_ap" }} {{ printf "%.3f" .Latest.MetricsSuperImportantAveragePrecision }}{{ else }}{{ t "page.ai_metrics.metric.f1" }} {{ printf "%.3f" .Latest.MetricsF1 }}{{ end }}</span>
                 </div>
                 <div class="chart-inner">
                     <div class="chart-tooltip"></div>
@@ -85,7 +105,11 @@
                         data-label-rps="{{ t "page.ai_metrics.metric.rps" }}"
                         data-label-macro-f1="{{ t "page.ai_metrics.metric.macro_f1" }}"
                         data-label-weighted-kappa="{{ t "page.ai_metrics.metric.weighted_kappa" }}"
+                        data-label-preference-ap="{{ t "page.ai_metrics.metric.preference_ap" }}"
+                        data-label-relevance-ap="{{ t "page.ai_metrics.metric.relevance_ap" }}"
+                        data-label-recall-at-50="{{ t "page.ai_metrics.metric.recall_at_50" }}"
                         data-is-freshness="{{ .IsFreshness }}"
+                        data-is-super-important="{{ .IsSuperImportant }}"
                     ></div>
                 </div>
                 <ul class="u-legend ai-metrics-legend" aria-label="{{ t "page.ai_metrics.graph" }}">
@@ -93,6 +117,10 @@
                     <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="rps" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-average-precision"></span>{{ t "page.ai_metrics.metric.rps" }}</button></li>
                     <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="f1" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-f1"></span>{{ t "page.ai_metrics.metric.macro_f1" }}</button></li>
                     <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="weighted_kappa" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-roc-auc"></span>{{ t "page.ai_metrics.metric.weighted_kappa" }}</button></li>
+                    {{ else if .IsSuperImportant }}
+                    <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="super_important_average_precision" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-f1"></span>{{ t "page.ai_metrics.metric.preference_ap" }}</button></li>
+                    <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="relevance_average_precision" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-roc-auc"></span>{{ t "page.ai_metrics.metric.relevance_ap" }}</button></li>
+                    <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="recall_at_50" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-average-precision"></span>{{ t "page.ai_metrics.metric.recall_at_50" }}</button></li>
                     {{ else }}
                     <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="f1" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-f1"></span>{{ t "page.ai_metrics.metric.f1" }}</button></li>
                     <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="roc_auc" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-roc-auc"></span>{{ t "page.ai_metrics.metric.roc_auc" }}</button></li>
@@ -117,6 +145,13 @@
                         <th>{{ t "page.ai_metrics.metric.weighted_kappa" }}</th>
                         <th>{{ t "page.ai_metrics.metric.log_duration_mae" }}</th>
                         <th>{{ t "page.ai_metrics.metric.long_lived_auc" }}</th>
+                        {{ else if .IsSuperImportant }}
+                        <th>{{ t "page.ai_metrics.metric.preference_ap" }}</th>
+                        <th>{{ t "page.ai_metrics.metric.relevance_ap" }}</th>
+                        <th>{{ t "page.ai_metrics.metric.recall_at_10" }}</th>
+                        <th>{{ t "page.ai_metrics.metric.recall_at_25" }}</th>
+                        <th>{{ t "page.ai_metrics.metric.recall_at_50" }}</th>
+                        <th>{{ t "page.ai_metrics.metric.super_important_bonus" }}</th>
                         {{ else }}
                         <th>{{ t "page.ai_metrics.metric.accuracy" }}</th>
                         <th>{{ t "page.ai_metrics.metric.precision" }}</th>
@@ -141,6 +176,13 @@
                         <td>{{ if .HasMetricsWeightedKappa }}{{ printf "%.3f" .MetricsWeightedKappa }}{{ else }}-{{ end }}</td>
                         <td>{{ printf "%.3f" .MetricsLogDurationMAE }}</td>
                         <td>{{ if .HasMetricsROCAUC }}{{ printf "%.3f" .MetricsROCAUC }}{{ else }}-{{ end }}</td>
+                        {{ else if $model.IsSuperImportant }}
+                        <td>{{ printf "%.3f" .MetricsSuperImportantAveragePrecision }}</td>
+                        <td>{{ printf "%.3f" .MetricsRelevanceAveragePrecision }}</td>
+                        <td>{{ printf "%.3f" .MetricsRecallAt10 }}</td>
+                        <td>{{ printf "%.3f" .MetricsRecallAt25 }}</td>
+                        <td>{{ printf "%.3f" .MetricsRecallAt50 }}</td>
+                        <td>{{ printf "%.3f" .MetricsSuperImportantBonus }}</td>
                         {{ else }}
                         <td>{{ printf "%.3f" .MetricsAccuracy }}</td>
                         <td>{{ printf "%.3f" .MetricsPrecision }}</td>
