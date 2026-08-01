@@ -21,24 +21,22 @@
                     <span class="ai-metrics-badge">{{ .Latest.EvalDate }}</span>
                 </div>
                 <div class="ai-metrics-card-stats">
-                    <div>
-                        <span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.f1" }}</span>
-                        <span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsF1 }}</span>
-                    </div>
-                    <div>
-                        <span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.roc_auc" }}</span>
-                        <span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsROCAUC }}</span>
-                    </div>
-                    <div>
-                        <span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.average_precision" }}</span>
-                        <span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsAveragePrecision }}</span>
-                    </div>
+                    {{ if .IsFreshness }}
+                    <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.rps" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsRPS }}</span></div>
+                    <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.macro_f1" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsF1 }}</span></div>
+                    <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.weighted_kappa" }}</span><span class="ai-metrics-stat-value">{{ if .Latest.HasMetricsWeightedKappa }}{{ printf "%.3f" .Latest.MetricsWeightedKappa }}{{ else }}-{{ end }}</span></div>
+                    {{ else }}
+                    <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.f1" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsF1 }}</span></div>
+                    <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.roc_auc" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsROCAUC }}</span></div>
+                    <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.average_precision" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsAveragePrecision }}</span></div>
+                    {{ end }}
                 </div>
             </section>
         {{ end }}
         </div>
 
     {{ range .models }}
+        {{ $model := . }}
         <section class="ai-metrics-detail-card" aria-labelledby="ai-metrics-{{ .Name }}">
             <div class="ai-metrics-detail-header">
                 <h2 id="ai-metrics-{{ .Name }}" class="ai-metrics-section-title">{{ .Name }}</h2>
@@ -46,28 +44,24 @@
             </div>
 
             <div class="ai-metrics-latest-grid" aria-label="{{ t "page.ai_metrics.latest" }}">
-                <div class="ai-metrics-latest-stat">
-                    <span>{{ t "page.ai_metrics.metric.f1" }}</span>
-                    <strong>{{ printf "%.3f" .Latest.MetricsF1 }}</strong>
-                </div>
-                <div class="ai-metrics-latest-stat">
-                    <span>{{ t "page.ai_metrics.metric.roc_auc" }}</span>
-                    <strong>{{ printf "%.3f" .Latest.MetricsROCAUC }}</strong>
-                </div>
-                <div class="ai-metrics-latest-stat">
-                    <span>{{ t "page.ai_metrics.metric.average_precision" }}</span>
-                    <strong>{{ printf "%.3f" .Latest.MetricsAveragePrecision }}</strong>
-                </div>
-                <div class="ai-metrics-latest-stat">
-                    <span>{{ t "page.ai_metrics.metric.log_loss" }}</span>
-                    <strong>{{ printf "%.3f" .Latest.MetricsLogLoss }}</strong>
-                </div>
+                {{ if .IsFreshness }}
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.rps" }}</span><strong>{{ printf "%.3f" .Latest.MetricsRPS }}</strong></div>
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.macro_f1" }}</span><strong>{{ printf "%.3f" .Latest.MetricsF1 }}</strong></div>
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.weighted_kappa" }}</span><strong>{{ if .Latest.HasMetricsWeightedKappa }}{{ printf "%.3f" .Latest.MetricsWeightedKappa }}{{ else }}-{{ end }}</strong></div>
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.log_duration_mae" }}</span><strong>{{ printf "%.3f" .Latest.MetricsLogDurationMAE }}</strong></div>
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.long_lived_auc" }}</span><strong>{{ if .Latest.HasMetricsROCAUC }}{{ printf "%.3f" .Latest.MetricsROCAUC }}{{ else }}-{{ end }}</strong></div>
+                {{ else }}
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.f1" }}</span><strong>{{ printf "%.3f" .Latest.MetricsF1 }}</strong></div>
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.roc_auc" }}</span><strong>{{ printf "%.3f" .Latest.MetricsROCAUC }}</strong></div>
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.average_precision" }}</span><strong>{{ printf "%.3f" .Latest.MetricsAveragePrecision }}</strong></div>
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.log_loss" }}</span><strong>{{ printf "%.3f" .Latest.MetricsLogLoss }}</strong></div>
+                {{ end }}
             </div>
 
             <div class="chart-wrap ai-metrics-chart-wrapper">
                 <div class="chart-title-bar ai-metrics-chart-title-bar">
                     <span class="chart-title-text ai-metrics-chart-title-text">{{ t "page.ai_metrics.graph" }}</span>
-                    <span class="chart-current ai-metrics-chart-current">{{ t "page.ai_metrics.metric.f1" }} {{ printf "%.3f" .Latest.MetricsF1 }}</span>
+                    <span class="chart-current ai-metrics-chart-current">{{ if .IsFreshness }}{{ t "page.ai_metrics.metric.rps" }} {{ printf "%.3f" .Latest.MetricsRPS }}{{ else }}{{ t "page.ai_metrics.metric.f1" }} {{ printf "%.3f" .Latest.MetricsF1 }}{{ end }}</span>
                 </div>
                 <div class="chart-inner">
                     <div class="chart-tooltip"></div>
@@ -78,24 +72,22 @@
                         data-label-f1="{{ t "page.ai_metrics.metric.f1" }}"
                         data-label-roc-auc="{{ t "page.ai_metrics.metric.roc_auc" }}"
                         data-label-average-precision="{{ t "page.ai_metrics.metric.average_precision" }}"
+                        data-label-rps="{{ t "page.ai_metrics.metric.rps" }}"
+                        data-label-macro-f1="{{ t "page.ai_metrics.metric.macro_f1" }}"
+                        data-label-weighted-kappa="{{ t "page.ai_metrics.metric.weighted_kappa" }}"
+                        data-is-freshness="{{ .IsFreshness }}"
                     ></div>
                 </div>
                 <ul class="u-legend ai-metrics-legend" aria-label="{{ t "page.ai_metrics.graph" }}">
-                    <li>
-                        <button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="f1" aria-pressed="true">
-                            <span class="ai-metrics-legend-color ai-metrics-series-f1"></span>{{ t "page.ai_metrics.metric.f1" }}
-                        </button>
-                    </li>
-                    <li>
-                        <button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="roc_auc" aria-pressed="true">
-                            <span class="ai-metrics-legend-color ai-metrics-series-roc-auc"></span>{{ t "page.ai_metrics.metric.roc_auc" }}
-                        </button>
-                    </li>
-                    <li>
-                        <button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="average_precision" aria-pressed="true">
-                            <span class="ai-metrics-legend-color ai-metrics-series-average-precision"></span>{{ t "page.ai_metrics.metric.average_precision" }}
-                        </button>
-                    </li>
+                    {{ if .IsFreshness }}
+                    <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="rps" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-average-precision"></span>{{ t "page.ai_metrics.metric.rps" }}</button></li>
+                    <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="f1" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-f1"></span>{{ t "page.ai_metrics.metric.macro_f1" }}</button></li>
+                    <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="weighted_kappa" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-roc-auc"></span>{{ t "page.ai_metrics.metric.weighted_kappa" }}</button></li>
+                    {{ else }}
+                    <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="f1" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-f1"></span>{{ t "page.ai_metrics.metric.f1" }}</button></li>
+                    <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="roc_auc" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-roc-auc"></span>{{ t "page.ai_metrics.metric.roc_auc" }}</button></li>
+                    <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="average_precision" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-average-precision"></span>{{ t "page.ai_metrics.metric.average_precision" }}</button></li>
+                    {{ end }}
                 </ul>
                 {{ if not .HasMultiplePoints }}
                     <p class="ai-metrics-note">{{ t "page.ai_metrics.more_data_needed" }}</p>
@@ -109,6 +101,13 @@
                         <th>{{ t "page.ai_metrics.table.date" }}</th>
                         <th>{{ t "page.ai_metrics.table.training" }}</th>
                         <th>{{ t "page.ai_metrics.table.eval" }}</th>
+                        {{ if .IsFreshness }}
+                        <th>{{ t "page.ai_metrics.metric.rps" }}</th>
+                        <th>{{ t "page.ai_metrics.metric.macro_f1" }}</th>
+                        <th>{{ t "page.ai_metrics.metric.weighted_kappa" }}</th>
+                        <th>{{ t "page.ai_metrics.metric.log_duration_mae" }}</th>
+                        <th>{{ t "page.ai_metrics.metric.long_lived_auc" }}</th>
+                        {{ else }}
                         <th>{{ t "page.ai_metrics.metric.accuracy" }}</th>
                         <th>{{ t "page.ai_metrics.metric.precision" }}</th>
                         <th>{{ t "page.ai_metrics.metric.recall" }}</th>
@@ -116,6 +115,7 @@
                         <th>{{ t "page.ai_metrics.metric.roc_auc" }}</th>
                         <th>{{ t "page.ai_metrics.metric.average_precision" }}</th>
                         <th>{{ t "page.ai_metrics.metric.log_loss" }}</th>
+                        {{ end }}
                         <th>{{ t "page.ai_metrics.table.created_at" }}</th>
                     </tr>
                     </thead>
@@ -125,6 +125,13 @@
                         <td>{{ .EvalDate }}</td>
                         <td>{{ .Training }}</td>
                         <td>{{ .Eval }}</td>
+                        {{ if $model.IsFreshness }}
+                        <td>{{ printf "%.3f" .MetricsRPS }}</td>
+                        <td>{{ printf "%.3f" .MetricsF1 }}</td>
+                        <td>{{ if .HasMetricsWeightedKappa }}{{ printf "%.3f" .MetricsWeightedKappa }}{{ else }}-{{ end }}</td>
+                        <td>{{ printf "%.3f" .MetricsLogDurationMAE }}</td>
+                        <td>{{ if .HasMetricsROCAUC }}{{ printf "%.3f" .MetricsROCAUC }}{{ else }}-{{ end }}</td>
+                        {{ else }}
                         <td>{{ printf "%.3f" .MetricsAccuracy }}</td>
                         <td>{{ printf "%.3f" .MetricsPrecision }}</td>
                         <td>{{ printf "%.3f" .MetricsRecall }}</td>
@@ -132,6 +139,7 @@
                         <td>{{ printf "%.3f" .MetricsROCAUC }}</td>
                         <td>{{ printf "%.3f" .MetricsAveragePrecision }}</td>
                         <td>{{ printf "%.3f" .MetricsLogLoss }}</td>
+                        {{ end }}
                         <td>{{ .CreatedAt }}</td>
                     </tr>
                     {{ end }}

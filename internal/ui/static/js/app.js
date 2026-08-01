@@ -1512,25 +1512,14 @@ function renderAIMetricsChart(chartElement) {
     chartElement.appendChild(canvas);
 
     const tooltip = chartElement.parentElement.querySelector(".chart-tooltip");
-    const series = [
-        {
-            key: "f1",
-            label: chartElement.dataset.labelF1 || "F1",
-            color: "#16a34a",
-            visible: true,
-        },
-        {
-            key: "roc_auc",
-            label: chartElement.dataset.labelRocAuc || "ROC AUC",
-            color: "#2563eb",
-            visible: true,
-        },
-        {
-            key: "average_precision",
-            label: chartElement.dataset.labelAveragePrecision || "Average precision",
-            color: "#ea580c",
-            visible: true,
-        },
+    const series = chartElement.dataset.isFreshness === "true" ? [
+        { key: "rps", label: chartElement.dataset.labelRps || "RPS", color: "#ea580c", visible: true },
+        { key: "f1", label: chartElement.dataset.labelMacroF1 || "Macro F1", color: "#16a34a", visible: true },
+        { key: "weighted_kappa", label: chartElement.dataset.labelWeightedKappa || "Weighted kappa", color: "#2563eb", visible: true },
+    ] : [
+        { key: "f1", label: chartElement.dataset.labelF1 || "F1", color: "#16a34a", visible: true },
+        { key: "roc_auc", label: chartElement.dataset.labelRocAuc || "ROC AUC", color: "#2563eb", visible: true },
+        { key: "average_precision", label: chartElement.dataset.labelAveragePrecision || "Average precision", color: "#ea580c", visible: true },
     ];
 
     const chartWrapper = chartElement.closest(".ai-metrics-chart-wrapper");
@@ -1549,6 +1538,12 @@ function renderAIMetricsChart(chartElement) {
     });
 
     let hitTargets = [];
+
+    const pointValue = (point, key) => {
+        if (point[key] === null || point[key] === undefined) return null;
+        const value = Number(point[key]);
+        return Number.isFinite(value) ? value : null;
+    };
 
     const draw = () => {
         const width = Math.max(320, Math.floor(chartElement.clientWidth || chartElement.getBoundingClientRect().width || 320));
@@ -1583,16 +1578,18 @@ function renderAIMetricsChart(chartElement) {
             return plot.left + (index * plotWidth / (points.length - 1));
         };
 
+        const isFreshness = chartElement.dataset.isFreshness === "true";
+        const minimum = isFreshness ? -1 : 0;
         const yForValue = (value) => {
-            const clamped = Math.max(0, Math.min(1, Number(value) || 0));
-            return plot.top + ((1 - clamped) * plotHeight);
+            const clamped = Math.max(minimum, Math.min(1, Number(value) || 0));
+            return plot.top + ((1 - clamped) / (1 - minimum) * plotHeight);
         };
 
         ctx.font = "12px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
         ctx.lineWidth = 1;
         ctx.textBaseline = "middle";
 
-        [0, 0.25, 0.5, 0.75, 1].forEach((tick) => {
+        (isFreshness ? [-1, -0.5, 0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1]).forEach((tick) => {
             const y = yForValue(tick);
             ctx.strokeStyle = borderColor;
             ctx.beginPath();
@@ -1621,24 +1618,34 @@ function renderAIMetricsChart(chartElement) {
             ctx.fillText(points[points.length - 1].date, width - plot.right, height - 20);
         }
 
-        const firstVisibleSeries = series.find((item) => item.visible);
-        hitTargets = points.map((point, index) => ({
-            index,
-            x: xForIndex(index),
-            y: yForValue(firstVisibleSeries ? point[firstVisibleSeries.key] : 0.5),
-        }));
+        const visibleSeries = series.filter((item) => item.visible);
+        hitTargets = points.map((point, index) => {
+            const value = visibleSeries.map((item) => pointValue(point, item.key)).find((item) => item !== null);
+            return {
+                index,
+                x: xForIndex(index),
+                y: yForValue(value === undefined ? 0.5 : value),
+            };
+        });
 
-        series.filter((item) => item.visible).forEach((item) => {
+        visibleSeries.forEach((item) => {
             ctx.strokeStyle = item.color;
             ctx.fillStyle = item.color;
             ctx.lineWidth = 2;
             ctx.beginPath();
+            let segmentStarted = false;
 
             points.forEach((point, index) => {
+                const value = pointValue(point, item.key);
+                if (value === null) {
+                    segmentStarted = false;
+                    return;
+                }
                 const x = xForIndex(index);
-                const y = yForValue(point[item.key]);
-                if (index === 0) {
+                const y = yForValue(value);
+                if (!segmentStarted) {
                     ctx.moveTo(x, y);
+                    segmentStarted = true;
                 } else {
                     ctx.lineTo(x, y);
                 }
@@ -1647,8 +1654,10 @@ function renderAIMetricsChart(chartElement) {
             ctx.stroke();
 
             points.forEach((point, index) => {
+                const value = pointValue(point, item.key);
+                if (value === null) return;
                 const x = xForIndex(index);
-                const y = yForValue(point[item.key]);
+                const y = yForValue(value);
                 ctx.beginPath();
                 ctx.arc(x, y, 3, 0, Math.PI * 2);
                 ctx.fill();
@@ -1679,7 +1688,15 @@ function renderAIMetricsChart(chartElement) {
         }
 
         const point = points[nearest.index];
-        tooltip.textContent = point.date + "  " + visibleSeries.map((item) => `${item.label}: ${Number(point[item.key]).toFixed(3)}`).join("  ");
+        const values = visibleSeries.flatMap((item) => {
+            const value = pointValue(point, item.key);
+            return value === null ? [] : [`${item.label}: ${value.toFixed(3)}`];
+        });
+        if (values.length === 0) {
+            tooltip.style.display = "none";
+            return;
+        }
+        tooltip.textContent = point.date + "  " + values.join("  ");
         tooltip.style.display = "block";
 
         const tooltipWidth = tooltip.offsetWidth || 220;

@@ -32,6 +32,9 @@ func (s *Storage) ModelEvals(limit int) (model.ModelEvals, error) {
 			metrics_roc_auc,
 			metrics_average_precision,
 			metrics_log_loss,
+			metrics_rps,
+			metrics_weighted_kappa,
+			metrics_log_duration_mae,
 			created_at
 		FROM model_evals
 		ORDER BY eval_date DESC, created_at DESC, model ASC
@@ -62,6 +65,9 @@ func (s *Storage) ModelEvals(limit int) (model.ModelEvals, error) {
 			&modelEval.MetricsROCAUC,
 			&modelEval.MetricsAveragePrecision,
 			&modelEval.MetricsLogLoss,
+			&modelEval.MetricsRPS,
+			&modelEval.MetricsWeightedKappa,
+			&modelEval.MetricsLogDurationMAE,
 			&modelEval.CreatedAt,
 		)
 		if err != nil {

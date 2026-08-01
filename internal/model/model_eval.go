@@ -12,13 +12,16 @@ type ModelEval struct {
 	Model                   string
 	Training                map[string]int
 	Eval                    map[string]int
-	MetricsAccuracy         float64
-	MetricsPrecision        float64
-	MetricsRecall           float64
-	MetricsF1               float64
-	MetricsROCAUC           float64
-	MetricsAveragePrecision float64
-	MetricsLogLoss          float64
+	MetricsAccuracy         *float64
+	MetricsPrecision        *float64
+	MetricsRecall           *float64
+	MetricsF1               *float64
+	MetricsROCAUC           *float64
+	MetricsAveragePrecision *float64
+	MetricsLogLoss          *float64
+	MetricsRPS              *float64
+	MetricsWeightedKappa    *float64
+	MetricsLogDurationMAE   *float64
 	CreatedAt               time.Time
 }
 

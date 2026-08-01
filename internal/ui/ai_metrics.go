@@ -6,6 +6,7 @@ package ui // import "miniflux.app/v2/internal/ui"
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"sort"
 	"strings"
@@ -21,6 +22,7 @@ const aiMetricsEvalLimit = 200
 
 type aiMetricModelView struct {
 	Name              string
+	IsFreshness       bool
 	Rows              []aiMetricRowView
 	Latest            aiMetricRowView
 	ChartData         string
@@ -39,6 +41,11 @@ type aiMetricRowView struct {
 	MetricsROCAUC           float64
 	MetricsAveragePrecision float64
 	MetricsLogLoss          float64
+	MetricsRPS              float64
+	MetricsWeightedKappa    float64
+	MetricsLogDurationMAE   float64
+	HasMetricsROCAUC        bool
+	HasMetricsWeightedKappa bool
 }
 
 func (h *handler) showAIMetricsPage(w http.ResponseWriter, r *http.Request) {
@@ -76,13 +83,13 @@ func buildAIMetricModelViews(modelEvals model.ModelEvals, userTimezone string) [
 		groups[modelEval.Model] = append(groups[modelEval.Model], modelEval)
 	}
 
-	modelNames := []string{"Relevance", "Urgency"}
+	modelNames := []string{"Relevance", "Urgency", "Freshness"}
 	for modelName := range groups {
-		if modelName != "Relevance" && modelName != "Urgency" {
+		if modelName != "Relevance" && modelName != "Urgency" && modelName != "Freshness" {
 			modelNames = append(modelNames, modelName)
 		}
 	}
-	sort.Strings(modelNames[2:])
+	sort.Strings(modelNames[3:])
 
 	views := make([]aiMetricModelView, 0, len(groups))
 	for _, modelName := range modelNames {
@@ -98,14 +105,26 @@ func buildAIMetricModelViews(modelEvals model.ModelEvals, userTimezone string) [
 
 		views = append(views, aiMetricModelView{
 			Name:              modelName,
+			IsFreshness:       modelName == "Freshness",
 			Rows:              rowViews,
 			Latest:            rowViews[0],
-			ChartData:         buildAIMetricChartData(rowViews),
+			ChartData:         buildAIMetricChartData(rowViews, modelName == "Freshness"),
 			HasMultiplePoints: len(rowViews) > 1,
 		})
 	}
 
 	return views
+}
+
+func metricPresent(value *float64) bool {
+	return value != nil && !math.IsNaN(*value) && !math.IsInf(*value, 0)
+}
+
+func metricValue(value *float64) float64 {
+	if !metricPresent(value) {
+		return 0
+	}
+	return *value
 }
 
 func buildAIMetricRowView(row *model.ModelEval, userTimezone string) aiMetricRowView {
@@ -114,13 +133,18 @@ func buildAIMetricRowView(row *model.ModelEval, userTimezone string) aiMetricRow
 		CreatedAt:               timezone.Convert(userTimezone, row.CreatedAt).Format("2006-01-02 15:04"),
 		Training:                formatAIMetricCounts(row.Training),
 		Eval:                    formatAIMetricCounts(row.Eval),
-		MetricsAccuracy:         row.MetricsAccuracy,
-		MetricsPrecision:        row.MetricsPrecision,
-		MetricsRecall:           row.MetricsRecall,
-		MetricsF1:               row.MetricsF1,
-		MetricsROCAUC:           row.MetricsROCAUC,
-		MetricsAveragePrecision: row.MetricsAveragePrecision,
-		MetricsLogLoss:          row.MetricsLogLoss,
+		MetricsAccuracy:         metricValue(row.MetricsAccuracy),
+		MetricsPrecision:        metricValue(row.MetricsPrecision),
+		MetricsRecall:           metricValue(row.MetricsRecall),
+		MetricsF1:               metricValue(row.MetricsF1),
+		MetricsROCAUC:           metricValue(row.MetricsROCAUC),
+		MetricsAveragePrecision: metricValue(row.MetricsAveragePrecision),
+		MetricsLogLoss:          metricValue(row.MetricsLogLoss),
+		MetricsRPS:              metricValue(row.MetricsRPS),
+		MetricsWeightedKappa:    metricValue(row.MetricsWeightedKappa),
+		MetricsLogDurationMAE:   metricValue(row.MetricsLogDurationMAE),
+		HasMetricsROCAUC:        metricPresent(row.MetricsROCAUC),
+		HasMetricsWeightedKappa: metricPresent(row.MetricsWeightedKappa),
 	}
 }
 
@@ -143,15 +167,25 @@ func formatAIMetricCounts(counts map[string]int) string {
 	return strings.Join(parts, ", ")
 }
 
-func buildAIMetricChartData(rows []aiMetricRowView) string {
+func buildAIMetricChartData(rows []aiMetricRowView, isFreshness bool) string {
 	points := make([]map[string]any, 0, len(rows))
 	for i := len(rows) - 1; i >= 0; i-- {
-		points = append(points, map[string]any{
+		point := map[string]any{
 			"date":              rows[i].EvalDate,
 			"f1":                rows[i].MetricsF1,
 			"roc_auc":           rows[i].MetricsROCAUC,
 			"average_precision": rows[i].MetricsAveragePrecision,
-		})
+		}
+		if isFreshness {
+			point["rps"] = rows[i].MetricsRPS
+			if rows[i].HasMetricsWeightedKappa {
+				point["weighted_kappa"] = rows[i].MetricsWeightedKappa
+			}
+			if !rows[i].HasMetricsROCAUC {
+				delete(point, "roc_auc")
+			}
+		}
+		points = append(points, point)
 	}
 
 	data, err := json.Marshal(points)

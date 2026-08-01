@@ -1568,4 +1568,20 @@ var migrations = [...]func(tx *sql.Tx) error{
 		`)
 		return err
 	},
+	func(tx *sql.Tx) (err error) {
+		_, err = tx.Exec(`
+			ALTER TABLE model_evals
+				ALTER COLUMN metrics_accuracy DROP NOT NULL,
+				ALTER COLUMN metrics_precision DROP NOT NULL,
+				ALTER COLUMN metrics_recall DROP NOT NULL,
+				ALTER COLUMN metrics_f1 DROP NOT NULL,
+				ALTER COLUMN metrics_roc_auc DROP NOT NULL,
+				ALTER COLUMN metrics_average_precision DROP NOT NULL,
+				ALTER COLUMN metrics_log_loss DROP NOT NULL,
+				ADD COLUMN metrics_rps double precision,
+				ADD COLUMN metrics_weighted_kappa double precision,
+				ADD COLUMN metrics_log_duration_mae double precision;
+		`)
+		return err
+	},
 }
