@@ -101,6 +101,9 @@ add-string:
 test:
 	go test -cover -race -count=1 ./...
 
+test-js:
+	node --test tests/*.js
+
 lint:
 	go vet ./...
 	test -z "$$(gofmt -l .)"

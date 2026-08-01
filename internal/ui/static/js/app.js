@@ -1490,6 +1490,50 @@ function initializeAIMetricsCharts() {
     });
 }
 
+function calculateAIMetricsYAxis(points, visibleSeries, pointValue, isFreshness) {
+    const lowerBound = isFreshness ? -1 : 0;
+    const upperBound = 1;
+    const values = points.flatMap((point) => visibleSeries.flatMap((item) => {
+        const value = pointValue(point, item.key);
+        return value === null ? [] : [value];
+    }));
+
+    if (values.length === 0) {
+        const ticks = isFreshness ? [-1, -0.5, 0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
+        return { minimum: lowerBound, maximum: upperBound, ticks };
+    }
+
+    const dataMinimum = Math.min(...values);
+    const dataMaximum = Math.max(...values);
+    const dataRange = dataMaximum - dataMinimum;
+    const padding = Math.max((0.2 - dataRange) / 2, dataRange * 0.1);
+    let minimum = dataMinimum - padding;
+    let maximum = dataMaximum + padding;
+
+    if (maximum > upperBound) {
+        minimum -= maximum - upperBound;
+        maximum = upperBound;
+    }
+    if (minimum < lowerBound) {
+        maximum += lowerBound - minimum;
+        minimum = lowerBound;
+    }
+
+    const roughStep = (maximum - minimum) / 4;
+    const magnitude = 10 ** Math.floor(Math.log10(roughStep));
+    const normalizedStep = roughStep / magnitude;
+    const niceStep = [1, 2, 2.5, 5, 10].find((step) => step >= normalizedStep) * magnitude;
+
+    minimum = Math.max(lowerBound, Math.floor(minimum / niceStep) * niceStep);
+    maximum = Math.min(upperBound, Math.ceil(maximum / niceStep) * niceStep);
+
+    const ticks = [];
+    for (let tick = minimum; tick <= maximum + niceStep / 2; tick += niceStep) {
+        ticks.push(Number(tick.toFixed(10)));
+    }
+    return { minimum, maximum, ticks };
+}
+
 function renderAIMetricsChart(chartElement) {
     let points = [];
     try {
@@ -1579,17 +1623,18 @@ function renderAIMetricsChart(chartElement) {
         };
 
         const isFreshness = chartElement.dataset.isFreshness === "true";
-        const minimum = isFreshness ? -1 : 0;
+        const visibleSeries = series.filter((item) => item.visible);
+        const yAxis = calculateAIMetricsYAxis(points, visibleSeries, pointValue, isFreshness);
         const yForValue = (value) => {
-            const clamped = Math.max(minimum, Math.min(1, Number(value) || 0));
-            return plot.top + ((1 - clamped) / (1 - minimum) * plotHeight);
+            const clamped = Math.max(yAxis.minimum, Math.min(yAxis.maximum, Number(value) || 0));
+            return plot.top + ((yAxis.maximum - clamped) / (yAxis.maximum - yAxis.minimum) * plotHeight);
         };
 
         ctx.font = "12px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
         ctx.lineWidth = 1;
         ctx.textBaseline = "middle";
 
-        (isFreshness ? [-1, -0.5, 0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1]).forEach((tick) => {
+        yAxis.ticks.forEach((tick) => {
             const y = yForValue(tick);
             ctx.strokeStyle = borderColor;
             ctx.beginPath();
@@ -1618,13 +1663,12 @@ function renderAIMetricsChart(chartElement) {
             ctx.fillText(points[points.length - 1].date, width - plot.right, height - 20);
         }
 
-        const visibleSeries = series.filter((item) => item.visible);
         hitTargets = points.map((point, index) => {
             const value = visibleSeries.map((item) => pointValue(point, item.key)).find((item) => item !== null);
             return {
                 index,
                 x: xForIndex(index),
-                y: yForValue(value === undefined ? 0.5 : value),
+                y: yForValue(value === undefined ? (yAxis.minimum + yAxis.maximum) / 2 : value),
             };
         });
 
