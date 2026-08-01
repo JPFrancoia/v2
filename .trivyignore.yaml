@@ -1,4 +1,7 @@
 vulnerabilities:
+  - id: CVE-2026-55185
+    statement: The vulnerable redirect path is fixed by the local backport of upstream commit c896bafd and covered by IsRelativePath regression tests; Trivy only sees the custom pre-2.3.1 module version.
+    expired_at: 2027-08-01
   - id: GO-2026-5932
     statement: Miniflux does not import golang.org/x/crypto/openpgp and the package is absent from the compiled dependency closure; Trivy reports the advisory at module level.
     expired_at: 2027-08-01
