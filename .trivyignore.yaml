@@ -1,0 +1,4 @@
+vulnerabilities:
+  - id: GO-2026-5932
+    statement: Miniflux does not import golang.org/x/crypto/openpgp and the package is absent from the compiled dependency closure; Trivy reports the advisory at module level.
+    expired_at: 2027-08-01
