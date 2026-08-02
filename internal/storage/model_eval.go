@@ -4,6 +4,7 @@
 package storage // import "miniflux.app/v2/internal/storage"
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 
@@ -23,6 +24,7 @@ func (s *Storage) ModelEvals(limit int) (model.ModelEvals, error) {
 			id,
 			eval_date,
 			model,
+			evaluation_model,
 			training,
 			eval,
 			metrics_accuracy,
@@ -55,6 +57,7 @@ func (s *Storage) ModelEvals(limit int) (model.ModelEvals, error) {
 	modelEvals := make(model.ModelEvals, 0)
 	for rows.Next() {
 		var modelEval model.ModelEval
+		var evaluationModel sql.NullString
 		var trainingData []byte
 		var evalData []byte
 
@@ -62,6 +65,7 @@ func (s *Storage) ModelEvals(limit int) (model.ModelEvals, error) {
 			&modelEval.ID,
 			&modelEval.EvalDate,
 			&modelEval.Model,
+			&evaluationModel,
 			&trainingData,
 			&evalData,
 			&modelEval.MetricsAccuracy,
@@ -84,6 +88,9 @@ func (s *Storage) ModelEvals(limit int) (model.ModelEvals, error) {
 		)
 		if err != nil {
 			return nil, fmt.Errorf(`store: unable to fetch model evaluation row: %v`, err)
+		}
+		if evaluationModel.Valid {
+			modelEval.EvaluationModel = evaluationModel.String
 		}
 
 		if err := json.Unmarshal(trainingData, &modelEval.Training); err != nil {

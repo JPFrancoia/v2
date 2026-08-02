@@ -10,6 +10,7 @@ type ModelEval struct {
 	ID                                    int64
 	EvalDate                              time.Time
 	Model                                 string
+	EvaluationModel                       string
 	Training                              map[string]int
 	Eval                                  map[string]int
 	MetricsAccuracy                       *float64

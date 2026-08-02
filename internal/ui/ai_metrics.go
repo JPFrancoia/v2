@@ -32,6 +32,7 @@ type aiMetricModelView struct {
 
 type aiMetricRowView struct {
 	EvalDate                              string
+	EvaluationModel                       string
 	CreatedAt                             string
 	Training                              string
 	Eval                                  string
@@ -136,8 +137,14 @@ func metricValue(value *float64) float64 {
 }
 
 func buildAIMetricRowView(row *model.ModelEval, userTimezone string) aiMetricRowView {
+	evaluationModel := row.EvaluationModel
+	if evaluationModel == "" {
+		evaluationModel = "-"
+	}
+
 	return aiMetricRowView{
 		EvalDate:                              row.EvalDate.Format("2006-01-02"),
+		EvaluationModel:                       evaluationModel,
 		CreatedAt:                             timezone.Convert(userTimezone, row.CreatedAt).Format("2006-01-02 15:04"),
 		Training:                              formatAIMetricCounts(row.Training),
 		Eval:                                  formatAIMetricCounts(row.Eval),

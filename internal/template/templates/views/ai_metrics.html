@@ -18,7 +18,7 @@
                     <h2 id="ai-metrics-summary-{{ .Name }}" class="ai-metrics-card-name">
                         <a href="#ai-metrics-{{ .Name }}">{{ .Name }}</a>
                     </h2>
-                    <span class="ai-metrics-badge">{{ .Latest.EvalDate }}</span>
+                    <span class="ai-metrics-badge">{{ .Latest.EvalDate }} · {{ .Latest.EvaluationModel }}</span>
                 </div>
                 <div class="ai-metrics-card-stats">
                     {{ if .IsFreshness }}
@@ -44,7 +44,7 @@
         <section class="ai-metrics-detail-card" aria-labelledby="ai-metrics-{{ .Name }}">
             <div class="ai-metrics-detail-header">
                 <h2 id="ai-metrics-{{ .Name }}" class="ai-metrics-section-title">{{ .Name }}</h2>
-                <span class="ai-metrics-badge ai-metrics-badge-muted">{{ t "page.ai_metrics.latest" }} {{ .Latest.EvalDate }}</span>
+                <span class="ai-metrics-badge ai-metrics-badge-muted">{{ t "page.ai_metrics.latest" }} {{ .Latest.EvalDate }} · {{ .Latest.EvaluationModel }}</span>
             </div>
 
             <div class="ai-metrics-latest-grid" aria-label="{{ t "page.ai_metrics.latest" }}">
@@ -137,6 +137,7 @@
                     <thead>
                     <tr>
                         <th>{{ t "page.ai_metrics.table.date" }}</th>
+                        <th>{{ t "page.ai_metrics.table.model" }}</th>
                         <th>{{ t "page.ai_metrics.table.training" }}</th>
                         <th>{{ t "page.ai_metrics.table.eval" }}</th>
                         {{ if .IsFreshness }}
@@ -168,6 +169,7 @@
                     {{ range .Rows }}
                     <tr>
                         <td>{{ .EvalDate }}</td>
+                        <td>{{ .EvaluationModel }}</td>
                         <td>{{ .Training }}</td>
                         <td>{{ .Eval }}</td>
                         {{ if $model.IsFreshness }}

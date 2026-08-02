@@ -25,6 +25,7 @@ func TestBuildAIMetricModelViews(t *testing.T) {
 		&model.ModelEval{Model: "Relevance", EvalDate: evalDate},
 		&model.ModelEval{
 			Model:                                 "Super-important",
+			EvaluationModel:                       "EmbeddingGemma 300M + logistic regression",
 			EvalDate:                              evalDate,
 			MetricsSuperImportantAveragePrecision: floatPointer(0.91),
 			MetricsRelevanceAveragePrecision:      floatPointer(0.82),
@@ -43,6 +44,9 @@ func TestBuildAIMetricModelViews(t *testing.T) {
 	superImportant := views[1]
 	if !superImportant.IsSuperImportant {
 		t.Fatal("super-important view is not marked as super-important")
+	}
+	if superImportant.Latest.EvaluationModel != "EmbeddingGemma 300M + logistic regression" {
+		t.Fatalf("evaluation model mapped incorrectly: %q", superImportant.Latest.EvaluationModel)
 	}
 	if superImportant.Latest.MetricsRecallAt10 != 0.3 || superImportant.Latest.MetricsRecallAt25 != 0.5 || superImportant.Latest.MetricsSuperImportantBonus != 1.4 {
 		t.Fatalf("super-important fields mapped incorrectly: %#v", superImportant.Latest)
@@ -77,5 +81,8 @@ func TestBuildAIMetricModelViews(t *testing.T) {
 
 	if strings.Contains(views[0].ChartData, "rps") || !strings.Contains(views[0].ChartData, "average_precision") {
 		t.Fatalf("binary chart data changed unexpectedly: %s", views[0].ChartData)
+	}
+	if views[0].Latest.EvaluationModel != "-" {
+		t.Fatalf("missing evaluation model should display as '-', got %q", views[0].Latest.EvaluationModel)
 	}
 }

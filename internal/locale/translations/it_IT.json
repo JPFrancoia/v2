@@ -497,6 +497,7 @@
     "page.ai_metrics.metric.roc_auc": "ROC AUC",
     "page.ai_metrics.more_data_needed": "More eval runs are needed to draw a line graph.",
     "page.ai_metrics.table.created_at": "Recorded",
+    "page.ai_metrics.table.model": "Model",
     "page.ai_metrics.table.date": "Date",
     "page.ai_metrics.table.eval": "Eval",
     "page.ai_metrics.table.training": "Training",

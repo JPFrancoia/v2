@@ -1596,4 +1596,8 @@ var migrations = [...]func(tx *sql.Tx) error{
 		`)
 		return err
 	},
+	func(tx *sql.Tx) (err error) {
+		_, err = tx.Exec(`ALTER TABLE model_evals ADD COLUMN evaluation_model text`)
+		return err
+	},
 }
