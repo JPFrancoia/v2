@@ -14,7 +14,8 @@ import (
 )
 
 const (
-	toReviewScoreTarget int64 = 50
+	// 21 is the transformed equivalent of the previous score target of 50.
+	toReviewScoreTarget int64 = 21
 	toReviewMaxAge            = 5 * 24 * time.Hour
 )
 
