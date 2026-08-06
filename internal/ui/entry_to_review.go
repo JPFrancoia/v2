@@ -6,6 +6,7 @@ package ui // import "miniflux.app/v2/internal/ui"
 import (
 	"net/http"
 
+	"miniflux.app/v2/internal/config"
 	"miniflux.app/v2/internal/http/request"
 	"miniflux.app/v2/internal/http/response"
 	"miniflux.app/v2/internal/model"
@@ -45,7 +46,7 @@ func (h *handler) showToReviewEntryPage(w http.ResponseWriter, r *http.Request) 
 	entryPaginationBuilder.WithVote(0)
 	entryPaginationBuilder.AfterPublishedDate(publishedAfter)
 	entryPaginationBuilder.WithGloballyVisible()
-	entryPaginationBuilder.WithScoreDistanceSorting(toReviewScoreTarget)
+	entryPaginationBuilder.WithScoreDistanceSorting(config.Opts.ToReviewScoreTarget())
 	prevEntry, nextEntry, err := entryPaginationBuilder.Entries()
 	if err != nil {
 		response.HTMLServerError(w, r, err)

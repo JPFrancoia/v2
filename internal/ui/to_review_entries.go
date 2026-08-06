@@ -7,17 +7,14 @@ import (
 	"net/http"
 	"time"
 
+	"miniflux.app/v2/internal/config"
 	"miniflux.app/v2/internal/http/request"
 	"miniflux.app/v2/internal/http/response"
 	"miniflux.app/v2/internal/model"
 	"miniflux.app/v2/internal/ui/view"
 )
 
-const (
-	// 21 is the transformed equivalent of the previous score target of 50.
-	toReviewScoreTarget int64 = 21
-	toReviewMaxAge            = 5 * 24 * time.Hour
-)
+const toReviewMaxAge = 5 * 24 * time.Hour
 
 func toReviewPublishedAfter() time.Time {
 	return time.Now().Add(-toReviewMaxAge)
@@ -36,7 +33,7 @@ func (h *handler) showToReviewPage(w http.ResponseWriter, r *http.Request) {
 	builder.WithStatus(model.EntryStatusUnread)
 	builder.WithVote(0)
 	builder.AfterPublishedDate(publishedAfter)
-	builder.WithScoreDistanceSorting(toReviewScoreTarget)
+	builder.WithScoreDistanceSorting(config.Opts.ToReviewScoreTarget())
 	builder.WithSorting("published_at", "DESC")
 	builder.WithSorting("id", "DESC")
 	builder.WithOffset(offset)
@@ -56,7 +53,7 @@ func (h *handler) showToReviewPage(w http.ResponseWriter, r *http.Request) {
 		builder.WithStatus(model.EntryStatusUnread)
 		builder.WithVote(0)
 		builder.AfterPublishedDate(publishedAfter)
-		builder.WithScoreDistanceSorting(toReviewScoreTarget)
+		builder.WithScoreDistanceSorting(config.Opts.ToReviewScoreTarget())
 		builder.WithSorting("published_at", "DESC")
 		builder.WithSorting("id", "DESC")
 		builder.WithLimit(user.EntriesPerPage)

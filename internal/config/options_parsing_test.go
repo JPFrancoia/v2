@@ -1619,6 +1619,31 @@ func TestSchedulerRoundRobinMinIntervalOptionParsing(t *testing.T) {
 	}
 }
 
+// TestToReviewScoreTargetOptionParsing checks the default, valid range, and invalid values.
+func TestToReviewScoreTargetOptionParsing(t *testing.T) {
+	configParser := NewConfigParser()
+
+	if configParser.options.ToReviewScoreTarget() != 21 {
+		t.Fatal("Expected TO_REVIEW_SCORE_TARGET to be 21 by default")
+	}
+
+	for _, value := range []string{"0", "50", "100"} {
+		if err := configParser.parseLines([]string{"TO_REVIEW_SCORE_TARGET=" + value}); err != nil {
+			t.Fatalf("Unexpected error for TO_REVIEW_SCORE_TARGET=%s: %v", value, err)
+		}
+	}
+
+	if configParser.options.ToReviewScoreTarget() != 100 {
+		t.Fatal("Expected TO_REVIEW_SCORE_TARGET to accept 100")
+	}
+
+	for _, value := range []string{"-1", "101"} {
+		if err := configParser.parseLines([]string{"TO_REVIEW_SCORE_TARGET=" + value}); err == nil {
+			t.Fatalf("Expected error for TO_REVIEW_SCORE_TARGET=%s", value)
+		}
+	}
+}
+
 func TestTrustedReverseProxyNetworksOptionParsing(t *testing.T) {
 	configParser := NewConfigParser()
 

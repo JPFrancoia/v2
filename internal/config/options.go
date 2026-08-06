@@ -561,6 +561,14 @@ func NewConfigOptions() *configOptions {
 					return validateGreaterOrEqualThan(rawValue, 1)
 				},
 			},
+			"TO_REVIEW_SCORE_TARGET": {
+				parsedInt64Value: 21,
+				rawValue:         "21",
+				valueType:        int64Type,
+				validator: func(rawValue string) error {
+					return validateRange(rawValue, 0, 100)
+				},
+			},
 			"TRUSTED_REVERSE_PROXY_NETWORKS": {
 				parsedStringList: []string{},
 				rawValue:         "",
@@ -974,6 +982,10 @@ func (c *configOptions) SchedulerRoundRobinMaxInterval() time.Duration {
 
 func (c *configOptions) SchedulerRoundRobinMinInterval() time.Duration {
 	return c.options["SCHEDULER_ROUND_ROBIN_MIN_INTERVAL"].parsedDuration
+}
+
+func (c *configOptions) ToReviewScoreTarget() int64 {
+	return c.options["TO_REVIEW_SCORE_TARGET"].parsedInt64Value
 }
 
 func (c *configOptions) TrustedReverseProxyNetworks() []string {
