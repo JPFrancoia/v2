@@ -88,16 +88,19 @@ func (h *handler) showAIMetricsPage(w http.ResponseWriter, r *http.Request) {
 func buildAIMetricModelViews(modelEvals model.ModelEvals, userTimezone string) []aiMetricModelView {
 	groups := make(map[string]model.ModelEvals)
 	for _, modelEval := range modelEvals {
+		if modelEval.Model == "Super-important" {
+			continue
+		}
 		groups[modelEval.Model] = append(groups[modelEval.Model], modelEval)
 	}
 
-	modelNames := []string{"Relevance", "Super-important", "Urgency", "Freshness"}
+	modelNames := []string{"Relevance", "Urgency", "Freshness"}
 	for modelName := range groups {
-		if modelName != "Relevance" && modelName != "Super-important" && modelName != "Urgency" && modelName != "Freshness" {
+		if modelName != "Relevance" && modelName != "Urgency" && modelName != "Freshness" {
 			modelNames = append(modelNames, modelName)
 		}
 	}
-	sort.Strings(modelNames[4:])
+	sort.Strings(modelNames[3:])
 
 	views := make([]aiMetricModelView, 0, len(groups))
 	for _, modelName := range modelNames {

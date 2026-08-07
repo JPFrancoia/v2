@@ -15,7 +15,7 @@ func floatPointer(value float64) *float64 {
 	return &value
 }
 
-// TestBuildAIMetricModelViews checks canonical ordering, metric mapping, and model-specific chart data.
+// TestBuildAIMetricModelViews checks filtering, canonical ordering, metric mapping, and model-specific chart data.
 func TestBuildAIMetricModelViews(t *testing.T) {
 	evalDate := time.Date(2026, 7, 26, 0, 0, 0, 0, time.UTC)
 	views := buildAIMetricModelViews(model.ModelEvals{
@@ -23,44 +23,15 @@ func TestBuildAIMetricModelViews(t *testing.T) {
 		&model.ModelEval{Model: "Freshness", EvalDate: evalDate, MetricsRPS: floatPointer(0.1), MetricsF1: floatPointer(0.2), MetricsWeightedKappa: floatPointer(-0.3)},
 		&model.ModelEval{Model: "Freshness", EvalDate: evalDate.Add(-24 * time.Hour), MetricsRPS: floatPointer(0.2), MetricsF1: floatPointer(0.1)},
 		&model.ModelEval{Model: "Relevance", EvalDate: evalDate},
-		&model.ModelEval{
-			Model:                                 "Super-important",
-			EvaluationModel:                       "EmbeddingGemma 300M + logistic regression",
-			EvalDate:                              evalDate,
-			MetricsSuperImportantAveragePrecision: floatPointer(0.91),
-			MetricsRelevanceAveragePrecision:      floatPointer(0.82),
-			MetricsRecallAt10:                     floatPointer(0.3),
-			MetricsRecallAt25:                     floatPointer(0.5),
-			MetricsRecallAt50:                     floatPointer(0.7),
-			MetricsSuperImportantBonus:            floatPointer(1.4),
-		},
+		&model.ModelEval{Model: "Super-important", EvalDate: evalDate},
 		&model.ModelEval{Model: "Urgency", EvalDate: evalDate},
 	}, "UTC")
 
-	if len(views) != 5 || views[0].Name != "Relevance" || views[1].Name != "Super-important" || views[2].Name != "Urgency" || views[3].Name != "Freshness" || views[4].Name != "Other" {
-		t.Fatalf("unexpected model ordering: %#v", views)
+	if len(views) != 4 || views[0].Name != "Relevance" || views[1].Name != "Urgency" || views[2].Name != "Freshness" || views[3].Name != "Other" {
+		t.Fatalf("unexpected model filtering or ordering: %#v", views)
 	}
 
-	superImportant := views[1]
-	if !superImportant.IsSuperImportant {
-		t.Fatal("super-important view is not marked as super-important")
-	}
-	if superImportant.Latest.EvaluationModel != "EmbeddingGemma 300M + logistic regression" {
-		t.Fatalf("evaluation model mapped incorrectly: %q", superImportant.Latest.EvaluationModel)
-	}
-	if superImportant.Latest.MetricsRecallAt10 != 0.3 || superImportant.Latest.MetricsRecallAt25 != 0.5 || superImportant.Latest.MetricsSuperImportantBonus != 1.4 {
-		t.Fatalf("super-important fields mapped incorrectly: %#v", superImportant.Latest)
-	}
-	for _, expected := range []string{`"super_important_average_precision":0.91`, `"relevance_average_precision":0.82`, `"recall_at_50":0.7`} {
-		if !strings.Contains(superImportant.ChartData, expected) {
-			t.Errorf("super-important chart data %q does not contain %q", superImportant.ChartData, expected)
-		}
-	}
-	if strings.Contains(superImportant.ChartData, `"recall_at_10"`) || strings.Contains(superImportant.ChartData, `"bonus"`) {
-		t.Fatalf("super-important chart contains detail-only metrics: %s", superImportant.ChartData)
-	}
-
-	freshness := views[3]
+	freshness := views[2]
 	if !freshness.IsFreshness {
 		t.Fatal("freshness view is not marked as freshness")
 	}
