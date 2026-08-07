@@ -44,7 +44,8 @@ func (h *handler) showUnreadEntryPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	entryPaginationBuilder := storage.NewEntryPaginationBuilder(h.store, user.ID, entry.ID, user.EntryOrder, user.EntryDirection)
+	order, direction := entryListSorting(r, user)
+	entryPaginationBuilder := storage.NewEntryPaginationBuilder(h.store, user.ID, entry.ID, order, direction)
 	entryPaginationBuilder.WithStatus(model.EntryStatusUnread)
 	entryPaginationBuilder.WithGloballyVisible()
 	prevEntry, nextEntry, err := entryPaginationBuilder.Entries()
@@ -99,6 +100,8 @@ func (h *handler) showUnreadEntryPage(w http.ResponseWriter, r *http.Request) {
 	view.Set("nextEntry", nextEntry)
 	view.Set("nextEntryRoute", nextEntryRoute)
 	view.Set("prevEntryRoute", prevEntryRoute)
+	view.Set("sortOrder", order)
+	view.Set("sortDirection", direction)
 	view.Set("menu", "unread")
 	view.Set("user", user)
 	view.Set("hasSaveEntry", h.store.HasSaveEntry(user.ID))

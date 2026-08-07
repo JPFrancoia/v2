@@ -204,7 +204,7 @@ func TestFormatFileSize(t *testing.T) {
 }
 
 func TestQueryString(t *testing.T) {
-	params, err := dict("q", "ai", "unread", true, "offset", 20)
+	params, err := dict("q", "ai", "unread", true, "offset", 20, "order", "score", "direction", "desc")
 	if err != nil {
 		t.Fatalf(`The dict should be valid: %v`, err)
 	}
@@ -228,6 +228,14 @@ func TestQueryString(t *testing.T) {
 
 	if !strings.Contains(got, "offset=20") {
 		t.Fatalf(`Expected query string to contain offset=20, got %q`, got)
+	}
+
+	if !strings.Contains(got, "order=score") {
+		t.Fatalf(`Expected query string to contain order=score, got %q`, got)
+	}
+
+	if !strings.Contains(got, "direction=desc") {
+		t.Fatalf(`Expected query string to contain direction=desc, got %q`, got)
 	}
 
 	empty, err := dict("q", "", "unread", false, "offset", 0)

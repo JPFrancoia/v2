@@ -7,6 +7,18 @@
         <span aria-hidden="true"> ({{ .total }})</span>
     </h1>
     <span id="page-header-title-count" class="sr-only">{{ t "page.saved_for_later_entry_count" .total }}</span>
+    {{ if .entries }}
+    <nav aria-label="{{ t "page.saved_for_later.title" }} {{ t "menu.title" }}">
+        <ul>
+            <li>
+                <a class="page-link" href="{{ routePath "/saved-for-later" }}{{ queryString (dict "order" "score" "direction" .scoreSortDirection) }}">{{ t "form.prefs.select.score" }}{{ if eq .sortOrder "score" }} {{ if eq .sortDirection "asc" }}↑{{ else }}↓{{ end }}{{ end }}</a>
+            </li>
+            <li>
+                <a class="page-link" href="{{ routePath "/saved-for-later" }}{{ queryString (dict "order" "published_at" "direction" .publishedSortDirection) }}">{{ t "form.prefs.select.publish_time" }}{{ if eq .sortOrder "published_at" }} {{ if eq .sortDirection "asc" }}↑{{ else }}↓{{ end }}{{ end }}</a>
+            </li>
+        </ul>
+    </nav>
+    {{ end }}
 </section>
 {{ end }}
 
@@ -27,7 +39,7 @@
         >
             <header class="item-header" dir="auto">
                 <h2 id="entry-title-{{ .ID }}" class="item-title">
-                    <a href="{{ routePath "/saved-for-later/entry/%d" .ID }}" {{ if and $.user.AlwaysOpenExternalLinks $.user.OpenExternalLinksInNewTab }}target="_blank"{{ end }}>
+                    <a href="{{ routePath "/saved-for-later/entry/%d" .ID }}{{ queryString (dict "order" $.sortOrder "direction" $.sortDirection) }}" {{ if and $.user.AlwaysOpenExternalLinks $.user.OpenExternalLinksInNewTab }}target="_blank"{{ end }}>
                         {{ if ne .Feed.Icon.IconID 0 }}
                         <img src="{{ routePath "/feed-icon/%s" .Feed.Icon.ExternalIconID }}" width="16" height="16" loading="lazy" alt="">
                         {{ end }}

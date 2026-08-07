@@ -155,10 +155,6 @@ func (e *entryPaginationBuilder) Entries() (*model.Entry, *model.Entry, error) {
 
 	tx.Commit()
 
-	if e.direction == "desc" {
-		return nextEntry, prevEntry, nil
-	}
-
 	return prevEntry, nextEntry, nil
 }
 
@@ -208,7 +204,7 @@ func (e *entryPaginationBuilder) buildSorting() string {
 		return strings.Join(e.sortExpressions, ", ")
 	}
 
-	return fmt.Sprintf("e.%s asc, e.created_at asc, e.id desc", e.order)
+	return fmt.Sprintf("e.%s %s, e.id %s", e.order, e.direction, e.direction)
 }
 
 func (e *entryPaginationBuilder) getEntry(tx *sql.Tx, entryID int64) (*model.Entry, error) {

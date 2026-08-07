@@ -38,7 +38,8 @@ func (h *handler) showSavedForLaterEntryPage(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	entryPaginationBuilder := storage.NewEntryPaginationBuilder(h.store, user.ID, entry.ID, user.EntryOrder, user.EntryDirection)
+	order, direction := entryListSorting(r, user)
+	entryPaginationBuilder := storage.NewEntryPaginationBuilder(h.store, user.ID, entry.ID, order, direction)
 	entryPaginationBuilder.WithSavedForLater()
 	entryPaginationBuilder.WithStatus(model.EntryStatusUnread)
 	entryPaginationBuilder.WithGloballyVisible()
@@ -92,6 +93,8 @@ func (h *handler) showSavedForLaterEntryPage(w http.ResponseWriter, r *http.Requ
 	view.Set("nextEntry", nextEntry)
 	view.Set("nextEntryRoute", nextEntryRoute)
 	view.Set("prevEntryRoute", prevEntryRoute)
+	view.Set("sortOrder", order)
+	view.Set("sortDirection", direction)
 	view.Set("menu", "saved_for_later")
 	view.Set("user", user)
 	view.Set("countUnread", h.store.CountUnreadEntries(user.ID))
