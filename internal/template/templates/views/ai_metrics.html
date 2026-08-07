@@ -7,10 +7,47 @@
 {{ end }}
 
 {{ define "content"}}
-{{ if eq .total 0 }}
-    <p role="alert" class="alert alert-info">{{ t "alert.no_ai_metrics" }}</p>
-{{ else }}
-    <div class="ai-metrics">
+<div class="ai-metrics">
+        {{ with .importantDiscovery }}
+        <section class="ai-metrics-detail-card" aria-labelledby="important-discovery-title">
+            <div class="ai-metrics-detail-header">
+                <h2 id="important-discovery-title" class="ai-metrics-section-title">{{ t "page.ai_metrics.discovery.title" }}</h2>
+                <span class="ai-metrics-badge">{{ t "page.ai_metrics.discovery.this_week" }} · {{ .Latest.WeekStart }}</span>
+            </div>
+            <div class="ai-metrics-latest-grid" aria-label="{{ t "page.ai_metrics.discovery.this_week" }}">
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.discovery.important" }}</span><strong>{{ .Latest.ImportantCount }}</strong></div>
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.discovery.read" }}</span><strong>{{ .Latest.ReadCount }}</strong></div>
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.discovery.rate" }}</span><strong>{{ if .Latest.HasRate }}{{ printf "%.1f%%" .Latest.RatePercent }}{{ else }}-{{ end }}</strong></div>
+            </div>
+            <p class="ai-metrics-note">{{ t "page.ai_metrics.discovery.description" }}</p>
+            <div class="ai-metrics-table-wrapper">
+                <table class="ai-metrics-table">
+                    <thead>
+                    <tr>
+                        <th>{{ t "page.ai_metrics.discovery.week" }}</th>
+                        <th>{{ t "page.ai_metrics.discovery.important" }}</th>
+                        <th>{{ t "page.ai_metrics.discovery.read" }}</th>
+                        <th>{{ t "page.ai_metrics.discovery.rate" }}</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {{ range .Rows }}
+                    <tr>
+                        <td>{{ .WeekStart }}</td>
+                        <td>{{ .ImportantCount }}</td>
+                        <td>{{ .ReadCount }}</td>
+                        <td>{{ if .HasRate }}{{ printf "%.1f%%" .RatePercent }}{{ else }}-{{ end }}</td>
+                    </tr>
+                    {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        {{ end }}
+
+        {{ if eq .total 0 }}
+        <p role="alert" class="alert alert-info">{{ t "alert.no_ai_metrics" }}</p>
+        {{ else }}
         <div class="ai-metrics-dashboard">
         {{ range .models }}
             <section class="ai-metrics-summary-card" aria-labelledby="ai-metrics-summary-{{ .Name }}">
@@ -219,6 +256,6 @@
             </div>
         </section>
     {{ end }}
-    </div>
-{{ end }}
+    {{ end }}
+</div>
 {{ end }}

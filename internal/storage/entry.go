@@ -759,6 +759,52 @@ func (s *Storage) MarkCategoryAsRead(userID, categoryID int64, before time.Time)
 	return nil
 }
 
+// ImportantDiscoveryWeeks returns read and important article counts for the last 12 calendar weeks.
+func (s *Storage) ImportantDiscoveryWeeks(userID int64, userTimezone string) (model.ImportantDiscoveryWeeks, error) {
+	query := `
+		WITH weeks AS (
+			SELECT generate_series(
+				date_trunc('week', CURRENT_TIMESTAMP AT TIME ZONE $2) - INTERVAL '11 weeks',
+				date_trunc('week', CURRENT_TIMESTAMP AT TIME ZONE $2),
+				INTERVAL '1 week'
+			)::date AS week_start
+		)
+		SELECT
+			weeks.week_start,
+			COUNT(entries.id) FILTER (
+				WHERE entries.vote >= 0 AND (entries.starred OR entries.vote = 1)
+			),
+			COUNT(entries.id)
+		FROM weeks
+		LEFT JOIN entries ON
+			entries.user_id = $1
+			AND entries.status = 'read'
+			AND entries.changed_at >= weeks.week_start::timestamp AT TIME ZONE $2
+			AND entries.changed_at < (weeks.week_start::timestamp + INTERVAL '1 week') AT TIME ZONE $2
+		GROUP BY weeks.week_start
+		ORDER BY weeks.week_start DESC
+	`
+	rows, err := s.db.Query(query, userID, userTimezone)
+	if err != nil {
+		return nil, fmt.Errorf(`store: unable to fetch important discovery weeks: %v`, err)
+	}
+	defer rows.Close()
+
+	weeks := make(model.ImportantDiscoveryWeeks, 0, 12)
+	for rows.Next() {
+		week := &model.ImportantDiscoveryWeek{}
+		if err := rows.Scan(&week.WeekStart, &week.ImportantCount, &week.ReadCount); err != nil {
+			return nil, fmt.Errorf(`store: unable to fetch important discovery week: %v`, err)
+		}
+		weeks = append(weeks, week)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf(`store: unable to fetch important discovery weeks: %v`, err)
+	}
+
+	return weeks, nil
+}
+
 // EntryShareCode returns the share code of the provided entry.
 // It generates a new one if not already defined.
 func (s *Storage) EntryShareCode(userID int64, entryID int64) (shareCode string, err error) {

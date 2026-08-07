@@ -71,6 +71,16 @@ func (e *Entry) ShouldMarkAsReadOnView(user *User) bool {
 // Entries represents a list of entries.
 type Entries []*Entry
 
+// ImportantDiscoveryWeek stores weekly read and important article counts.
+type ImportantDiscoveryWeek struct {
+	WeekStart      time.Time
+	ImportantCount int
+	ReadCount      int
+}
+
+// ImportantDiscoveryWeeks represents weekly important discovery counts.
+type ImportantDiscoveryWeeks []*ImportantDiscoveryWeek
+
 // EntriesStatusUpdateRequest represents a request to change entries status.
 type EntriesStatusUpdateRequest struct {
 	EntryIDs []int64 `json:"entry_ids"`

@@ -34,6 +34,19 @@ type aiMetricModelView struct {
 	HasMultiplePoints bool
 }
 
+type importantDiscoveryView struct {
+	Rows   []importantDiscoveryWeekView
+	Latest importantDiscoveryWeekView
+}
+
+type importantDiscoveryWeekView struct {
+	WeekStart      string
+	ImportantCount int
+	ReadCount      int
+	RatePercent    float64
+	HasRate        bool
+}
+
 type aiMetricRowView struct {
 	EvalDate                              string
 	EvaluationModel                       string
@@ -79,7 +92,14 @@ func (h *handler) showAIMetricsPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	discoveryWeeks, err := h.store.ImportantDiscoveryWeeks(user.ID, user.Timezone)
+	if err != nil {
+		response.HTMLServerError(w, r, err)
+		return
+	}
+
 	view := view.New(h.tpl, r)
+	view.Set("importantDiscovery", buildImportantDiscoveryView(discoveryWeeks))
 	view.Set("models", buildAIMetricModelViews(modelEvals, user.Timezone))
 	view.Set("total", len(modelEvals))
 	view.Set("menu", "ai_metrics")
@@ -88,6 +108,26 @@ func (h *handler) showAIMetricsPage(w http.ResponseWriter, r *http.Request) {
 	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
 
 	response.HTML(w, r, view.Render("ai_metrics"))
+}
+
+func buildImportantDiscoveryView(weeks model.ImportantDiscoveryWeeks) importantDiscoveryView {
+	result := importantDiscoveryView{Rows: make([]importantDiscoveryWeekView, 0, len(weeks))}
+	for _, week := range weeks {
+		row := importantDiscoveryWeekView{
+			WeekStart:      week.WeekStart.Format("2006-01-02"),
+			ImportantCount: week.ImportantCount,
+			ReadCount:      week.ReadCount,
+			HasRate:        week.ReadCount > 0,
+		}
+		if row.HasRate {
+			row.RatePercent = float64(week.ImportantCount) / float64(week.ReadCount) * 100
+		}
+		result.Rows = append(result.Rows, row)
+	}
+	if len(result.Rows) > 0 {
+		result.Latest = result.Rows[0]
+	}
+	return result
 }
 
 func buildAIMetricModelViews(modelEvals model.ModelEvals, userTimezone string) []aiMetricModelView {

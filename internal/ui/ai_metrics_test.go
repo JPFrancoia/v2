@@ -15,6 +15,25 @@ func floatPointer(value float64) *float64 {
 	return &value
 }
 
+// TestBuildImportantDiscoveryView checks weekly rate formatting and empty-week handling.
+func TestBuildImportantDiscoveryView(t *testing.T) {
+	weekStart := time.Date(2026, 8, 3, 0, 0, 0, 0, time.UTC)
+	result := buildImportantDiscoveryView(model.ImportantDiscoveryWeeks{
+		&model.ImportantDiscoveryWeek{WeekStart: weekStart, ImportantCount: 5, ReadCount: 34},
+		&model.ImportantDiscoveryWeek{WeekStart: weekStart.Add(-7 * 24 * time.Hour)},
+	})
+
+	if len(result.Rows) != 2 || result.Latest.WeekStart != "2026-08-03" {
+		t.Fatalf("unexpected discovery weeks: %#v", result)
+	}
+	if !result.Latest.HasRate || result.Latest.RatePercent < 14.70 || result.Latest.RatePercent > 14.71 {
+		t.Fatalf("unexpected discovery rate: %#v", result.Latest)
+	}
+	if result.Rows[1].HasRate || result.Rows[1].RatePercent != 0 {
+		t.Fatalf("an empty week should not have a rate: %#v", result.Rows[1])
+	}
+}
+
 // TestBuildAIMetricModelViews checks filtering, canonical ordering, metric mapping, and model-specific chart data.
 func TestBuildAIMetricModelViews(t *testing.T) {
 	evalDate := time.Date(2026, 7, 26, 0, 0, 0, 0, time.UTC)
