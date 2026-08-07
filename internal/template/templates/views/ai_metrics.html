@@ -31,8 +31,7 @@
                     <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.recall_at_50" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsRecallAt50 }}</span></div>
                     {{ else if .IsRelevance }}
                     <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.average_precision" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsAveragePrecision }}</span></div>
-                    <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.recall_at_25" }}</span><span class="ai-metrics-stat-value">{{ if .Latest.HasMetricsRecallAt25 }}{{ printf "%.3f" .Latest.MetricsRecallAt25 }}{{ else }}-{{ end }}</span></div>
-                    <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.recall_at_50" }}</span><span class="ai-metrics-stat-value">{{ if .Latest.HasMetricsRecallAt50 }}{{ printf "%.3f" .Latest.MetricsRecallAt50 }}{{ else }}-{{ end }}</span></div>
+                    <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.precision" }}@50</span><span class="ai-metrics-stat-value">{{ if .Latest.HasMetricsPrecisionAt50 }}{{ printf "%.3f" .Latest.MetricsPrecision }}{{ else }}-{{ end }}</span></div>
                     {{ else }}
                     <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.f1" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsF1 }}</span></div>
                     <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.roc_auc" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsROCAUC }}</span></div>
@@ -67,9 +66,7 @@
                 <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.super_important_bonus" }}</span><strong>{{ printf "%.3f" .Latest.MetricsSuperImportantBonus }}</strong></div>
                 {{ else if .IsRelevance }}
                 <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.average_precision" }}</span><strong>{{ printf "%.3f" .Latest.MetricsAveragePrecision }}</strong></div>
-                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.recall_at_10" }}</span><strong>{{ if .Latest.HasMetricsRecallAt10 }}{{ printf "%.3f" .Latest.MetricsRecallAt10 }}{{ else }}-{{ end }}</strong></div>
-                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.recall_at_25" }}</span><strong>{{ if .Latest.HasMetricsRecallAt25 }}{{ printf "%.3f" .Latest.MetricsRecallAt25 }}{{ else }}-{{ end }}</strong></div>
-                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.recall_at_50" }}</span><strong>{{ if .Latest.HasMetricsRecallAt50 }}{{ printf "%.3f" .Latest.MetricsRecallAt50 }}{{ else }}-{{ end }}</strong></div>
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.precision" }}@50</span><strong>{{ if .Latest.HasMetricsPrecisionAt50 }}{{ printf "%.3f" .Latest.MetricsPrecision }}{{ else }}-{{ end }}</strong></div>
                 {{ else }}
                 <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.f1" }}</span><strong>{{ printf "%.3f" .Latest.MetricsF1 }}</strong></div>
                 <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.roc_auc" }}</span><strong>{{ printf "%.3f" .Latest.MetricsROCAUC }}</strong></div>
@@ -116,8 +113,7 @@
                         data-label-weighted-kappa="{{ t "page.ai_metrics.metric.weighted_kappa" }}"
                         data-label-preference-ap="{{ t "page.ai_metrics.metric.preference_ap" }}"
                         data-label-relevance-ap="{{ t "page.ai_metrics.metric.relevance_ap" }}"
-                        data-label-recall-at-10="{{ t "page.ai_metrics.metric.recall_at_10" }}"
-                        data-label-recall-at-25="{{ t "page.ai_metrics.metric.recall_at_25" }}"
+                        data-label-precision-at-50="{{ t "page.ai_metrics.metric.precision" }}@50"
                         data-label-recall-at-50="{{ t "page.ai_metrics.metric.recall_at_50" }}"
                         data-is-relevance="{{ .IsRelevance }}"
                         data-is-freshness="{{ .IsFreshness }}"
@@ -135,9 +131,7 @@
                     <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="recall_at_50" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-average-precision"></span>{{ t "page.ai_metrics.metric.recall_at_50" }}</button></li>
                     {{ else if .IsRelevance }}
                     <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="average_precision" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-average-precision"></span>{{ t "page.ai_metrics.metric.average_precision" }}</button></li>
-                    <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="recall_at_10" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-f1"></span>{{ t "page.ai_metrics.metric.recall_at_10" }}</button></li>
-                    <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="recall_at_25" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-roc-auc"></span>{{ t "page.ai_metrics.metric.recall_at_25" }}</button></li>
-                    <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="recall_at_50" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-recall-at-50"></span>{{ t "page.ai_metrics.metric.recall_at_50" }}</button></li>
+                    <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="precision_at_50" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-f1"></span>{{ t "page.ai_metrics.metric.precision" }}@50</button></li>
                     {{ else }}
                     <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="f1" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-f1"></span>{{ t "page.ai_metrics.metric.f1" }}</button></li>
                     <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="roc_auc" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-roc-auc"></span>{{ t "page.ai_metrics.metric.roc_auc" }}</button></li>
@@ -172,9 +166,7 @@
                         <th>{{ t "page.ai_metrics.metric.super_important_bonus" }}</th>
                         {{ else if .IsRelevance }}
                         <th>{{ t "page.ai_metrics.metric.average_precision" }}</th>
-                        <th>{{ t "page.ai_metrics.metric.recall_at_10" }}</th>
-                        <th>{{ t "page.ai_metrics.metric.recall_at_25" }}</th>
-                        <th>{{ t "page.ai_metrics.metric.recall_at_50" }}</th>
+                        <th>{{ t "page.ai_metrics.metric.precision" }}@50</th>
                         {{ else }}
                         <th>{{ t "page.ai_metrics.metric.accuracy" }}</th>
                         <th>{{ t "page.ai_metrics.metric.precision" }}</th>
@@ -209,9 +201,7 @@
                         <td>{{ printf "%.3f" .MetricsSuperImportantBonus }}</td>
                         {{ else if $model.IsRelevance }}
                         <td>{{ printf "%.3f" .MetricsAveragePrecision }}</td>
-                        <td>{{ if .HasMetricsRecallAt10 }}{{ printf "%.3f" .MetricsRecallAt10 }}{{ else }}-{{ end }}</td>
-                        <td>{{ if .HasMetricsRecallAt25 }}{{ printf "%.3f" .MetricsRecallAt25 }}{{ else }}-{{ end }}</td>
-                        <td>{{ if .HasMetricsRecallAt50 }}{{ printf "%.3f" .MetricsRecallAt50 }}{{ else }}-{{ end }}</td>
+                        <td>{{ if .HasMetricsPrecisionAt50 }}{{ printf "%.3f" .MetricsPrecision }}{{ else }}-{{ end }}</td>
                         {{ else }}
                         <td>{{ printf "%.3f" .MetricsAccuracy }}</td>
                         <td>{{ printf "%.3f" .MetricsPrecision }}</td>

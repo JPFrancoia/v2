@@ -18,7 +18,10 @@ import (
 	"miniflux.app/v2/internal/ui/view"
 )
 
-const aiMetricsEvalLimit = 200
+const (
+	aiMetricsEvalLimit                    = 200
+	relevancePrecisionAt50EvaluationModel = "EmbeddingGemma 300M prompted + MLP (AP + Precision@50)"
+)
 
 type aiMetricModelView struct {
 	Name              string
@@ -54,9 +57,7 @@ type aiMetricRowView struct {
 	MetricsRecallAt50                     float64
 	MetricsSuperImportantBonus            float64
 	HasMetricsROCAUC                      bool
-	HasMetricsRecallAt10                  bool
-	HasMetricsRecallAt25                  bool
-	HasMetricsRecallAt50                  bool
+	HasMetricsPrecisionAt50               bool
 	HasMetricsWeightedKappa               bool
 }
 
@@ -173,10 +174,9 @@ func buildAIMetricRowView(row *model.ModelEval, userTimezone string) aiMetricRow
 		MetricsRecallAt50:                     metricValue(row.MetricsRecallAt50),
 		MetricsSuperImportantBonus:            metricValue(row.MetricsSuperImportantBonus),
 		HasMetricsROCAUC:                      metricPresent(row.MetricsROCAUC),
-		HasMetricsRecallAt10:                  metricPresent(row.MetricsRecallAt10),
-		HasMetricsRecallAt25:                  metricPresent(row.MetricsRecallAt25),
-		HasMetricsRecallAt50:                  metricPresent(row.MetricsRecallAt50),
-		HasMetricsWeightedKappa:               metricPresent(row.MetricsWeightedKappa),
+		HasMetricsPrecisionAt50: metricPresent(row.MetricsPrecision) &&
+			row.EvaluationModel == relevancePrecisionAt50EvaluationModel,
+		HasMetricsWeightedKappa: metricPresent(row.MetricsWeightedKappa),
 	}
 }
 
@@ -219,14 +219,8 @@ func buildAIMetricChartData(rows []aiMetricRowView, modelName string) string {
 			point["recall_at_50"] = rows[i].MetricsRecallAt50
 		case "Relevance":
 			point["average_precision"] = rows[i].MetricsAveragePrecision
-			if rows[i].HasMetricsRecallAt10 {
-				point["recall_at_10"] = rows[i].MetricsRecallAt10
-			}
-			if rows[i].HasMetricsRecallAt25 {
-				point["recall_at_25"] = rows[i].MetricsRecallAt25
-			}
-			if rows[i].HasMetricsRecallAt50 {
-				point["recall_at_50"] = rows[i].MetricsRecallAt50
+			if rows[i].HasMetricsPrecisionAt50 {
+				point["precision_at_50"] = rows[i].MetricsPrecision
 			}
 		default:
 			point["f1"] = rows[i].MetricsF1

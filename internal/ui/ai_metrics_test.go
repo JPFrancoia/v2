@@ -22,8 +22,8 @@ func TestBuildAIMetricModelViews(t *testing.T) {
 		&model.ModelEval{Model: "Other", EvalDate: evalDate},
 		&model.ModelEval{Model: "Freshness", EvalDate: evalDate, MetricsRPS: floatPointer(0.1), MetricsF1: floatPointer(0.2), MetricsWeightedKappa: floatPointer(-0.3)},
 		&model.ModelEval{Model: "Freshness", EvalDate: evalDate.Add(-24 * time.Hour), MetricsRPS: floatPointer(0.2), MetricsF1: floatPointer(0.1)},
-		&model.ModelEval{Model: "Relevance", EvalDate: evalDate, MetricsAveragePrecision: floatPointer(0.9), MetricsRecallAt10: floatPointer(0.2), MetricsRecallAt25: floatPointer(0.4), MetricsRecallAt50: floatPointer(0.6)},
-		&model.ModelEval{Model: "Relevance", EvalDate: evalDate.Add(-24 * time.Hour), MetricsAveragePrecision: floatPointer(0.8)},
+		&model.ModelEval{Model: "Relevance", EvaluationModel: relevancePrecisionAt50EvaluationModel, EvalDate: evalDate, MetricsPrecision: floatPointer(0.94), MetricsAveragePrecision: floatPointer(0.9)},
+		&model.ModelEval{Model: "Relevance", EvalDate: evalDate.Add(-24 * time.Hour), MetricsPrecision: floatPointer(0.85), MetricsF1: floatPointer(0.8), MetricsAveragePrecision: floatPointer(0.8)},
 		&model.ModelEval{Model: "Super-important", EvalDate: evalDate},
 		&model.ModelEval{Model: "Urgency", EvalDate: evalDate, MetricsF1: floatPointer(0.7), MetricsROCAUC: floatPointer(0.8), MetricsAveragePrecision: floatPointer(0.9)},
 	}, "UTC")
@@ -36,18 +36,19 @@ func TestBuildAIMetricModelViews(t *testing.T) {
 	if !relevance.IsRelevance {
 		t.Fatal("relevance view is not marked as relevance")
 	}
-	if relevance.Rows[1].HasMetricsRecallAt10 || relevance.Rows[1].HasMetricsRecallAt25 || relevance.Rows[1].HasMetricsRecallAt50 {
-		t.Fatal("nil relevance recall metrics should remain undefined")
+	if !relevance.Latest.HasMetricsPrecisionAt50 {
+		t.Fatal("new relevance precision should be marked as Precision@50")
 	}
-	for _, expected := range []string{`"average_precision":0.9`, `"recall_at_10":0.2`, `"recall_at_25":0.4`, `"recall_at_50":0.6`} {
+	if relevance.Rows[1].HasMetricsPrecisionAt50 {
+		t.Fatal("historical threshold precision should not be marked as Precision@50")
+	}
+	for _, expected := range []string{`"average_precision":0.9`, `"precision_at_50":0.94`} {
 		if !strings.Contains(relevance.ChartData, expected) {
 			t.Errorf("relevance chart data %q does not contain %q", relevance.ChartData, expected)
 		}
 	}
-	for _, key := range []string{`"recall_at_10"`, `"recall_at_25"`, `"recall_at_50"`} {
-		if strings.Count(relevance.ChartData, key) != 1 {
-			t.Fatalf("missing historical relevance metric should be omitted from chart data: %s", relevance.ChartData)
-		}
+	if strings.Count(relevance.ChartData, `"precision_at_50"`) != 1 {
+		t.Fatalf("historical threshold precision should be omitted from chart data: %s", relevance.ChartData)
 	}
 
 	freshness := views[2]
@@ -72,7 +73,10 @@ func TestBuildAIMetricModelViews(t *testing.T) {
 	if strings.Contains(views[1].ChartData, "rps") || !strings.Contains(views[1].ChartData, `"f1":0.7`) {
 		t.Fatalf("urgency chart data changed unexpectedly: %s", views[1].ChartData)
 	}
-	if views[0].Latest.EvaluationModel != "-" {
-		t.Fatalf("missing evaluation model should display as '-', got %q", views[0].Latest.EvaluationModel)
+	if relevance.Latest.EvaluationModel != relevancePrecisionAt50EvaluationModel {
+		t.Fatalf("precision metric contract was not preserved: %q", relevance.Latest.EvaluationModel)
+	}
+	if relevance.Rows[1].EvaluationModel != "-" {
+		t.Fatalf("missing evaluation model should display as '-', got %q", relevance.Rows[1].EvaluationModel)
 	}
 }

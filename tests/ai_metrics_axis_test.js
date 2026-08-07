@@ -20,9 +20,7 @@ test("selects the Relevance ranking chart series", () => {
 
     assert.deepEqual(series.map((item) => item.key), [
         "average_precision",
-        "recall_at_10",
-        "recall_at_25",
-        "recall_at_50",
+        "precision_at_50",
     ]);
 });
 
