@@ -894,6 +894,10 @@ fieldset .buttons {
     color: #ea580c;
 }
 
+.ai-metrics-series-recall-at-50 {
+    color: #9333ea;
+}
+
 .ai-metrics-legend {
     display: flex;
     flex-wrap: wrap;

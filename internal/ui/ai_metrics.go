@@ -22,6 +22,7 @@ const aiMetricsEvalLimit = 200
 
 type aiMetricModelView struct {
 	Name              string
+	IsRelevance       bool
 	IsFreshness       bool
 	IsSuperImportant  bool
 	Rows              []aiMetricRowView
@@ -53,6 +54,9 @@ type aiMetricRowView struct {
 	MetricsRecallAt50                     float64
 	MetricsSuperImportantBonus            float64
 	HasMetricsROCAUC                      bool
+	HasMetricsRecallAt10                  bool
+	HasMetricsRecallAt25                  bool
+	HasMetricsRecallAt50                  bool
 	HasMetricsWeightedKappa               bool
 }
 
@@ -116,6 +120,7 @@ func buildAIMetricModelViews(modelEvals model.ModelEvals, userTimezone string) [
 
 		views = append(views, aiMetricModelView{
 			Name:              modelName,
+			IsRelevance:       modelName == "Relevance",
 			IsFreshness:       modelName == "Freshness",
 			IsSuperImportant:  modelName == "Super-important",
 			Rows:              rowViews,
@@ -168,6 +173,9 @@ func buildAIMetricRowView(row *model.ModelEval, userTimezone string) aiMetricRow
 		MetricsRecallAt50:                     metricValue(row.MetricsRecallAt50),
 		MetricsSuperImportantBonus:            metricValue(row.MetricsSuperImportantBonus),
 		HasMetricsROCAUC:                      metricPresent(row.MetricsROCAUC),
+		HasMetricsRecallAt10:                  metricPresent(row.MetricsRecallAt10),
+		HasMetricsRecallAt25:                  metricPresent(row.MetricsRecallAt25),
+		HasMetricsRecallAt50:                  metricPresent(row.MetricsRecallAt50),
 		HasMetricsWeightedKappa:               metricPresent(row.MetricsWeightedKappa),
 	}
 }
@@ -209,6 +217,17 @@ func buildAIMetricChartData(rows []aiMetricRowView, modelName string) string {
 			point["super_important_average_precision"] = rows[i].MetricsSuperImportantAveragePrecision
 			point["relevance_average_precision"] = rows[i].MetricsRelevanceAveragePrecision
 			point["recall_at_50"] = rows[i].MetricsRecallAt50
+		case "Relevance":
+			point["average_precision"] = rows[i].MetricsAveragePrecision
+			if rows[i].HasMetricsRecallAt10 {
+				point["recall_at_10"] = rows[i].MetricsRecallAt10
+			}
+			if rows[i].HasMetricsRecallAt25 {
+				point["recall_at_25"] = rows[i].MetricsRecallAt25
+			}
+			if rows[i].HasMetricsRecallAt50 {
+				point["recall_at_50"] = rows[i].MetricsRecallAt50
+			}
 		default:
 			point["f1"] = rows[i].MetricsF1
 			point["roc_auc"] = rows[i].MetricsROCAUC

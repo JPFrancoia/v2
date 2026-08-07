@@ -1542,6 +1542,14 @@ function aiMetricsChartSeries(chartElement) {
             { key: "weighted_kappa", label: chartElement.dataset.labelWeightedKappa || "Weighted kappa", color: "#2563eb", visible: true },
         ];
     }
+    if (chartElement.dataset.isRelevance === "true") {
+        return [
+            { key: "average_precision", label: chartElement.dataset.labelAveragePrecision || "Average precision", color: "#ea580c", visible: true },
+            { key: "recall_at_10", label: chartElement.dataset.labelRecallAt10 || "Recall@10", color: "#16a34a", visible: true },
+            { key: "recall_at_25", label: chartElement.dataset.labelRecallAt25 || "Recall@25", color: "#2563eb", visible: true },
+            { key: "recall_at_50", label: chartElement.dataset.labelRecallAt50 || "Recall@50", color: "#9333ea", visible: true },
+        ];
+    }
     if (chartElement.dataset.isSuperImportant === "true") {
         return [
             { key: "super_important_average_precision", label: chartElement.dataset.labelPreferenceAp || "Preference AP", color: "#16a34a", visible: true },

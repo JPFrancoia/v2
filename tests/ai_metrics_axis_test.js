@@ -15,6 +15,17 @@ const aiMetricsChartSeries = Function(
 )();
 const pointValue = (point, key) => point[key] ?? null;
 
+test("selects the Relevance ranking chart series", () => {
+    const series = aiMetricsChartSeries({ dataset: { isRelevance: "true" } });
+
+    assert.deepEqual(series.map((item) => item.key), [
+        "average_precision",
+        "recall_at_10",
+        "recall_at_25",
+        "recall_at_50",
+    ]);
+});
+
 test("selects the Super-important chart series", () => {
     const series = aiMetricsChartSeries({ dataset: { isSuperImportant: "true" } });
 
