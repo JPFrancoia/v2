@@ -26,6 +26,7 @@ const (
 type aiMetricModelView struct {
 	Name              string
 	IsRelevance       bool
+	IsSuperImportant  bool
 	Rows              []aiMetricRowView
 	Latest            aiMetricRowView
 	ChartData         string
