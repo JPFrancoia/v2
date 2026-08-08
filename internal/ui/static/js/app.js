@@ -1490,8 +1490,8 @@ function initializeAIMetricsCharts() {
     });
 }
 
-function calculateAIMetricsYAxis(points, visibleSeries, pointValue, isFreshness) {
-    const lowerBound = isFreshness ? -1 : 0;
+function calculateAIMetricsYAxis(points, visibleSeries, pointValue) {
+    const lowerBound = 0;
     const upperBound = 1;
     const values = points.flatMap((point) => visibleSeries.flatMap((item) => {
         const value = pointValue(point, item.key);
@@ -1499,8 +1499,7 @@ function calculateAIMetricsYAxis(points, visibleSeries, pointValue, isFreshness)
     }));
 
     if (values.length === 0) {
-        const ticks = isFreshness ? [-1, -0.5, 0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
-        return { minimum: lowerBound, maximum: upperBound, ticks };
+        return { minimum: lowerBound, maximum: upperBound, ticks: [0, 0.25, 0.5, 0.75, 1] };
     }
 
     const dataMinimum = Math.min(...values);
@@ -1546,24 +1545,10 @@ function aiMetricsChartSeries(chartElement) {
             { key: "rate", label: chartElement.dataset.labelRate || "Important discovery rate", color: "#16a34a", visible: true },
         ];
     }
-    if (chartElement.dataset.isFreshness === "true") {
-        return [
-            { key: "rps", label: chartElement.dataset.labelRps || "RPS", color: "#ea580c", visible: true },
-            { key: "f1", label: chartElement.dataset.labelMacroF1 || "Macro F1", color: "#16a34a", visible: true },
-            { key: "weighted_kappa", label: chartElement.dataset.labelWeightedKappa || "Weighted kappa", color: "#2563eb", visible: true },
-        ];
-    }
     if (chartElement.dataset.isRelevance === "true") {
         return [
             { key: "average_precision", label: chartElement.dataset.labelAveragePrecision || "Average precision", color: "#ea580c", visible: true },
             { key: "precision_at_50", label: chartElement.dataset.labelPrecisionAt50 || "Precision@50", color: "#16a34a", visible: true },
-        ];
-    }
-    if (chartElement.dataset.isSuperImportant === "true") {
-        return [
-            { key: "super_important_average_precision", label: chartElement.dataset.labelPreferenceAp || "Preference AP", color: "#16a34a", visible: true },
-            { key: "relevance_average_precision", label: chartElement.dataset.labelRelevanceAp || "Relevance AP", color: "#2563eb", visible: true },
-            { key: "recall_at_50", label: chartElement.dataset.labelRecallAt50 || "Recall@50", color: "#ea580c", visible: true },
         ];
     }
     return [
@@ -1658,9 +1643,8 @@ function renderAIMetricsChart(chartElement) {
             return plot.left + (index * plotWidth / (points.length - 1));
         };
 
-        const isFreshness = chartElement.dataset.isFreshness === "true";
         const visibleSeries = series.filter((item) => item.visible);
-        const yAxis = calculateAIMetricsYAxis(points, visibleSeries, pointValue, isFreshness);
+        const yAxis = calculateAIMetricsYAxis(points, visibleSeries, pointValue);
         const yForValue = (value) => {
             const clamped = Math.max(yAxis.minimum, Math.min(yAxis.maximum, Number(value) || 0));
             return plot.top + ((yAxis.maximum - clamped) / (yAxis.maximum - yAxis.minimum) * plotHeight);

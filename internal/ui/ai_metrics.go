@@ -26,8 +26,6 @@ const (
 type aiMetricModelView struct {
 	Name              string
 	IsRelevance       bool
-	IsFreshness       bool
-	IsSuperImportant  bool
 	Rows              []aiMetricRowView
 	Latest            aiMetricRowView
 	ChartData         string
@@ -49,30 +47,20 @@ type importantDiscoveryWeekView struct {
 }
 
 type aiMetricRowView struct {
-	EvalDate                              string
-	EvaluationModel                       string
-	CreatedAt                             string
-	Training                              string
-	Eval                                  string
-	MetricsAccuracy                       float64
-	MetricsPrecision                      float64
-	MetricsRecall                         float64
-	MetricsF1                             float64
-	MetricsROCAUC                         float64
-	MetricsAveragePrecision               float64
-	MetricsLogLoss                        float64
-	MetricsRPS                            float64
-	MetricsWeightedKappa                  float64
-	MetricsLogDurationMAE                 float64
-	MetricsSuperImportantAveragePrecision float64
-	MetricsRelevanceAveragePrecision      float64
-	MetricsRecallAt10                     float64
-	MetricsRecallAt25                     float64
-	MetricsRecallAt50                     float64
-	MetricsSuperImportantBonus            float64
-	HasMetricsROCAUC                      bool
-	HasMetricsPrecisionAt50               bool
-	HasMetricsWeightedKappa               bool
+	EvalDate                string
+	EvaluationModel         string
+	CreatedAt               string
+	Training                string
+	Eval                    string
+	MetricsAccuracy         float64
+	MetricsPrecision        float64
+	MetricsRecall           float64
+	MetricsF1               float64
+	MetricsROCAUC           float64
+	MetricsAveragePrecision float64
+	MetricsLogLoss          float64
+	HasMetricsROCAUC        bool
+	HasMetricsPrecisionAt50 bool
 }
 
 func (h *handler) showAIMetricsPage(w http.ResponseWriter, r *http.Request) {
@@ -99,10 +87,11 @@ func (h *handler) showAIMetricsPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	models := buildAIMetricModelViews(modelEvals, user.Timezone)
 	view := view.New(h.tpl, r)
 	view.Set("importantDiscovery", buildImportantDiscoveryView(discoveryWeeks))
-	view.Set("models", buildAIMetricModelViews(modelEvals, user.Timezone))
-	view.Set("total", len(modelEvals))
+	view.Set("models", models)
+	view.Set("total", len(models))
 	view.Set("menu", "ai_metrics")
 	view.Set("user", user)
 	view.Set("countUnread", h.store.CountUnreadEntries(user.ID))
@@ -151,19 +140,19 @@ func buildImportantDiscoveryChartData(rows []importantDiscoveryWeekView) string 
 func buildAIMetricModelViews(modelEvals model.ModelEvals, userTimezone string) []aiMetricModelView {
 	groups := make(map[string]model.ModelEvals)
 	for _, modelEval := range modelEvals {
-		if modelEval.Model == "Super-important" {
+		if modelEval.Model == "Super-important" || modelEval.Model == "Urgency" || modelEval.Model == "Freshness" {
 			continue
 		}
 		groups[modelEval.Model] = append(groups[modelEval.Model], modelEval)
 	}
 
-	modelNames := []string{"Relevance", "Urgency", "Freshness"}
+	modelNames := []string{"Relevance"}
 	for modelName := range groups {
-		if modelName != "Relevance" && modelName != "Urgency" && modelName != "Freshness" {
+		if modelName != "Relevance" {
 			modelNames = append(modelNames, modelName)
 		}
 	}
-	sort.Strings(modelNames[3:])
+	sort.Strings(modelNames[1:])
 
 	views := make([]aiMetricModelView, 0, len(groups))
 	for _, modelName := range modelNames {
@@ -180,8 +169,6 @@ func buildAIMetricModelViews(modelEvals model.ModelEvals, userTimezone string) [
 		views = append(views, aiMetricModelView{
 			Name:              modelName,
 			IsRelevance:       modelName == "Relevance",
-			IsFreshness:       modelName == "Freshness",
-			IsSuperImportant:  modelName == "Super-important",
 			Rows:              rowViews,
 			Latest:            rowViews[0],
 			ChartData:         buildAIMetricChartData(rowViews, modelName),
@@ -210,31 +197,21 @@ func buildAIMetricRowView(row *model.ModelEval, userTimezone string) aiMetricRow
 	}
 
 	return aiMetricRowView{
-		EvalDate:                              row.EvalDate.Format("2006-01-02"),
-		EvaluationModel:                       evaluationModel,
-		CreatedAt:                             timezone.Convert(userTimezone, row.CreatedAt).Format("2006-01-02 15:04"),
-		Training:                              formatAIMetricCounts(row.Training),
-		Eval:                                  formatAIMetricCounts(row.Eval),
-		MetricsAccuracy:                       metricValue(row.MetricsAccuracy),
-		MetricsPrecision:                      metricValue(row.MetricsPrecision),
-		MetricsRecall:                         metricValue(row.MetricsRecall),
-		MetricsF1:                             metricValue(row.MetricsF1),
-		MetricsROCAUC:                         metricValue(row.MetricsROCAUC),
-		MetricsAveragePrecision:               metricValue(row.MetricsAveragePrecision),
-		MetricsLogLoss:                        metricValue(row.MetricsLogLoss),
-		MetricsRPS:                            metricValue(row.MetricsRPS),
-		MetricsWeightedKappa:                  metricValue(row.MetricsWeightedKappa),
-		MetricsLogDurationMAE:                 metricValue(row.MetricsLogDurationMAE),
-		MetricsSuperImportantAveragePrecision: metricValue(row.MetricsSuperImportantAveragePrecision),
-		MetricsRelevanceAveragePrecision:      metricValue(row.MetricsRelevanceAveragePrecision),
-		MetricsRecallAt10:                     metricValue(row.MetricsRecallAt10),
-		MetricsRecallAt25:                     metricValue(row.MetricsRecallAt25),
-		MetricsRecallAt50:                     metricValue(row.MetricsRecallAt50),
-		MetricsSuperImportantBonus:            metricValue(row.MetricsSuperImportantBonus),
-		HasMetricsROCAUC:                      metricPresent(row.MetricsROCAUC),
+		EvalDate:                row.EvalDate.Format("2006-01-02"),
+		EvaluationModel:         evaluationModel,
+		CreatedAt:               timezone.Convert(userTimezone, row.CreatedAt).Format("2006-01-02 15:04"),
+		Training:                formatAIMetricCounts(row.Training),
+		Eval:                    formatAIMetricCounts(row.Eval),
+		MetricsAccuracy:         metricValue(row.MetricsAccuracy),
+		MetricsPrecision:        metricValue(row.MetricsPrecision),
+		MetricsRecall:           metricValue(row.MetricsRecall),
+		MetricsF1:               metricValue(row.MetricsF1),
+		MetricsROCAUC:           metricValue(row.MetricsROCAUC),
+		MetricsAveragePrecision: metricValue(row.MetricsAveragePrecision),
+		MetricsLogLoss:          metricValue(row.MetricsLogLoss),
+		HasMetricsROCAUC:        metricPresent(row.MetricsROCAUC),
 		HasMetricsPrecisionAt50: metricPresent(row.MetricsPrecision) &&
 			row.EvaluationModel == relevancePrecisionAt50EvaluationModel,
-		HasMetricsWeightedKappa: metricPresent(row.MetricsWeightedKappa),
 	}
 }
 
@@ -261,26 +238,12 @@ func buildAIMetricChartData(rows []aiMetricRowView, modelName string) string {
 	points := make([]map[string]any, 0, len(rows))
 	for i := len(rows) - 1; i >= 0; i-- {
 		point := map[string]any{"date": rows[i].EvalDate}
-		switch modelName {
-		case "Freshness":
-			point["rps"] = rows[i].MetricsRPS
-			point["f1"] = rows[i].MetricsF1
-			if rows[i].HasMetricsWeightedKappa {
-				point["weighted_kappa"] = rows[i].MetricsWeightedKappa
-			}
-			if rows[i].HasMetricsROCAUC {
-				point["roc_auc"] = rows[i].MetricsROCAUC
-			}
-		case "Super-important":
-			point["super_important_average_precision"] = rows[i].MetricsSuperImportantAveragePrecision
-			point["relevance_average_precision"] = rows[i].MetricsRelevanceAveragePrecision
-			point["recall_at_50"] = rows[i].MetricsRecallAt50
-		case "Relevance":
+		if modelName == "Relevance" {
 			point["average_precision"] = rows[i].MetricsAveragePrecision
 			if rows[i].HasMetricsPrecisionAt50 {
 				point["precision_at_50"] = rows[i].MetricsPrecision
 			}
-		default:
+		} else {
 			point["f1"] = rows[i].MetricsF1
 			point["roc_auc"] = rows[i].MetricsROCAUC
 			point["average_precision"] = rows[i].MetricsAveragePrecision
@@ -292,6 +255,5 @@ func buildAIMetricChartData(rows []aiMetricRowView, modelName string) string {
 	if err != nil {
 		return "[]"
 	}
-
 	return string(data)
 }
