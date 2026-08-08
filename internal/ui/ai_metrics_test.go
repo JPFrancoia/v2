@@ -32,6 +32,10 @@ func TestBuildImportantDiscoveryView(t *testing.T) {
 	if result.Rows[1].HasRate || result.Rows[1].RatePercent != 0 {
 		t.Fatalf("an empty week should not have a rate: %#v", result.Rows[1])
 	}
+	if !strings.HasPrefix(result.ChartData, `[{"date":"2026-07-27","rate":null}`) ||
+		!strings.Contains(result.ChartData, `{"date":"2026-08-03","rate":0.147`) {
+		t.Fatalf("unexpected chronological chart data: %s", result.ChartData)
+	}
 }
 
 // TestBuildAIMetricModelViews checks filtering, canonical ordering, metric mapping, and model-specific chart data.

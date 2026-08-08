@@ -35,8 +35,9 @@ type aiMetricModelView struct {
 }
 
 type importantDiscoveryView struct {
-	Rows   []importantDiscoveryWeekView
-	Latest importantDiscoveryWeekView
+	Rows      []importantDiscoveryWeekView
+	Latest    importantDiscoveryWeekView
+	ChartData string
 }
 
 type importantDiscoveryWeekView struct {
@@ -127,7 +128,24 @@ func buildImportantDiscoveryView(weeks model.ImportantDiscoveryWeeks) importantD
 	if len(result.Rows) > 0 {
 		result.Latest = result.Rows[0]
 	}
+	result.ChartData = buildImportantDiscoveryChartData(result.Rows)
 	return result
+}
+
+func buildImportantDiscoveryChartData(rows []importantDiscoveryWeekView) string {
+	points := make([]map[string]any, 0, len(rows))
+	for i := len(rows) - 1; i >= 0; i-- {
+		point := map[string]any{"date": rows[i].WeekStart, "rate": nil}
+		if rows[i].HasRate {
+			point["rate"] = rows[i].RatePercent / 100
+		}
+		points = append(points, point)
+	}
+	data, err := json.Marshal(points)
+	if err != nil {
+		return "[]"
+	}
+	return string(data)
 }
 
 func buildAIMetricModelViews(modelEvals model.ModelEvals, userTimezone string) []aiMetricModelView {

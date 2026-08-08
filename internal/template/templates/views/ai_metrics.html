@@ -20,6 +20,26 @@
                 <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.discovery.rate" }}</span><strong>{{ if .Latest.HasRate }}{{ printf "%.1f%%" .Latest.RatePercent }}{{ else }}-{{ end }}</strong></div>
             </div>
             <p class="ai-metrics-note">{{ t "page.ai_metrics.discovery.description" }}</p>
+            <div class="chart-wrap ai-metrics-chart-wrapper">
+                <div class="chart-title-bar ai-metrics-chart-title-bar">
+                    <span class="chart-title-text ai-metrics-chart-title-text">{{ t "page.ai_metrics.graph" }}</span>
+                    <span class="chart-current ai-metrics-chart-current">{{ t "page.ai_metrics.discovery.rate" }} {{ if .Latest.HasRate }}{{ printf "%.1f%%" .Latest.RatePercent }}{{ else }}-{{ end }}</span>
+                </div>
+                <div class="chart-inner">
+                    <div class="chart-tooltip"></div>
+                    <div
+                        class="ai-metrics-chart"
+                        data-ai-metrics-chart="true"
+                        data-points="{{ .ChartData }}"
+                        data-label-rate="{{ t "page.ai_metrics.discovery.rate" }}"
+                        data-is-discovery="true"
+                        data-is-percentage="true"
+                    ></div>
+                </div>
+                <ul class="u-legend ai-metrics-legend" aria-label="{{ t "page.ai_metrics.graph" }}">
+                    <li><button type="button" class="ai-metrics-legend-toggle" data-ai-metrics-series-toggle="rate" aria-pressed="true"><span class="ai-metrics-legend-color ai-metrics-series-f1"></span>{{ t "page.ai_metrics.discovery.rate" }}</button></li>
+                </ul>
+            </div>
             <div class="ai-metrics-table-wrapper">
                 <table class="ai-metrics-table">
                     <thead>

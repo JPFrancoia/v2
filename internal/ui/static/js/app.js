@@ -1534,7 +1534,18 @@ function calculateAIMetricsYAxis(points, visibleSeries, pointValue, isFreshness)
     return { minimum, maximum, ticks };
 }
 
+function hasAIMetricsChartValue(points) {
+    return points.some((point) => Object.entries(point).some(([key, value]) => (
+        key !== "date" && value !== null && value !== undefined && Number.isFinite(Number(value))
+    )));
+}
+
 function aiMetricsChartSeries(chartElement) {
+    if (chartElement.dataset.isDiscovery === "true") {
+        return [
+            { key: "rate", label: chartElement.dataset.labelRate || "Important discovery rate", color: "#16a34a", visible: true },
+        ];
+    }
     if (chartElement.dataset.isFreshness === "true") {
         return [
             { key: "rps", label: chartElement.dataset.labelRps || "RPS", color: "#ea580c", visible: true },
@@ -1562,6 +1573,10 @@ function aiMetricsChartSeries(chartElement) {
     ];
 }
 
+function formatAIMetricsChartValue(value, isPercentage, digits) {
+    return isPercentage ? `${(value * 100).toFixed(digits)}%` : value.toFixed(digits);
+}
+
 function renderAIMetricsChart(chartElement) {
     let points = [];
     try {
@@ -1572,7 +1587,7 @@ function renderAIMetricsChart(chartElement) {
 
     chartElement.textContent = "";
 
-    if (points.length === 0) {
+    if (!hasAIMetricsChartValue(points)) {
         const placeholder = document.createElement("div");
         placeholder.className = "chart-placeholder";
         placeholder.textContent = "No chart data yet.";
@@ -1585,6 +1600,7 @@ function renderAIMetricsChart(chartElement) {
 
     const tooltip = chartElement.parentElement.querySelector(".chart-tooltip");
     const series = aiMetricsChartSeries(chartElement);
+    const isPercentage = chartElement.dataset.isPercentage === "true";
 
     const chartWrapper = chartElement.closest(".ai-metrics-chart-wrapper");
     const legendButtons = chartWrapper ? chartWrapper.querySelectorAll("[data-ai-metrics-series-toggle]") : [];
@@ -1664,7 +1680,7 @@ function renderAIMetricsChart(chartElement) {
 
             ctx.fillStyle = mutedColor;
             ctx.textAlign = "right";
-            ctx.fillText(tick.toFixed(2), plot.left - 8, y);
+            ctx.fillText(formatAIMetricsChartValue(tick, isPercentage, isPercentage ? 0 : 2), plot.left - 8, y);
         });
 
         ctx.strokeStyle = textColor;
@@ -1754,7 +1770,9 @@ function renderAIMetricsChart(chartElement) {
         const point = points[nearest.index];
         const values = visibleSeries.flatMap((item) => {
             const value = pointValue(point, item.key);
-            return value === null ? [] : [`${item.label}: ${value.toFixed(3)}`];
+            return value === null ? [] : [
+                `${item.label}: ${formatAIMetricsChartValue(value, isPercentage, isPercentage ? 1 : 3)}`,
+            ];
         });
         if (values.length === 0) {
             tooltip.style.display = "none";
