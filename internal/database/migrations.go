@@ -1663,4 +1663,26 @@ var migrations = [...]func(tx *sql.Tx) error{
 		`)
 		return err
 	},
+	func(tx *sql.Tx) (err error) {
+		_, err = tx.Exec(`
+			ALTER TABLE model_evals
+				DROP COLUMN metrics_accuracy,
+				DROP COLUMN metrics_precision,
+				DROP COLUMN metrics_recall,
+				DROP COLUMN metrics_f1,
+				DROP COLUMN metrics_roc_auc,
+				DROP COLUMN metrics_average_precision,
+				DROP COLUMN metrics_log_loss,
+				DROP COLUMN metrics_rps,
+				DROP COLUMN metrics_weighted_kappa,
+				DROP COLUMN metrics_log_duration_mae,
+				DROP COLUMN metrics_super_important_average_precision,
+				DROP COLUMN metrics_relevance_average_precision,
+				DROP COLUMN metrics_recall_at_10,
+				DROP COLUMN metrics_recall_at_25,
+				DROP COLUMN metrics_recall_at_50,
+				DROP COLUMN metrics_super_important_bonus;
+		`)
+		return err
+	},
 }
