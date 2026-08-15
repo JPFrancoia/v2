@@ -11,10 +11,6 @@ import (
 	"miniflux.app/v2/internal/model"
 )
 
-func floatPointer(value float64) *float64 {
-	return &value
-}
-
 // TestBuildImportantDiscoveryView checks weekly rate formatting and empty-week handling.
 func TestBuildImportantDiscoveryView(t *testing.T) {
 	weekStart := time.Date(2026, 8, 3, 0, 0, 0, 0, time.UTC)
@@ -44,8 +40,9 @@ func TestBuildAIMetricModelViewsHidesRemovedModels(t *testing.T) {
 	views := buildAIMetricModelViews(model.ModelEvals{
 		&model.ModelEval{Model: "Other", EvalDate: evalDate},
 		&model.ModelEval{Model: "Freshness", EvalDate: evalDate},
-		&model.ModelEval{Model: "Relevance", EvaluationModel: relevancePrecisionAt50EvaluationModel, EvalDate: evalDate, MetricsPrecision: floatPointer(0.94), MetricsAveragePrecision: floatPointer(0.9)},
-		&model.ModelEval{Model: "Relevance", EvalDate: evalDate.Add(-24 * time.Hour), MetricsPrecision: floatPointer(0.85), MetricsAveragePrecision: floatPointer(0.8)},
+		&model.ModelEval{Model: "Relevance", EvaluationModel: "future implementation name", EvalDate: evalDate, Metrics: map[string]float64{"precision_at_50": 0.95, "average_precision": 0.91}},
+		&model.ModelEval{Model: "Relevance", EvaluationModel: "renamed implementation", EvalDate: evalDate.Add(-24 * time.Hour), Metrics: map[string]float64{"precision_at_50": 0.94, "average_precision": 0.9}},
+		&model.ModelEval{Model: "Relevance", EvalDate: evalDate.Add(-48 * time.Hour), Metrics: map[string]float64{"precision": 0.85, "average_precision": 0.8}},
 		&model.ModelEval{Model: "Super-important", EvalDate: evalDate},
 		&model.ModelEval{Model: "Urgency", EvalDate: evalDate},
 	}, "UTC")
@@ -55,18 +52,21 @@ func TestBuildAIMetricModelViewsHidesRemovedModels(t *testing.T) {
 	}
 
 	relevance := views[0]
-	if !relevance.IsRelevance || !relevance.Latest.HasMetricsPrecisionAt50 {
+	if !relevance.IsRelevance || !relevance.Latest.HasMetricsPrecisionAt50 || relevance.Latest.MetricsPrecisionAt50 != 0.95 {
 		t.Fatalf("unexpected relevance view: %#v", relevance)
 	}
-	if relevance.Rows[1].HasMetricsPrecisionAt50 {
+	if !relevance.Rows[1].HasMetricsPrecisionAt50 {
+		t.Fatalf("old Precision@50 contract should remain visible: %#v", relevance.Rows[1])
+	}
+	if relevance.Rows[2].HasMetricsPrecisionAt50 {
 		t.Fatal("historical threshold precision should not be marked as Precision@50")
 	}
-	for _, expected := range []string{`"average_precision":0.9`, `"precision_at_50":0.94`} {
+	for _, expected := range []string{`"average_precision":0.91`, `"precision_at_50":0.95`, `"precision_at_50":0.94`} {
 		if !strings.Contains(relevance.ChartData, expected) {
 			t.Errorf("relevance chart data %q does not contain %q", relevance.ChartData, expected)
 		}
 	}
-	if strings.Count(relevance.ChartData, `"precision_at_50"`) != 1 {
+	if strings.Count(relevance.ChartData, `"precision_at_50"`) != 2 {
 		t.Fatalf("historical threshold precision should be omitted from chart data: %s", relevance.ChartData)
 	}
 	for _, removedName := range []string{"Urgency", "Freshness"} {

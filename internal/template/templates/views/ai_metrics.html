@@ -84,7 +84,7 @@
                     <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.recall_at_50" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsRecallAt50 }}</span></div>
                     {{ else if .IsRelevance }}
                     <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.average_precision" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsAveragePrecision }}</span></div>
-                    <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.precision" }}@50</span><span class="ai-metrics-stat-value">{{ if .Latest.HasMetricsPrecisionAt50 }}{{ printf "%.3f" .Latest.MetricsPrecision }}{{ else }}-{{ end }}</span></div>
+                    <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.precision" }}@50</span><span class="ai-metrics-stat-value">{{ if .Latest.HasMetricsPrecisionAt50 }}{{ printf "%.3f" .Latest.MetricsPrecisionAt50 }}{{ else }}-{{ end }}</span></div>
                     {{ else }}
                     <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.f1" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsF1 }}</span></div>
                     <div><span class="ai-metrics-stat-label">{{ t "page.ai_metrics.metric.roc_auc" }}</span><span class="ai-metrics-stat-value">{{ printf "%.3f" .Latest.MetricsROCAUC }}</span></div>
@@ -113,7 +113,7 @@
                 <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.super_important_bonus" }}</span><strong>{{ printf "%.3f" .Latest.MetricsSuperImportantBonus }}</strong></div>
                 {{ else if .IsRelevance }}
                 <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.average_precision" }}</span><strong>{{ printf "%.3f" .Latest.MetricsAveragePrecision }}</strong></div>
-                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.precision" }}@50</span><strong>{{ if .Latest.HasMetricsPrecisionAt50 }}{{ printf "%.3f" .Latest.MetricsPrecision }}{{ else }}-{{ end }}</strong></div>
+                <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.precision" }}@50</span><strong>{{ if .Latest.HasMetricsPrecisionAt50 }}{{ printf "%.3f" .Latest.MetricsPrecisionAt50 }}{{ else }}-{{ end }}</strong></div>
                 {{ else }}
                 <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.f1" }}</span><strong>{{ printf "%.3f" .Latest.MetricsF1 }}</strong></div>
                 <div class="ai-metrics-latest-stat"><span>{{ t "page.ai_metrics.metric.roc_auc" }}</span><strong>{{ printf "%.3f" .Latest.MetricsROCAUC }}</strong></div>
@@ -220,7 +220,7 @@
                         <td>{{ printf "%.3f" .MetricsSuperImportantBonus }}</td>
                         {{ else if $model.IsRelevance }}
                         <td>{{ printf "%.3f" .MetricsAveragePrecision }}</td>
-                        <td>{{ if .HasMetricsPrecisionAt50 }}{{ printf "%.3f" .MetricsPrecision }}{{ else }}-{{ end }}</td>
+                        <td>{{ if .HasMetricsPrecisionAt50 }}{{ printf "%.3f" .MetricsPrecisionAt50 }}{{ else }}-{{ end }}</td>
                         {{ else }}
                         <td>{{ printf "%.3f" .MetricsAccuracy }}</td>
                         <td>{{ printf "%.3f" .MetricsPrecision }}</td>

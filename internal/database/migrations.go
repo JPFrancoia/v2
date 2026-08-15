@@ -1600,4 +1600,67 @@ var migrations = [...]func(tx *sql.Tx) error{
 		_, err = tx.Exec(`ALTER TABLE model_evals ADD COLUMN evaluation_model text`)
 		return err
 	},
+	func(tx *sql.Tx) (err error) {
+		_, err = tx.Exec(`
+			DO $$
+			BEGIN
+				IF EXISTS (
+					SELECT 1
+					FROM model_evals
+					WHERE metrics_precision IS NOT NULL
+						AND evaluation_model ILIKE '%precision@50%'
+						AND evaluation_model NOT IN (
+							'EmbeddingGemma 300M prompted + MLP (AP + Precision@50)',
+							'EmbeddingGemma 300M prompted + MLP (forward AP + Precision@50)'
+						)
+				) THEN
+					RAISE EXCEPTION 'model_evals contains an unknown Precision@50 contract';
+				END IF;
+			END
+			$$;
+
+			ALTER TABLE model_evals ADD COLUMN metrics jsonb;
+
+			UPDATE model_evals
+			SET metrics = jsonb_strip_nulls(jsonb_build_object(
+				'accuracy', metrics_accuracy,
+				'precision', CASE
+					WHEN evaluation_model IN (
+						'EmbeddingGemma 300M prompted + MLP (AP + Precision@50)',
+						'EmbeddingGemma 300M prompted + MLP (forward AP + Precision@50)'
+					) THEN NULL
+					ELSE metrics_precision
+				END,
+				'precision_at_50', CASE
+					WHEN evaluation_model IN (
+						'EmbeddingGemma 300M prompted + MLP (AP + Precision@50)',
+						'EmbeddingGemma 300M prompted + MLP (forward AP + Precision@50)'
+					) THEN metrics_precision
+					ELSE NULL
+				END,
+				'recall', metrics_recall,
+				'f1', metrics_f1,
+				'roc_auc', metrics_roc_auc,
+				'average_precision', metrics_average_precision,
+				'log_loss', metrics_log_loss,
+				'rps', metrics_rps,
+				'weighted_kappa', metrics_weighted_kappa,
+				'log_duration_mae', metrics_log_duration_mae,
+				'super_important_average_precision', metrics_super_important_average_precision,
+				'relevance_average_precision', metrics_relevance_average_precision,
+				'recall_at_10', metrics_recall_at_10,
+				'recall_at_25', metrics_recall_at_25,
+				'recall_at_50', metrics_recall_at_50,
+				'super_important_bonus', metrics_super_important_bonus
+			));
+
+			ALTER TABLE model_evals
+				ALTER COLUMN metrics SET NOT NULL,
+				ADD CONSTRAINT model_evals_metrics_object_check
+					CHECK (jsonb_typeof(metrics) = 'object'),
+				ADD CONSTRAINT model_evals_metrics_values_check
+					CHECK (NOT jsonb_path_exists(metrics, '$.* ? (@.type() != "number")'));
+		`)
+		return err
+	},
 }

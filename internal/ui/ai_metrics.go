@@ -18,10 +18,7 @@ import (
 	"miniflux.app/v2/internal/ui/view"
 )
 
-const (
-	aiMetricsEvalLimit                    = 200
-	relevancePrecisionAt50EvaluationModel = "EmbeddingGemma 300M prompted + MLP (AP + Precision@50)"
-)
+const aiMetricsEvalLimit = 200
 
 type aiMetricModelView struct {
 	Name              string
@@ -55,6 +52,7 @@ type aiMetricRowView struct {
 	Eval                    string
 	MetricsAccuracy         float64
 	MetricsPrecision        float64
+	MetricsPrecisionAt50    float64
 	MetricsRecall           float64
 	MetricsF1               float64
 	MetricsROCAUC           float64
@@ -180,15 +178,12 @@ func buildAIMetricModelViews(modelEvals model.ModelEvals, userTimezone string) [
 	return views
 }
 
-func metricPresent(value *float64) bool {
-	return value != nil && !math.IsNaN(*value) && !math.IsInf(*value, 0)
-}
-
-func metricValue(value *float64) float64 {
-	if !metricPresent(value) {
-		return 0
+func metricValue(metrics map[string]float64, name string) (float64, bool) {
+	value, ok := metrics[name]
+	if !ok || math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0, false
 	}
-	return *value
+	return value, true
 }
 
 func buildAIMetricRowView(row *model.ModelEval, userTimezone string) aiMetricRowView {
@@ -197,22 +192,31 @@ func buildAIMetricRowView(row *model.ModelEval, userTimezone string) aiMetricRow
 		evaluationModel = "-"
 	}
 
+	accuracy, _ := metricValue(row.Metrics, "accuracy")
+	precision, _ := metricValue(row.Metrics, "precision")
+	precisionAt50, hasPrecisionAt50 := metricValue(row.Metrics, "precision_at_50")
+	recall, _ := metricValue(row.Metrics, "recall")
+	f1, _ := metricValue(row.Metrics, "f1")
+	rocAUC, hasROCAUC := metricValue(row.Metrics, "roc_auc")
+	averagePrecision, _ := metricValue(row.Metrics, "average_precision")
+	logLoss, _ := metricValue(row.Metrics, "log_loss")
+
 	return aiMetricRowView{
 		EvalDate:                row.EvalDate.Format("2006-01-02"),
 		EvaluationModel:         evaluationModel,
 		CreatedAt:               timezone.Convert(userTimezone, row.CreatedAt).Format("2006-01-02 15:04"),
 		Training:                formatAIMetricCounts(row.Training),
 		Eval:                    formatAIMetricCounts(row.Eval),
-		MetricsAccuracy:         metricValue(row.MetricsAccuracy),
-		MetricsPrecision:        metricValue(row.MetricsPrecision),
-		MetricsRecall:           metricValue(row.MetricsRecall),
-		MetricsF1:               metricValue(row.MetricsF1),
-		MetricsROCAUC:           metricValue(row.MetricsROCAUC),
-		MetricsAveragePrecision: metricValue(row.MetricsAveragePrecision),
-		MetricsLogLoss:          metricValue(row.MetricsLogLoss),
-		HasMetricsROCAUC:        metricPresent(row.MetricsROCAUC),
-		HasMetricsPrecisionAt50: metricPresent(row.MetricsPrecision) &&
-			row.EvaluationModel == relevancePrecisionAt50EvaluationModel,
+		MetricsAccuracy:         accuracy,
+		MetricsPrecision:        precision,
+		MetricsPrecisionAt50:    precisionAt50,
+		MetricsRecall:           recall,
+		MetricsF1:               f1,
+		MetricsROCAUC:           rocAUC,
+		MetricsAveragePrecision: averagePrecision,
+		MetricsLogLoss:          logLoss,
+		HasMetricsROCAUC:        hasROCAUC,
+		HasMetricsPrecisionAt50: hasPrecisionAt50,
 	}
 }
 
@@ -242,7 +246,7 @@ func buildAIMetricChartData(rows []aiMetricRowView, modelName string) string {
 		if modelName == "Relevance" {
 			point["average_precision"] = rows[i].MetricsAveragePrecision
 			if rows[i].HasMetricsPrecisionAt50 {
-				point["precision_at_50"] = rows[i].MetricsPrecision
+				point["precision_at_50"] = rows[i].MetricsPrecisionAt50
 			}
 		} else {
 			point["f1"] = rows[i].MetricsF1
