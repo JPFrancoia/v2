@@ -540,7 +540,7 @@ func (e *EntryQueryBuilder) contentColumn() string {
 		return "'' AS content"
 	}
 	if e.previewContent {
-		return "left(e.content, 4096) as content"
+		return "(select left(preview.content, 4096) from entries preview where preview.id = e.id) as content"
 	}
 	return "e.content"
 }

@@ -18,7 +18,7 @@ func TestEntryQueryBuilderContentColumn(t *testing.T) {
 	}
 
 	builder.WithContentPreview()
-	if result := builder.contentColumn(); result != "left(e.content, 4096) as content" {
+	if result := builder.contentColumn(); result != "(select left(preview.content, 4096) from entries preview where preview.id = e.id) as content" {
 		t.Fatalf(`Unexpected preview content column: %q`, result)
 	}
 }
