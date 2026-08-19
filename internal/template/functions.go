@@ -20,6 +20,7 @@ import (
 	"miniflux.app/v2/internal/locale"
 	"miniflux.app/v2/internal/mediaproxy"
 	"miniflux.app/v2/internal/model"
+	"miniflux.app/v2/internal/reader/sanitizer"
 	"miniflux.app/v2/internal/timezone"
 	"miniflux.app/v2/internal/ui/static"
 	"miniflux.app/v2/internal/urllib"
@@ -38,6 +39,7 @@ func (f *funcMap) Map() template.FuncMap {
 		"formatFileSize":   formatFileSize,
 		"dict":             dict,
 		"truncate":         truncate,
+		"truncateHTML":     sanitizer.TruncateHTML,
 		"isEmail":          isEmail,
 		"baseURL":          config.Opts.BaseURL,
 		"apiEnabled":       config.Opts.HasAPI,

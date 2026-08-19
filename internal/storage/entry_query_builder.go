@@ -26,6 +26,7 @@ type EntryQueryBuilder struct {
 	offset          int
 	fetchEnclosures bool
 	excludeContent  bool
+	previewContent  bool
 }
 
 // WithEnclosures fetches enclosures for each entry.
@@ -39,6 +40,14 @@ func (e *EntryQueryBuilder) WithEnclosures() *EntryQueryBuilder {
 // transfer from PostgreSQL on list pages where content is not displayed.
 func (e *EntryQueryBuilder) WithoutContent() *EntryQueryBuilder {
 	e.excludeContent = true
+	e.previewContent = false
+	return e
+}
+
+// WithContentPreview fetches a bounded content prefix for list previews.
+func (e *EntryQueryBuilder) WithContentPreview() *EntryQueryBuilder {
+	e.excludeContent = false
+	e.previewContent = true
 	return e
 }
 
@@ -529,6 +538,9 @@ func (e *EntryQueryBuilder) GetEntryIDs() ([]int64, error) {
 func (e *EntryQueryBuilder) contentColumn() string {
 	if e.excludeContent {
 		return "'' AS content"
+	}
+	if e.previewContent {
+		return "left(e.content, 4096) as content"
 	}
 	return "e.content"
 }

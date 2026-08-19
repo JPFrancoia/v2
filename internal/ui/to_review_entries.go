@@ -39,7 +39,7 @@ func (h *handler) showToReviewPage(w http.ResponseWriter, r *http.Request) {
 	builder.WithOffset(offset)
 	builder.WithLimit(user.EntriesPerPage)
 	builder.WithGloballyVisible()
-	builder.WithoutContent()
+	builder.WithContentPreview()
 
 	entries, count, err := builder.GetEntriesWithCount()
 	if err != nil {
@@ -58,7 +58,7 @@ func (h *handler) showToReviewPage(w http.ResponseWriter, r *http.Request) {
 		builder.WithSorting("id", "DESC")
 		builder.WithLimit(user.EntriesPerPage)
 		builder.WithGloballyVisible()
-		builder.WithoutContent()
+		builder.WithContentPreview()
 
 		entries, count, err = builder.GetEntriesWithCount()
 		if err != nil {

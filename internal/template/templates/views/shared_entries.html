@@ -60,6 +60,9 @@
                 </h2>
                 <span class="category"><a href="{{ routePath "/category/%d/entries" .Feed.Category.ID }}">{{ .Feed.Category.Title }}</a></span>
             </header>
+            {{ with truncateHTML .Content 320 }}
+            <p class="item-preview" dir="auto">{{ . }}</p>
+            {{ end }}
             <div class="item-meta">
                 <ul class="item-meta-info">
                     <li class="item-meta-info-site-url">

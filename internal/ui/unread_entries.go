@@ -28,7 +28,7 @@ func (h *handler) showUnreadPage(w http.ResponseWriter, r *http.Request) {
 	builder.WithOffset(offset)
 	builder.WithLimit(user.EntriesPerPage)
 	builder.WithGloballyVisible()
-	builder.WithoutContent()
+	builder.WithContentPreview()
 
 	entries, countUnread, err := builder.GetEntriesWithCount()
 	if err != nil {
@@ -44,7 +44,7 @@ func (h *handler) showUnreadPage(w http.ResponseWriter, r *http.Request) {
 		builder.WithSorting("id", direction)
 		builder.WithLimit(user.EntriesPerPage)
 		builder.WithGloballyVisible()
-		builder.WithoutContent()
+		builder.WithContentPreview()
 
 		entries, countUnread, err = builder.GetEntriesWithCount()
 		if err != nil {

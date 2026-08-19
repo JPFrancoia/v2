@@ -1,4 +1,7 @@
 {{ define "item_meta" -}}
+{{ with truncateHTML .entry.Content 320 }}
+<p class="item-preview" dir="auto">{{ . }}</p>
+{{ end }}
 <div class="item-meta">
     <ul class="item-meta-info">
         <li class="item-meta-info-title">

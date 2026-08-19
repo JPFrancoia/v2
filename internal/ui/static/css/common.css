@@ -1132,6 +1132,14 @@ dialog {
     overflow: hidden;
 }
 
+.entry-item {
+    background-color: var(--panel-background);
+    border-radius: 8px;
+    border-style: solid;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
+    padding: 12px 14px;
+}
+
 .item.current-item {
     border: var(--current-item-border-width) solid var(--current-item-border-color);
     padding: 3px;
@@ -1142,6 +1150,9 @@ dialog {
     outline: none;
 }
 
+.entry-item.current-item {
+    padding: 12px 14px;
+}
 
 .item-header {
     font-size: 1rem;
@@ -1172,6 +1183,18 @@ dialog {
 
 .item-status-read .item-title a {
     color: var(--item-status-read-title-link-color);
+}
+
+.item-preview {
+    color: var(--item-meta-focus-color);
+    display: -webkit-box;
+    font-size: 0.9rem;
+    line-height: 1.45;
+    margin: 0.55rem 0 0.25rem;
+    max-height: 4.35em;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
 }
 
 .item-meta {
