@@ -3,6 +3,8 @@ const OFFLINE_DB_VERSION = 1;
 const OFFLINE_CACHE_VERSION = 2;
 const OFFLINE_MEDIA_LIMIT = 4000000;
 const OFFLINE_REFRESH_INTERVAL = 15 * 60 * 1000;
+const OFFLINE_ENTRY_BATCH_SIZE = 8;
+const OFFLINE_MEDIA_BATCH_SIZE = 4;
 let offlineFlushPromise = null;
 let offlineRefreshPromise = null;
 let offlineRefreshProgress = null;
@@ -11,6 +13,9 @@ let offlineMediaStorageFull = false;
 let offlineHTMLPolicy = null;
 let offlineRetryTimer = null;
 let offlineRetryDelay = 5000;
+let offlineRefreshRetryTimer = null;
+let offlineRefreshRetryDelay = 5000;
+let offlineRefreshRetryPending = false;
 
 function trustedOfflineHTML(html) {
     if (!offlineHTMLPolicy) offlineHTMLPolicy = trustedTypes.createPolicy("html", {createHTML: (value) => value});
@@ -431,40 +436,70 @@ function mediaURLsFromDocument(documentNode) {
     return Array.from(urls);
 }
 
+async function runOfflineBatches(items, batchSize, callback) {
+    for (let offset = 0; offset < items.length; offset += batchSize) {
+        await Promise.all(items.slice(offset, offset + batchSize).map(callback));
+    }
+}
+
+async function deleteUnreferencedOfflineMedia(previousURLs, currentURLs, currentKey, mediaCache) {
+    const referencedURLs = new Set();
+    const mediaPrefix = `entryMedia:${offlineUserID()}:`;
+    for (const record of await getOfflineRecords("meta")) {
+        if (record.key === currentKey || !record.key.startsWith(mediaPrefix)) continue;
+        for (const mediaURL of record.value || []) referencedURLs.add(mediaURL);
+    }
+    for (const mediaURL of previousURLs) {
+        if (!currentURLs.includes(mediaURL) && !referencedURLs.has(mediaURL)) await mediaCache.delete(mediaURL);
+    }
+}
+
 async function cacheOfflineEntry(entryID, pageCache, mediaCache) {
     const prefix = document.body.dataset.offlineEntryUrl;
     const userID = offlineUserID();
-    if (!prefix || !userID) return;
+    if (!prefix || !userID) return false;
     const url = `${prefix}/${entryID}`;
     const response = await fetch(url, {credentials: "same-origin", headers: {"Accept": "text/html"}});
-    if (!response.ok || response.redirected) return;
+    if (!response.ok || response.redirected) return false;
     const html = await response.clone().text();
     await pageCache.put(url, response);
     const parsed = new DOMParser().parseFromString(trustedOfflineHTML(html), "text/html");
     const mediaURLs = mediaURLsFromDocument(parsed);
     const mediaKey = `entryMedia:${userID}:${entryID}`;
     const previousMedia = await getOfflineRecord("meta", mediaKey);
-    for (const oldURL of previousMedia?.value || []) {
-        if (!mediaURLs.includes(oldURL)) await mediaCache.delete(oldURL);
-    }
+    if (previousMedia) await deleteUnreferencedOfflineMedia(previousMedia.value || [], mediaURLs, mediaKey, mediaCache);
     await putOfflineRecord("meta", {key: mediaKey, value: mediaURLs});
-    for (const mediaURL of mediaURLs) {
+    return true;
+}
+
+async function cacheOfflineEntryMedia(entryID, mediaCache) {
+    const media = await getOfflineRecord("meta", `entryMedia:${offlineUserID()}:${entryID}`);
+    for (const mediaURL of media?.value || []) {
         if (!await cacheOfflineMedia(mediaURL, mediaCache)) offlineSkippedMedia += 1;
+    }
+}
+
+async function removeExpiredOfflineTagPages(pageCache, basePath, allowedPaths) {
+    const tagPathPrefix = `${basePath}/user-tag/`;
+    for (const request of await pageCache.keys()) {
+        const path = new URL(request.url).pathname;
+        if (path.startsWith(tagPathPrefix) && path.endsWith("/entries") && !allowedPaths.has(path)) {
+            await pageCache.delete(request);
+        }
     }
 }
 
 async function cacheOfflineListPages(startURL, allowedEntryIDs, pageCache) {
     const targetPath = new URL(startURL).pathname;
-    for (const request of await pageCache.keys()) {
-        if (new URL(request.url).pathname === targetPath) await pageCache.delete(request);
-    }
-
+    const previousRequests = (await pageCache.keys()).filter((request) => new URL(request.url).pathname === targetPath);
+    const refreshedURLs = new Set();
     const remaining = new Set(allowedEntryIDs);
     let url = startURL;
     for (let page = 0; url && page < 100; page += 1) {
         const response = await fetch(url, {credentials: "same-origin", headers: {"Accept": "text/html"}});
-        if (!response.ok || response.redirected) return;
+        if (!response.ok || response.redirected) return false;
         const parsed = new DOMParser().parseFromString(trustedOfflineHTML(await response.text()), "text/html");
+        parsed.body.dataset.offlineSnapshot = "true";
         parsed.querySelectorAll("article[data-id]").forEach((entry) => {
             const entryID = parseInt(entry.dataset.id, 10);
             if (allowedEntryIDs.has(entryID)) remaining.delete(entryID);
@@ -480,8 +515,22 @@ async function cacheOfflineListPages(startURL, allowedEntryIDs, pageCache) {
             statusText: response.statusText,
             headers,
         }));
+        refreshedURLs.add(url);
         url = remaining.size > 0 && next ? new URL(next.getAttribute("href"), location.origin).href : "";
     }
+    for (const request of previousRequests) if (!refreshedURLs.has(request.url)) await pageCache.delete(request);
+    return true;
+}
+
+function offlineListNeedsRefresh(allowedEntryIDs, previousEntryIDs, refreshedEntryIDs, hasCachedPage, metadataChanged = false) {
+    if (!hasCachedPage || metadataChanged) return true;
+    if (previousEntryIDs) {
+        const previous = new Set(previousEntryIDs);
+        if (previous.size !== allowedEntryIDs.size) return true;
+        for (const entryID of allowedEntryIDs) if (!previous.has(entryID)) return true;
+    }
+    for (const entryID of refreshedEntryIDs) if (allowedEntryIDs.has(entryID)) return true;
+    return false;
 }
 
 function offlineManifestEntryIDs(manifest) {
@@ -497,20 +546,55 @@ function offlineManifestEntryIDs(manifest) {
 
 async function removeExpiredOfflineEntries(pageCache, mediaCache, entryIDs) {
     const prefix = document.body.dataset.offlineEntryUrl;
+    const cachedEntryIDs = new Set();
     for (const request of await pageCache.keys()) {
         if (!request.url.startsWith(new URL(prefix, location.origin).href + "/")) continue;
         const entryID = parseInt(request.url.substring(request.url.lastIndexOf("/") + 1), 10);
-        if (!entryIDs.has(entryID)) await pageCache.delete(request);
+        if (entryIDs.has(entryID)) cachedEntryIDs.add(entryID);
+        else await pageCache.delete(request);
     }
 
     const userID = offlineUserID();
     const mediaRecords = (await getOfflineRecords("meta")).filter((record) => record.key.startsWith(`entryMedia:${userID}:`));
+    const retainedMediaURLs = new Set();
+    for (const record of mediaRecords) {
+        const entryID = parseInt(record.key.substring(record.key.lastIndexOf(":") + 1), 10);
+        if (entryIDs.has(entryID)) for (const mediaURL of record.value || []) retainedMediaURLs.add(mediaURL);
+    }
     for (const record of mediaRecords) {
         const entryID = parseInt(record.key.substring(record.key.lastIndexOf(":") + 1), 10);
         if (entryIDs.has(entryID)) continue;
-        for (const mediaURL of record.value || []) await mediaCache.delete(mediaURL);
+        for (const mediaURL of record.value || []) {
+            if (!retainedMediaURLs.has(mediaURL)) await mediaCache.delete(mediaURL);
+        }
         await deleteOfflineRecord("meta", record.key);
     }
+    return cachedEntryIDs;
+}
+
+function offlineEntryNeedsRefresh(entryID, cachedEntryIDs, previousVersions, currentVersions, lastRefresh = 0) {
+    if (!cachedEntryIDs.has(entryID)) return true;
+    const previousVersion = previousVersions?.[entryID];
+    const currentVersion = currentVersions?.[entryID];
+    if (previousVersion) return previousVersion !== currentVersion;
+    return !currentVersion || !lastRefresh || Date.parse(currentVersion) > lastRefresh;
+}
+
+function scheduleOfflineRefreshRetry() {
+    offlineRefreshRetryPending = true;
+    if (offlineRefreshRetryTimer || navigator.onLine === false) return;
+    offlineRefreshRetryTimer = setTimeout(() => {
+        offlineRefreshRetryTimer = null;
+        refreshOfflineContent(true);
+    }, offlineRefreshRetryDelay);
+    offlineRefreshRetryDelay = Math.min(offlineRefreshRetryDelay * 2, 300000);
+}
+
+function clearOfflineRefreshRetry() {
+    if (offlineRefreshRetryTimer) clearTimeout(offlineRefreshRetryTimer);
+    offlineRefreshRetryTimer = null;
+    offlineRefreshRetryDelay = 5000;
+    offlineRefreshRetryPending = false;
 }
 
 async function refreshOfflineContent(force = false) {
@@ -533,33 +617,86 @@ async function refreshOfflineContent(force = false) {
         const pageCache = await caches.open(offlinePageCacheName(userID));
         const mediaCache = await caches.open(offlineMediaCacheName(userID));
         const entryIDs = offlineManifestEntryIDs(manifest);
-        offlineRefreshProgress = {completed: 0, total: entryIDs.size};
+        const cachedEntryIDs = await removeExpiredOfflineEntries(pageCache, mediaCache, entryIDs);
+        const previousManifest = await getOfflineRecord("meta", `manifest:${userID}`);
+        const entriesToRefresh = Array.from(entryIDs).filter((entryID) => offlineEntryNeedsRefresh(
+            entryID,
+            cachedEntryIDs,
+            previousManifest?.value?.entry_versions,
+            manifest.entry_versions,
+            lastRefresh?.value,
+        ));
+        const entriesToRefreshSet = new Set(entriesToRefresh);
+        const synchronizedEntryIDs = new Set(Array.from(cachedEntryIDs).filter((entryID) => !entriesToRefreshSet.has(entryID)));
+        offlineRefreshProgress = {completed: synchronizedEntryIDs.size, total: entryIDs.size};
         updateOfflineProgress();
-        await removeExpiredOfflineEntries(pageCache, mediaCache, entryIDs);
+
+        let refreshFailures = 0;
+        const refreshedEntryIDs = [];
+        await runOfflineBatches(entriesToRefresh, OFFLINE_ENTRY_BATCH_SIZE, async (entryID) => {
+            try {
+                if (await cacheOfflineEntry(entryID, pageCache, mediaCache)) {
+                    refreshedEntryIDs.push(entryID);
+                    if (!synchronizedEntryIDs.has(entryID)) {
+                        synchronizedEntryIDs.add(entryID);
+                        offlineRefreshProgress.completed += 1;
+                        updateOfflineProgress();
+                    }
+                } else {
+                    refreshFailures += 1;
+                }
+            } catch (error) {
+                refreshFailures += 1;
+                console.debug("Unable to cache offline entry:", entryID, error);
+            }
+        });
 
         const basePath = document.body.dataset.basePath || "";
+        const previous = previousManifest?.value;
+        const previousTags = new Map((previous?.user_tags || []).map((tag) => [tag.id, tag]));
         const listSpecs = [
-            ["/unread", new Set(manifest.unread_entry_ids || [])],
-            ["/saved-for-later", new Set(manifest.saved_for_later_entry_ids || [])],
-            ["/starred", new Set(manifest.starred_entry_ids || [])],
-            ["/history", new Set(manifest.history_entry_ids || [])],
+            ["/unread", new Set(manifest.unread_entry_ids || []), previous?.unread_entry_ids],
+            ["/saved-for-later", new Set(manifest.saved_for_later_entry_ids || []), previous?.saved_for_later_entry_ids],
+            ["/starred", new Set(manifest.starred_entry_ids || []), previous?.starred_entry_ids],
+            ["/history", new Set(manifest.history_entry_ids || []), previous?.history_entry_ids],
         ];
-        (manifest.user_tags || []).forEach((tag) => listSpecs.push([`/user-tag/${tag.id}/entries`, new Set(tag.entry_ids || [])]));
-        for (const [path, allowed] of listSpecs) {
-            await cacheOfflineListPages(new URL(basePath + path, location.origin).href, allowed, pageCache);
+        (manifest.user_tags || []).forEach((tag) => {
+            const previousTag = previousTags.get(tag.id);
+            listSpecs.push([
+                `/user-tag/${tag.id}/entries`,
+                new Set(tag.entry_ids || []),
+                previousTag?.entry_ids,
+                Boolean(previousTag && previousTag.title !== tag.title),
+            ]);
+        });
+        const allowedTagPaths = new Set((manifest.user_tags || []).map((tag) => `${basePath}/user-tag/${tag.id}/entries`));
+        await removeExpiredOfflineTagPages(pageCache, basePath, allowedTagPaths);
+        const refreshedEntryIDSet = new Set(refreshedEntryIDs);
+        for (const [path, allowed, previousIDs, metadataChanged] of listSpecs) {
+            const listURL = new URL(basePath + path, location.origin).href;
+            const hasCachedPage = Boolean(await pageCache.match(listURL));
+            if (!offlineListNeedsRefresh(allowed, previousIDs, refreshedEntryIDSet, hasCachedPage, metadataChanged)) continue;
+            try {
+                if (!await cacheOfflineListPages(listURL, allowed, pageCache)) refreshFailures += 1;
+            } catch (error) {
+                refreshFailures += 1;
+                console.debug("Unable to cache offline list:", listURL, error);
+            }
         }
-        for (const entryID of entryIDs) {
-            await cacheOfflineEntry(entryID, pageCache, mediaCache);
-            offlineRefreshProgress.completed += 1;
-            updateOfflineProgress();
-        }
+        await runOfflineBatches(refreshedEntryIDs, OFFLINE_MEDIA_BATCH_SIZE, (entryID) => cacheOfflineEntryMedia(entryID, mediaCache));
 
-        await putOfflineRecord("meta", {key: `manifest:${userID}`, value: manifest});
-        await putOfflineRecord("meta", {key: `lastRefresh:${userID}`, value: Date.now()});
+        if (refreshFailures === 0) {
+            await putOfflineRecord("meta", {key: `manifest:${userID}`, value: manifest});
+            await putOfflineRecord("meta", {key: `lastRefresh:${userID}`, value: Date.now()});
+            clearOfflineRefreshRetry();
+        } else {
+            scheduleOfflineRefreshRetry();
+        }
         await putOfflineRecord("meta", {key: `mediaSkipped:${userID}`, value: offlineSkippedMedia});
     })().catch((error) => {
         window.offlineSyncLastError = String(error?.stack || error);
         console.error("Offline content refresh failed:", error);
+        scheduleOfflineRefreshRetry();
     }).finally(async () => {
         offlineRefreshPromise = null;
         offlineRefreshProgress = null;
@@ -622,6 +759,56 @@ function applyOfflinePatchToElement(element, patch) {
     if (tagMatch && (patch.remove_user_tag_ids || []).includes(parseInt(tagMatch[1], 10))) element.remove();
 }
 
+function applyOfflineManifestToPage(manifest) {
+    const tags = new Map((manifest.user_tags || []).map((tag) => [tag.id, tag]));
+    document.querySelectorAll(".entry-user-tags").forEach((container) => {
+        const entryID = parseInt(container.closest("[data-id]")?.dataset.id, 10);
+        if (!entryID) return;
+        const assigned = container.querySelector(".entry-user-tags-assigned");
+        assigned?.querySelectorAll("[data-user-tag-id]").forEach((label) => {
+            const tag = tags.get(parseInt(label.dataset.userTagId, 10));
+            if (tag) label.textContent = tag.title;
+            else label.remove();
+        });
+        const checklist = container.querySelector(".entry-user-tags-checklist");
+        if (!checklist) return;
+        checklist.querySelectorAll('input[name="user_tag_ids"]').forEach((input) => {
+            const tag = tags.get(parseInt(input.value, 10));
+            if (!tag) {
+                input.closest("li")?.remove();
+                return;
+            }
+            const label = input.closest("label");
+            label?.childNodes.forEach((node) => {
+                if (node.nodeType === 3) node.remove();
+            });
+            label?.append(document.createTextNode(` ${tag.title}`));
+            if ((tag.entry_ids || []).includes(entryID)) input.checked = true;
+        });
+        for (const tag of tags.values()) {
+            const manifestAssigned = (tag.entry_ids || []).includes(entryID);
+            if (manifestAssigned && assigned && !assigned.querySelector(`[data-user-tag-id="${tag.id}"]`)) {
+                const assignedLabel = document.createElement("span");
+                assignedLabel.className = "entry-user-tag-label";
+                assignedLabel.dataset.userTagId = String(tag.id);
+                assignedLabel.textContent = tag.title;
+                assigned.append(assignedLabel);
+            }
+            if (checklist.querySelector(`input[value="${tag.id}"]`)) continue;
+            const input = document.createElement("input");
+            input.type = "checkbox";
+            input.name = "user_tag_ids";
+            input.value = String(tag.id);
+            input.checked = manifestAssigned;
+            const label = document.createElement("label");
+            label.append(input, document.createTextNode(` ${tag.title}`));
+            const item = document.createElement("li");
+            item.append(label);
+            checklist.append(item);
+        }
+    });
+}
+
 async function applyOfflinePatchesToPage() {
     const userID = offlineUserID();
     if (!userID) return;
@@ -630,14 +817,14 @@ async function applyOfflinePatchesToPage() {
         document.querySelectorAll(`[data-id="${patch.entry_id}"]`).forEach((element) => applyOfflinePatchToElement(element, patch));
     });
 
-    if (navigator.onLine === false && location.pathname.endsWith("/unread")) {
-        const manifest = await getOfflineRecord("meta", `manifest:${userID}`);
-        if (manifest) {
-            const allowed = new Set(manifest.value.unread_entry_ids || []);
-            document.querySelectorAll("article[data-id]").forEach((element) => {
-                if (!allowed.has(parseInt(element.dataset.id, 10))) element.remove();
-            });
-        }
+    const manifest = await getOfflineRecord("meta", `manifest:${userID}`);
+    const offlinePage = navigator.onLine === false || document.body.dataset.offlineSnapshot === "true";
+    if (manifest && offlinePage) applyOfflineManifestToPage(manifest.value);
+    if (manifest && offlinePage && location.pathname.endsWith("/unread")) {
+        const allowed = new Set(manifest.value.unread_entry_ids || []);
+        document.querySelectorAll("article[data-id]").forEach((element) => {
+            if (!allowed.has(parseInt(element.dataset.id, 10))) element.remove();
+        });
     }
 }
 
@@ -774,7 +961,7 @@ async function initializeOfflineSync() {
     window.addEventListener("online", () => {
         updateOfflineStatus();
         flushOfflineChanges();
-        refreshOfflineContent();
+        refreshOfflineContent(offlineRefreshRetryPending);
     });
     window.addEventListener("offline", updateOfflineStatus);
     document.addEventListener("visibilitychange", () => {

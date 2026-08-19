@@ -45,6 +45,7 @@
     data-offline-manifest-url="{{ routePath "/offline/manifest" }}"
     data-offline-entry-url="{{ routePath "/offline/entry" }}"
     data-offline-sync-url="{{ routePath "/offline/sync" }}"
+    {{ if .offlineSnapshot }}data-offline-snapshot="true"{{ end }}
     data-add-subscription-url="{{ routePath "/subscribe" }}"
     data-entries-status-url="{{ routePath "/entry/status" }}"
     data-refresh-all-feeds-url="{{ routePath "/feeds/refresh" }}"

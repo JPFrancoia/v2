@@ -80,4 +80,5 @@ type OfflineManifest struct {
 	StarredEntryIDs       []int64                  `json:"starred_entry_ids"`
 	HistoryEntryIDs       []int64                  `json:"history_entry_ids"`
 	UserTags              []OfflineManifestUserTag `json:"user_tags"`
+	EntryVersions         map[int64]time.Time      `json:"entry_versions"`
 }

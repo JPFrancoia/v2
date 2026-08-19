@@ -212,6 +212,7 @@ func (s *Storage) OfflineManifest(ctx context.Context, userID int64, now time.Ti
 		StarredEntryIDs:       make([]int64, 0),
 		HistoryEntryIDs:       make([]int64, 0),
 		UserTags:              make([]model.OfflineManifestUserTag, 0),
+		EntryVersions:         make(map[int64]time.Time),
 	}
 
 	var err error
@@ -232,6 +233,24 @@ func (s *Storage) OfflineManifest(ctx context.Context, userID int64, now time.Ti
 		return nil, err
 	}
 	manifest.UserTags, err = s.offlineManifestUserTags(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	entryIDs := make(map[int64]struct{})
+	addEntryIDs := func(ids []int64) {
+		for _, entryID := range ids {
+			entryIDs[entryID] = struct{}{}
+		}
+	}
+	addEntryIDs(manifest.UnreadEntryIDs)
+	addEntryIDs(manifest.SavedForLaterEntryIDs)
+	addEntryIDs(manifest.StarredEntryIDs)
+	addEntryIDs(manifest.HistoryEntryIDs)
+	for _, tag := range manifest.UserTags {
+		addEntryIDs(tag.EntryIDs)
+	}
+	manifest.EntryVersions, err = s.offlineEntryVersions(ctx, userID, entryIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -265,6 +284,35 @@ func (s *Storage) offlineEntryIDs(ctx context.Context, condition string, userID 
 		return nil, fmt.Errorf(`store: unable to iterate offline entry IDs: %v`, err)
 	}
 	return entryIDs, nil
+}
+
+func (s *Storage) offlineEntryVersions(ctx context.Context, userID int64, entryIDs map[int64]struct{}) (map[int64]time.Time, error) {
+	versions := make(map[int64]time.Time, len(entryIDs))
+	if len(entryIDs) == 0 {
+		return versions, nil
+	}
+
+	ids := make([]int64, 0, len(entryIDs))
+	for entryID := range entryIDs {
+		ids = append(ids, entryID)
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT id, changed_at FROM entries WHERE user_id=$1 AND id=ANY($2)`, userID, pq.Array(ids))
+	if err != nil {
+		return nil, fmt.Errorf(`store: unable to fetch offline entry versions: %v`, err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var entryID int64
+		var changedAt time.Time
+		if err := rows.Scan(&entryID, &changedAt); err != nil {
+			return nil, fmt.Errorf(`store: unable to scan offline entry version: %v`, err)
+		}
+		versions[entryID] = changedAt
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf(`store: unable to iterate offline entry versions: %v`, err)
+	}
+	return versions, nil
 }
 
 func (s *Storage) offlineManifestUserTags(ctx context.Context, userID int64) ([]model.OfflineManifestUserTag, error) {

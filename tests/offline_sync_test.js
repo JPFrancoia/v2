@@ -39,3 +39,32 @@ test("status and saved-for-later conflicts stay coupled", () => {
 test("formats offline article progress", () => {
     assert.equal(context.offlineProgressText(12, 40, "articles synchronized"), "12/40 articles synchronized");
 });
+
+test("limits offline batch concurrency", async () => {
+    let active = 0;
+    let maximum = 0;
+    await context.runOfflineBatches([1, 2, 3, 4, 5], 2, async () => {
+        active += 1;
+        maximum = Math.max(maximum, active);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        active -= 1;
+    });
+    assert.equal(maximum, 2);
+});
+
+test("refreshes only missing or changed offline entries", () => {
+    const cached = new Set([1, 2]);
+    assert.equal(context.offlineEntryNeedsRefresh(3, cached, {}, {3: "2026-08-19T10:00:00Z"}), true);
+    assert.equal(context.offlineEntryNeedsRefresh(1, cached, {1: "v1"}, {1: "v1"}), false);
+    assert.equal(context.offlineEntryNeedsRefresh(1, cached, {1: "v1"}, {1: "v2"}), true);
+    assert.equal(context.offlineEntryNeedsRefresh(2, cached, undefined, {2: "2026-08-19T10:00:00Z"}), true);
+    assert.equal(context.offlineEntryNeedsRefresh(2, cached, undefined, {2: "2026-08-19T10:00:00Z"}, Date.parse("2026-08-19T11:00:00Z")), false);
+});
+
+test("refreshes offline lists only when needed", () => {
+    const allowed = new Set([1, 2]);
+    assert.equal(context.offlineListNeedsRefresh(allowed, [1, 2], new Set(), true), false);
+    assert.equal(context.offlineListNeedsRefresh(allowed, [1], new Set(), true), true);
+    assert.equal(context.offlineListNeedsRefresh(allowed, [1, 2], new Set([2]), true), true);
+    assert.equal(context.offlineListNeedsRefresh(allowed, [1, 2], new Set(), false), true);
+});
