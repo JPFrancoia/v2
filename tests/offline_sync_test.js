@@ -36,6 +36,21 @@ test("status and saved-for-later conflicts stay coupled", () => {
     assert.deepEqual(Array.from(fields).sort(), ["saved_for_later", "status"]);
 });
 
+test("reads saved-for-later false when the marker is absent", () => {
+    context.trustedTypes = {createPolicy: (_name, policy) => policy};
+    context.DOMParser = class {
+        parseFromString(html) {
+            return {querySelector: () => ({
+                querySelector: (selector) => selector.includes("toggle-status")
+                    ? {dataset: {value: "unread"}}
+                    : {dataset: html.includes("data-completed") ? {completed: "true"} : {}},
+            })};
+        }
+    };
+    assert.deepEqual({...context.offlineStatusValuesFromHTML("<button></button>")}, {status: "unread", saved_for_later: false});
+    assert.deepEqual({...context.offlineStatusValuesFromHTML("<button data-completed></button>")}, {status: "unread", saved_for_later: true});
+});
+
 test("repairs legacy status-only patches", () => {
     const patch = {base: {status: "unread"}, set: {status: "read"}};
     const current = {status: "unread", saved_for_later: true};

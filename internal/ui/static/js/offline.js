@@ -288,9 +288,9 @@ function offlineStatusValuesFromHTML(html) {
     const parsed = new DOMParser().parseFromString(trustedOfflineHTML(html), "text/html");
     const entry = parsed.querySelector("[data-id]");
     const status = entry?.querySelector(":is(a, button)[data-toggle-status]")?.dataset.value;
-    const saved = entry?.querySelector(":is(a, button)[data-save-for-later-entry]")?.dataset.completed;
-    if (!status || saved === undefined) return null;
-    return {status, saved_for_later: saved === "true"};
+    const saved = entry?.querySelector(":is(a, button)[data-save-for-later-entry]");
+    if (!status || !saved) return null;
+    return {status, saved_for_later: saved.dataset.completed === "true"};
 }
 
 function offlineDesiredStatusValues(patch, currentValues) {
