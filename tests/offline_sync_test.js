@@ -36,8 +36,39 @@ test("status and saved-for-later conflicts stay coupled", () => {
     assert.deepEqual(Array.from(fields).sort(), ["saved_for_later", "status"]);
 });
 
+test("repairs legacy status-only patches", () => {
+    const patch = {base: {status: "unread"}, set: {status: "read"}};
+    const current = {status: "unread", saved_for_later: true};
+    context.coupleOfflineStatusPatch(patch, current, context.offlineDesiredStatusValues(patch, current));
+    assert.deepEqual({...patch.base}, {status: "unread", saved_for_later: true});
+    assert.deepEqual({...patch.set}, {status: "read", saved_for_later: false});
+    assert.equal(context.isCompleteOfflineStatusPatch(patch), true);
+});
+
+test("repairs legacy saved-only patches", () => {
+    const patch = {base: {saved_for_later: false}, set: {saved_for_later: true}};
+    const current = {status: "read", saved_for_later: false};
+    context.coupleOfflineStatusPatch(patch, current, context.offlineDesiredStatusValues(patch, current));
+    assert.deepEqual({...patch.base}, {saved_for_later: false, status: "read"});
+    assert.deepEqual({...patch.set}, {saved_for_later: true, status: "unread"});
+    assert.equal(context.isCompleteOfflineStatusPatch(patch), true);
+});
+
+test("does not fake companion values during unrelated edits", () => {
+    const patch = {base: {status: "unread"}, set: {status: "read", saved_for_later: undefined}};
+    context.coupleOfflineStatusPatch(patch);
+    assert.equal(Object.hasOwn(patch.base, "saved_for_later"), false);
+    assert.equal(context.isCompleteOfflineStatusPatch(patch), false);
+});
+
 test("formats offline article progress", () => {
     assert.equal(context.offlineProgressText(12, 40, "articles cached"), "12/40 articles cached");
+});
+
+test("identifies the media caching phase", () => {
+    vm.runInContext('offlineRefreshPhase = "media"', context);
+    assert.equal(context.offlineStateLabel({dataset: {labelCachingMedia: "Caching media"}}), "Caching media");
+    vm.runInContext("offlineRefreshPhase = null", context);
 });
 
 test("limits offline batch concurrency", async () => {

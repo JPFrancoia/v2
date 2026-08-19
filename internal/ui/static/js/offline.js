@@ -8,6 +8,7 @@ const OFFLINE_MEDIA_BATCH_SIZE = 4;
 let offlineFlushPromise = null;
 let offlineRefreshPromise = null;
 let offlineRefreshProgress = null;
+let offlineRefreshPhase = null;
 let offlineSkippedMedia = 0;
 let offlineMediaStorageFull = false;
 let offlineHTMLPolicy = null;
@@ -104,6 +105,30 @@ function hasOfflinePatchChanges(patch) {
     return Object.keys(patch.set || {}).length > 0 || (patch.add_user_tag_ids || []).length > 0 || (patch.remove_user_tag_ids || []).length > 0;
 }
 
+function hasOfflineValue(values, field) {
+    return Object.hasOwn(values, field) && values[field] !== undefined && values[field] !== null;
+}
+
+function isCompleteOfflineStatusPatch(patch) {
+    const complete = ["status", "saved_for_later"].every((field) => hasOfflineValue(patch.base, field) && hasOfflineValue(patch.set, field));
+    if (!complete) return false;
+    if (patch.set.saved_for_later === true) return patch.set.status === "unread";
+    return patch.set.status !== "read" || patch.set.saved_for_later === false;
+}
+
+function coupleOfflineStatusPatch(patch, baseValues = {}, setValues = {}) {
+    if (!hasOfflineValue(patch.set, "status") && !hasOfflineValue(patch.set, "saved_for_later")) return;
+    ["status", "saved_for_later"].forEach((field) => {
+        if (!hasOfflineValue(patch.base, field) && hasOfflineValue(baseValues, field)) patch.base[field] = baseValues[field];
+        if (!hasOfflineValue(patch.set, field)) {
+            if (hasOfflineValue(setValues, field)) patch.set[field] = setValues[field];
+            else if (hasOfflineValue(baseValues, field)) patch.set[field] = baseValues[field];
+        }
+    });
+    if (patch.set.saved_for_later === true) patch.set.status = "unread";
+    else if (patch.set.status === "read") patch.set.saved_for_later = false;
+}
+
 function mergeOfflineTagDelta(patch, addTagIDs, removeTagIDs) {
     const additions = new Set(patch.add_user_tag_ids || []);
     const removals = new Set(patch.remove_user_tag_ids || []);
@@ -150,6 +175,7 @@ async function queueOfflineEntryPatch(entryID, baseValues = {}, setValues = {}, 
                         delete patch.base[field];
                     }
                 });
+                coupleOfflineStatusPatch(patch, baseValues, setValues);
                 mergeOfflineTagDelta(patch, addTagIDs, removeTagIDs);
                 patch.revision += 1;
                 patch.blocked = false;
@@ -257,6 +283,39 @@ function scheduleOfflineRetry() {
     offlineRetryDelay = Math.min(offlineRetryDelay * 2, 300000);
 }
 
+function offlineStatusValuesFromHTML(html) {
+    const parsed = new DOMParser().parseFromString(trustedOfflineHTML(html), "text/html");
+    const entry = parsed.querySelector("[data-id]");
+    const status = entry?.querySelector(":is(a, button)[data-toggle-status]")?.dataset.value;
+    const saved = entry?.querySelector(":is(a, button)[data-save-for-later-entry]")?.dataset.completed;
+    if (!status || saved === undefined) return null;
+    return {status, saved_for_later: saved === "true"};
+}
+
+function offlineDesiredStatusValues(patch, currentValues) {
+    const requestedStatus = hasOfflineValue(patch.set, "status");
+    const requestedSaved = hasOfflineValue(patch.set, "saved_for_later");
+    const desired = {...currentValues, ...patch.set};
+    if (requestedStatus && !requestedSaved) desired.saved_for_later = patch.set.status === "read" ? false : currentValues.saved_for_later;
+    if (requestedSaved && !requestedStatus) desired.status = patch.set.saved_for_later ? "unread" : currentValues.status;
+    return desired;
+}
+
+async function repairOfflineStatusPatch(patch) {
+    if (isCompleteOfflineStatusPatch(patch) ||
+        (!hasOfflineValue(patch.set, "status") && !hasOfflineValue(patch.set, "saved_for_later"))) return;
+    const entryURL = `${document.body.dataset.offlineEntryUrl}/${patch.entry_id}`;
+    const pageCache = await caches.open(offlinePageCacheName(patch.userId));
+    let response = await pageCache.match(entryURL);
+    if (!response) response = await fetch(entryURL, {credentials: "same-origin", headers: {"Accept": "text/html"}});
+    if (!response?.ok || response.redirected) throw new Error(`Unable to repair offline patch for entry ${patch.entry_id}`);
+    const values = offlineStatusValuesFromHTML(await response.text());
+    if (!values) throw new Error(`Unable to read offline status for entry ${patch.entry_id}`);
+    coupleOfflineStatusPatch(patch, values, offlineDesiredStatusValues(patch, values));
+    if (!isCompleteOfflineStatusPatch(patch)) throw new Error(`Unable to repair coupled values for entry ${patch.entry_id}`);
+    await putOfflineRecord("patches", patch);
+}
+
 async function flushOfflineChanges() {
     if (offlineFlushPromise) return offlineFlushPromise;
     const syncURL = document.body.dataset.offlineSyncUrl;
@@ -269,6 +328,7 @@ async function flushOfflineChanges() {
             .filter((patch) => patch.userId === userID && !patch.blocked)
             .slice(0, 100);
         if (patches.length === 0) return;
+        for (const patch of patches) await repairOfflineStatusPatch(patch);
 
         const response = await fetch(syncURL, {
             method: "POST",
@@ -617,6 +677,7 @@ async function refreshOfflineContent(force = false) {
     const lastRefresh = await getOfflineRecord("meta", `lastRefresh:${userID}`);
     if (!force && lastRefresh && Date.now() - lastRefresh.value < OFFLINE_REFRESH_INTERVAL) return null;
 
+    offlineRefreshPhase = "manifest";
     offlineRefreshPromise = (async () => {
         offlineSkippedMedia = 0;
         offlineMediaStorageFull = false;
@@ -629,6 +690,8 @@ async function refreshOfflineContent(force = false) {
         const mediaCache = await caches.open(offlineMediaCacheName(userID));
         const entryIDs = offlineManifestEntryIDs(manifest);
         const {cachedEntryIDs, cachedVersions} = await removeExpiredOfflineEntries(pageCache, mediaCache, entryIDs);
+        offlineRefreshPhase = "articles";
+        updateOfflineStatus();
         const previousManifest = await getOfflineRecord("meta", `manifest:${userID}`);
         const entriesToRefresh = Array.from(entryIDs).filter((entryID) => offlineEntryNeedsRefresh(
             entryID,
@@ -660,6 +723,8 @@ async function refreshOfflineContent(force = false) {
             }
         });
 
+        offlineRefreshPhase = "lists";
+        updateOfflineStatus();
         const basePath = document.body.dataset.basePath || "";
         const previous = previousManifest?.value;
         const previousTags = new Map((previous?.user_tags || []).map((tag) => [tag.id, tag]));
@@ -692,6 +757,8 @@ async function refreshOfflineContent(force = false) {
                 console.debug("Unable to cache offline list:", listURL, error);
             }
         }
+        offlineRefreshPhase = "media";
+        updateOfflineStatus();
         await runOfflineBatches(refreshedEntryIDs, OFFLINE_MEDIA_BATCH_SIZE, (entryID) => cacheOfflineEntryMedia(entryID, mediaCache));
 
         if (refreshFailures === 0) {
@@ -709,6 +776,7 @@ async function refreshOfflineContent(force = false) {
     }).finally(async () => {
         offlineRefreshPromise = null;
         offlineRefreshProgress = null;
+        offlineRefreshPhase = null;
         await updateOfflineStatus();
     });
     updateOfflineStatus();
@@ -857,21 +925,32 @@ function updateOfflineProgress() {
     }
 }
 
+function offlineStateLabel(status) {
+    if (offlineFlushPromise) return status.dataset.labelSendingChanges;
+    if (offlineRefreshPhase === "articles") return status.dataset.labelCachingArticles;
+    if (offlineRefreshPhase === "lists") return status.dataset.labelCachingLists;
+    if (offlineRefreshPhase === "media") return status.dataset.labelCachingMedia;
+    if (offlineRefreshPromise) return status.dataset.labelSyncing;
+    return navigator.onLine === false ? status.dataset.labelOffline : status.dataset.labelOnline;
+}
+
 async function updateOfflineStatus() {
     const status = document.getElementById("offline-sync-status");
     const userID = offlineUserID();
     if (!status || !userID) return;
     const patches = (await getOfflineRecords("patches")).filter((patch) => patch.userId === userID);
     const conflicts = patches.reduce((count, patch) => count + (patch.conflicts || []).length, 0);
+    const queued = patches.filter((patch) => !patch.blocked).length;
     const lastSync = await getOfflineRecord("meta", `lastSync:${userID}`);
+    const lastRefresh = await getOfflineRecord("meta", `lastRefresh:${userID}`);
+    const lastSyncAt = Math.max(lastSync?.value || 0, lastRefresh?.value || 0);
     const skippedMedia = await getOfflineRecord("meta", `mediaSkipped:${userID}`);
     status.hidden = false;
     status.dataset.offline = navigator.onLine === false ? "true" : "false";
-    status.querySelector("[data-offline-state]").textContent = offlineFlushPromise || offlineRefreshPromise ?
-        status.dataset.labelSyncing : (navigator.onLine === false ? status.dataset.labelOffline : status.dataset.labelOnline);
-    status.querySelector("[data-offline-queued]").textContent = String(patches.length);
+    status.querySelector("[data-offline-state]").textContent = offlineStateLabel(status);
+    status.querySelector("[data-offline-queued]").textContent = String(queued);
     status.querySelector("[data-offline-conflicts]").textContent = String(conflicts);
-    status.querySelector("[data-offline-last-sync]").textContent = lastSync ? new Date(lastSync.value).toLocaleString() : status.dataset.labelNever;
+    status.querySelector("[data-offline-last-sync]").textContent = lastSyncAt ? new Date(lastSyncAt).toLocaleString() : status.dataset.labelNever;
     status.querySelector("[data-offline-media-skipped]").textContent = String(skippedMedia?.value || 0);
     updateOfflineProgress();
     const review = status.querySelector("[data-offline-review]");
