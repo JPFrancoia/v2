@@ -728,7 +728,7 @@ async function refreshOfflineContent(force = false) {
             manifest.entry_versions,
             lastRefresh?.value,
         ));
-        offlineRefreshProgress = {completed: cachedEntryIDs.size, total: entryIDs.size};
+        offlineRefreshProgress = {completed: entryIDs.size - entriesToRefresh.length, total: entryIDs.size};
         updateOfflineProgress();
 
         let refreshFailures = 0;
@@ -737,11 +737,9 @@ async function refreshOfflineContent(force = false) {
             try {
                 if (await cacheOfflineEntry(entryID, manifest.entry_versions?.[entryID], pageCache, mediaCache)) {
                     refreshedEntryIDs.push(entryID);
-                    if (!cachedEntryIDs.has(entryID)) {
-                        cachedEntryIDs.add(entryID);
-                        offlineRefreshProgress.completed += 1;
-                        updateOfflineProgress();
-                    }
+                    cachedEntryIDs.add(entryID);
+                    offlineRefreshProgress.completed += 1;
+                    updateOfflineProgress();
                 } else {
                     refreshFailures += 1;
                 }
