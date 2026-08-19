@@ -35,3 +35,7 @@ test("status and saved-for-later conflicts stay coupled", () => {
     const fields = context.conflictPatchFields([{field: "status_saved_for_later"}]);
     assert.deepEqual(Array.from(fields).sort(), ["saved_for_later", "status"]);
 });
+
+test("formats offline article progress", () => {
+    assert.equal(context.offlineProgressText(12, 40, "articles synchronized"), "12/40 articles synchronized");
+});

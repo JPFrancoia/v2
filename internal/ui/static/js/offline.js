@@ -5,6 +5,7 @@ const OFFLINE_MEDIA_LIMIT = 4000000;
 const OFFLINE_REFRESH_INTERVAL = 15 * 60 * 1000;
 let offlineFlushPromise = null;
 let offlineRefreshPromise = null;
+let offlineRefreshProgress = null;
 let offlineSkippedMedia = 0;
 let offlineMediaStorageFull = false;
 let offlineHTMLPolicy = null;
@@ -532,6 +533,8 @@ async function refreshOfflineContent(force = false) {
         const pageCache = await caches.open(offlinePageCacheName(userID));
         const mediaCache = await caches.open(offlineMediaCacheName(userID));
         const entryIDs = offlineManifestEntryIDs(manifest);
+        offlineRefreshProgress = {completed: 0, total: entryIDs.size};
+        updateOfflineProgress();
         await removeExpiredOfflineEntries(pageCache, mediaCache, entryIDs);
 
         const basePath = document.body.dataset.basePath || "";
@@ -545,7 +548,11 @@ async function refreshOfflineContent(force = false) {
         for (const [path, allowed] of listSpecs) {
             await cacheOfflineListPages(new URL(basePath + path, location.origin).href, allowed, pageCache);
         }
-        for (const entryID of entryIDs) await cacheOfflineEntry(entryID, pageCache, mediaCache);
+        for (const entryID of entryIDs) {
+            await cacheOfflineEntry(entryID, pageCache, mediaCache);
+            offlineRefreshProgress.completed += 1;
+            updateOfflineProgress();
+        }
 
         await putOfflineRecord("meta", {key: `manifest:${userID}`, value: manifest});
         await putOfflineRecord("meta", {key: `lastRefresh:${userID}`, value: Date.now()});
@@ -555,6 +562,7 @@ async function refreshOfflineContent(force = false) {
         console.error("Offline content refresh failed:", error);
     }).finally(async () => {
         offlineRefreshPromise = null;
+        offlineRefreshProgress = null;
         await updateOfflineStatus();
     });
     updateOfflineStatus();
@@ -633,6 +641,26 @@ async function applyOfflinePatchesToPage() {
     }
 }
 
+function offlineProgressText(completed, total, label) {
+    return `${completed}/${total} ${label}`;
+}
+
+function updateOfflineProgress() {
+    const status = document.getElementById("offline-sync-status");
+    if (!status) return;
+    status.dataset.syncing = offlineFlushPromise || offlineRefreshPromise ? "true" : "false";
+    const progress = status.querySelector("[data-offline-progress]");
+    if (!progress) return;
+    progress.hidden = !offlineRefreshProgress;
+    if (offlineRefreshProgress) {
+        progress.textContent = offlineProgressText(
+            offlineRefreshProgress.completed,
+            offlineRefreshProgress.total,
+            status.dataset.labelArticlesSynchronized,
+        );
+    }
+}
+
 async function updateOfflineStatus() {
     const status = document.getElementById("offline-sync-status");
     const userID = offlineUserID();
@@ -649,6 +677,7 @@ async function updateOfflineStatus() {
     status.querySelector("[data-offline-conflicts]").textContent = String(conflicts);
     status.querySelector("[data-offline-last-sync]").textContent = lastSync ? new Date(lastSync.value).toLocaleString() : status.dataset.labelNever;
     status.querySelector("[data-offline-media-skipped]").textContent = String(skippedMedia?.value || 0);
+    updateOfflineProgress();
     const review = status.querySelector("[data-offline-review]");
     if (review) review.hidden = conflicts === 0;
 }

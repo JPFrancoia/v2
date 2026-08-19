@@ -71,9 +71,12 @@
         data-label-online="{{ t "offline.status.online" }}"
         data-label-offline="{{ t "offline.status.offline" }}"
         data-label-syncing="{{ t "offline.status.syncing" }}"
+        data-label-articles-synchronized="{{ t "offline.status.articles_synchronized" }}"
         data-label-never="{{ t "offline.status.never" }}"
         data-label-clear-confirm="{{ t "offline.clear.confirm" }}">
+        <span class="offline-sync-spinner" aria-hidden="true"></span>
         <span data-offline-state></span>
+        <span data-offline-progress hidden></span>
         <span>{{ t "offline.status.queued" }}: <strong data-offline-queued>0</strong></span>
         <span>{{ t "offline.status.conflicts" }}: <strong data-offline-conflicts>0</strong></span>
         <span>{{ t "offline.status.last_sync" }}: <time data-offline-last-sync></time></span>

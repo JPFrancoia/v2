@@ -1839,6 +1839,29 @@ audio, video {
     font-weight: 700;
 }
 
+.offline-sync-spinner {
+    animation: offline-sync-spin 800ms linear infinite;
+    border: 2px solid currentColor;
+    border-radius: 50%;
+    border-top-color: transparent;
+    height: 0.8em;
+    width: 0.8em;
+}
+
+.offline-sync-status:not([data-syncing="true"]) .offline-sync-spinner {
+    display: none;
+}
+
+@keyframes offline-sync-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .offline-sync-spinner {
+        animation: none;
+    }
+}
+
 .offline-conflict {
     border-bottom: 1px solid var(--table-border-color);
     padding: 8px 0 16px;
