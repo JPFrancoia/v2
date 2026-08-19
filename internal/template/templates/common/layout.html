@@ -64,33 +64,6 @@
 
     {{ if .user }}
     <a class="skip-to-content-link" href="#main">{{ t "skip_to_content" }}</a>
-    <aside id="offline-sync-status"
-        class="offline-sync-status"
-        role="status"
-        aria-live="polite"
-        hidden
-        data-label-online="{{ t "offline.status.online" }}"
-        data-label-offline="{{ t "offline.status.offline" }}"
-        data-label-syncing="{{ t "offline.status.syncing" }}"
-        data-label-sending-changes="{{ t "offline.status.sending_changes" }}"
-        data-label-retrying-changes="{{ t "offline.status.retrying_changes" }}"
-        data-label-caching-articles="{{ t "offline.status.caching_articles" }}"
-        data-label-caching-lists="{{ t "offline.status.caching_lists" }}"
-        data-label-caching-media="{{ t "offline.status.caching_media" }}"
-        data-label-articles-cached="{{ t "offline.status.articles_cached" }}"
-        data-label-never="{{ t "offline.status.never" }}"
-        data-label-clear-confirm="{{ t "offline.clear.confirm" }}">
-        <span class="offline-sync-spinner" aria-hidden="true"></span>
-        <span data-offline-state></span>
-        <span data-offline-progress hidden></span>
-        <span>{{ t "offline.status.queued" }}: <strong data-offline-queued>0</strong></span>
-        <span>{{ t "offline.status.conflicts" }}: <strong data-offline-conflicts>0</strong></span>
-        <span>{{ t "offline.status.last_sync" }}: <time data-offline-last-sync></time></span>
-        <span>{{ t "offline.status.media_skipped" }}: <strong data-offline-media-skipped>0</strong></span>
-        <button type="button" class="button button-small" data-offline-refresh>{{ t "offline.action.refresh" }}</button>
-        <button type="button" class="button button-small" data-offline-review hidden>{{ t "offline.action.review" }}</button>
-        <button type="button" class="button button-small" data-offline-clear>{{ t "offline.action.clear" }}</button>
-    </aside>
     <dialog id="offline-conflict-dialog"
         aria-labelledby="offline-conflict-title"
         data-label-entry="{{ t "offline.conflict.entry" }}"
@@ -169,6 +142,40 @@
                     </li>
                 {{ end }}
             </ul>
+            <details id="offline-sync-status"
+                class="offline-sync-status"
+                hidden
+                data-label-online="{{ t "offline.status.online" }}"
+                data-label-offline="{{ t "offline.status.offline" }}"
+                data-label-syncing="{{ t "offline.status.syncing" }}"
+                data-label-sending-changes="{{ t "offline.status.sending_changes" }}"
+                data-label-retrying-changes="{{ t "offline.status.retrying_changes" }}"
+                data-label-caching-articles="{{ t "offline.status.caching_articles" }}"
+                data-label-caching-lists="{{ t "offline.status.caching_lists" }}"
+                data-label-caching-media="{{ t "offline.status.caching_media" }}"
+                data-label-articles-cached="{{ t "offline.status.articles_cached" }}"
+                data-label-never="{{ t "offline.status.never" }}"
+                data-label-clear-confirm="{{ t "offline.clear.confirm" }}">
+                <summary>
+                    <span class="offline-sync-icon" aria-hidden="true">{{ icon "refresh" }}</span>
+                    <span class="offline-sync-spinner" aria-hidden="true"></span>
+                    <span data-offline-state role="status" aria-live="polite" aria-atomic="true"></span>
+                </summary>
+                <div class="offline-sync-panel">
+                    <strong data-offline-progress hidden></strong>
+                    <div class="offline-sync-details">
+                        <span>{{ t "offline.status.queued" }}: <strong data-offline-queued>0</strong></span>
+                        <span>{{ t "offline.status.conflicts" }}: <strong data-offline-conflicts>0</strong></span>
+                        <span>{{ t "offline.status.last_sync" }}: <span data-offline-last-sync></span></span>
+                        <span>{{ t "offline.status.media_skipped" }}: <strong data-offline-media-skipped>0</strong></span>
+                    </div>
+                    <div class="offline-sync-actions">
+                        <button type="button" class="button button-small" data-offline-refresh>{{ t "offline.action.refresh" }}</button>
+                        <button type="button" class="button button-small" data-offline-review hidden>{{ t "offline.action.review" }}</button>
+                        <button type="button" class="button button-small" data-offline-clear>{{ t "offline.action.clear" }}</button>
+                    </div>
+                </div>
+            </details>
         </nav>
     </header>
     {{ end }}

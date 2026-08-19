@@ -1825,18 +1825,46 @@ audio, video {
 }
 
 .offline-sync-status {
-    align-items: center;
-    border: 1px solid var(--table-border-color);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 16px;
-    margin: 8px auto;
-    max-width: 95%;
-    padding: 8px 12px;
+    flex: 0 0 auto;
+    margin-left: auto;
+    position: relative;
 }
 
-.offline-sync-status[data-offline="true"] {
+.offline-sync-status summary {
+    align-items: center;
+    border: 1px solid var(--table-border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    gap: 6px;
+    list-style: none;
+    padding: 3px 7px;
+    white-space: nowrap;
+}
+
+.offline-sync-status summary::-webkit-details-marker {
+    display: none;
+}
+
+.offline-sync-status summary:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+}
+
+.offline-sync-status summary [data-offline-state] {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.offline-sync-status[data-offline="true"] summary {
     font-weight: 700;
+}
+
+.offline-sync-icon,
+.offline-sync-icon .icon {
+    height: 1em;
+    width: 1em;
 }
 
 .offline-sync-spinner {
@@ -1844,16 +1872,63 @@ audio, video {
     border: 2px solid currentColor;
     border-radius: 50%;
     border-top-color: transparent;
-    height: 0.8em;
-    width: 0.8em;
+    height: 0.65em;
+    width: 0.65em;
 }
 
+.offline-sync-status[data-syncing="true"] .offline-sync-icon,
 .offline-sync-status:not([data-syncing="true"]) .offline-sync-spinner {
     display: none;
 }
 
+.offline-sync-panel {
+    background-color: var(--panel-background);
+    border: 1px solid var(--table-border-color);
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    width: min(340px, calc(100vw - 24px));
+    z-index: 100;
+}
+
+.offline-sync-panel [hidden] {
+    display: none;
+}
+
+.offline-sync-details {
+    display: grid;
+    gap: 4px;
+}
+
+.offline-sync-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
 @keyframes offline-sync-spin {
     to { transform: rotate(360deg); }
+}
+
+@media (max-width: 619px) {
+    .header nav {
+        position: relative;
+    }
+
+    .offline-sync-status {
+        position: absolute;
+        right: 0;
+        top: 0;
+    }
+
+    .offline-sync-status summary [data-offline-state] {
+        max-width: 110px;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
