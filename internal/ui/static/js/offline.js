@@ -14,6 +14,7 @@ let offlineMediaStorageFull = false;
 let offlineHTMLPolicy = null;
 let offlineRetryTimer = null;
 let offlineRetryDelay = 5000;
+let offlineFlushError = false;
 let offlineRefreshRetryTimer = null;
 let offlineRefreshRetryDelay = 5000;
 let offlineRefreshRetryPending = false;
@@ -303,17 +304,22 @@ function offlineDesiredStatusValues(patch, currentValues) {
 
 async function repairOfflineStatusPatch(patch) {
     if (isCompleteOfflineStatusPatch(patch) ||
-        (!hasOfflineValue(patch.set, "status") && !hasOfflineValue(patch.set, "saved_for_later"))) return;
+        (!hasOfflineValue(patch.set, "status") && !hasOfflineValue(patch.set, "saved_for_later"))) return true;
     const entryURL = `${document.body.dataset.offlineEntryUrl}/${patch.entry_id}`;
     const pageCache = await caches.open(offlinePageCacheName(patch.userId));
     let response = await pageCache.match(entryURL);
     if (!response) response = await fetch(entryURL, {credentials: "same-origin", headers: {"Accept": "text/html"}});
+    if (response?.status === 404) {
+        await deleteOfflineRecord("patches", patch.key);
+        return false;
+    }
     if (!response?.ok || response.redirected) throw new Error(`Unable to repair offline patch for entry ${patch.entry_id}`);
     const values = offlineStatusValuesFromHTML(await response.text());
     if (!values) throw new Error(`Unable to read offline status for entry ${patch.entry_id}`);
     coupleOfflineStatusPatch(patch, values, offlineDesiredStatusValues(patch, values));
     if (!isCompleteOfflineStatusPatch(patch)) throw new Error(`Unable to repair coupled values for entry ${patch.entry_id}`);
     await putOfflineRecord("patches", patch);
+    return true;
 }
 
 async function flushOfflineChanges() {
@@ -323,12 +329,31 @@ async function flushOfflineChanges() {
     if (!syncURL || !userID) return null;
 
     let flushSucceeded = false;
+    let repairFailed = false;
     offlineFlushPromise = (async () => {
-        const patches = (await getOfflineRecords("patches"))
+        const queuedPatches = (await getOfflineRecords("patches"))
             .filter((patch) => patch.userId === userID && !patch.blocked)
             .slice(0, 100);
-        if (patches.length === 0) return;
-        for (const patch of patches) await repairOfflineStatusPatch(patch);
+        if (queuedPatches.length === 0) {
+            offlineFlushError = false;
+            return;
+        }
+        const patches = [];
+        let repairError = null;
+        for (const patch of queuedPatches) {
+            try {
+                if (await repairOfflineStatusPatch(patch)) patches.push(patch);
+            } catch (error) {
+                repairError = error;
+                console.error("Unable to repair queued offline change:", patch.entry_id, error);
+            }
+        }
+        repairFailed = repairError !== null;
+        if (patches.length === 0) {
+            if (repairError) throw repairError;
+            offlineFlushError = false;
+            return;
+        }
 
         const response = await fetch(syncURL, {
             method: "POST",
@@ -349,19 +374,22 @@ async function flushOfflineChanges() {
         }
         await putOfflineRecord("meta", {key: `lastSync:${userID}`, value: Date.now()});
         flushSucceeded = true;
+        offlineFlushError = repairFailed;
         offlineRetryDelay = 5000;
         if (offlineRetryTimer) clearTimeout(offlineRetryTimer);
         offlineRetryTimer = null;
+        if (repairFailed) scheduleOfflineRetry();
         // ponytail: refresh the full bounded cache; add targeted reconciliation if network cost becomes material.
         refreshOfflineContent(true);
     })().catch((error) => {
+        offlineFlushError = true;
         console.error("Offline synchronization failed:", error);
         scheduleOfflineRetry();
     }).finally(async () => {
         offlineFlushPromise = null;
         await applyOfflinePatchesToPage();
         await updateOfflineStatus();
-        if (flushSucceeded) {
+        if (flushSucceeded && !repairFailed) {
             const remaining = (await getOfflineRecords("patches")).some((patch) => patch.userId === userID && !patch.blocked);
             if (remaining) flushOfflineChanges();
         }
@@ -927,6 +955,7 @@ function updateOfflineProgress() {
 
 function offlineStateLabel(status) {
     if (offlineFlushPromise) return status.dataset.labelSendingChanges;
+    if (offlineFlushError) return status.dataset.labelRetryingChanges;
     if (offlineRefreshPhase === "articles") return status.dataset.labelCachingArticles;
     if (offlineRefreshPhase === "lists") return status.dataset.labelCachingLists;
     if (offlineRefreshPhase === "media") return status.dataset.labelCachingMedia;
@@ -1063,7 +1092,10 @@ async function initializeOfflineSync() {
         }
     });
 
-    document.querySelector("[data-offline-refresh]")?.addEventListener("click", () => refreshOfflineContent(true));
+    document.querySelector("[data-offline-refresh]")?.addEventListener("click", () => {
+        flushOfflineChanges();
+        refreshOfflineContent(true);
+    });
     document.querySelector("[data-offline-review]")?.addEventListener("click", showOfflineConflictDialog);
     document.querySelector("[data-offline-conflict-close]")?.addEventListener("click", () => document.getElementById("offline-conflict-dialog")?.close());
     document.querySelector("[data-offline-clear]")?.addEventListener("click", async () => {

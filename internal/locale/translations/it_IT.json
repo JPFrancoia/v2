@@ -479,6 +479,7 @@
     "offline.status.offline": "Offline",
     "offline.status.online": "Online",
     "offline.status.queued": "Queued changes",
+    "offline.status.retrying_changes": "Retrying changes",
     "offline.status.sending_changes": "Sending changes",
     "offline.status.syncing": "Synchronizing",
     "page.about.authors_label": "Autori:",

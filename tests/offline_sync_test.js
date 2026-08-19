@@ -71,6 +71,12 @@ test("identifies the media caching phase", () => {
     vm.runInContext("offlineRefreshPhase = null", context);
 });
 
+test("shows queued change retry failures", () => {
+    vm.runInContext("offlineFlushError = true", context);
+    assert.equal(context.offlineStateLabel({dataset: {labelRetryingChanges: "Retrying changes"}}), "Retrying changes");
+    vm.runInContext("offlineFlushError = false", context);
+});
+
 test("limits offline batch concurrency", async () => {
     let active = 0;
     let maximum = 0;
