@@ -454,7 +454,7 @@ async function deleteUnreferencedOfflineMedia(previousURLs, currentURLs, current
     }
 }
 
-async function cacheOfflineEntry(entryID, pageCache, mediaCache) {
+async function cacheOfflineEntry(entryID, version, pageCache, mediaCache) {
     const prefix = document.body.dataset.offlineEntryUrl;
     const userID = offlineUserID();
     if (!prefix || !userID) return false;
@@ -469,6 +469,7 @@ async function cacheOfflineEntry(entryID, pageCache, mediaCache) {
     const previousMedia = await getOfflineRecord("meta", mediaKey);
     if (previousMedia) await deleteUnreferencedOfflineMedia(previousMedia.value || [], mediaURLs, mediaKey, mediaCache);
     await putOfflineRecord("meta", {key: mediaKey, value: mediaURLs});
+    await putOfflineRecord("meta", {key: `entryVersion:${userID}:${entryID}`, value: version});
     return true;
 }
 
@@ -555,7 +556,8 @@ async function removeExpiredOfflineEntries(pageCache, mediaCache, entryIDs) {
     }
 
     const userID = offlineUserID();
-    const mediaRecords = (await getOfflineRecords("meta")).filter((record) => record.key.startsWith(`entryMedia:${userID}:`));
+    const metaRecords = await getOfflineRecords("meta");
+    const mediaRecords = metaRecords.filter((record) => record.key.startsWith(`entryMedia:${userID}:`));
     const retainedMediaURLs = new Set();
     for (const record of mediaRecords) {
         const entryID = parseInt(record.key.substring(record.key.lastIndexOf(":") + 1), 10);
@@ -569,14 +571,23 @@ async function removeExpiredOfflineEntries(pageCache, mediaCache, entryIDs) {
         }
         await deleteOfflineRecord("meta", record.key);
     }
-    return cachedEntryIDs;
+
+    const cachedVersions = {};
+    const versionPrefix = `entryVersion:${userID}:`;
+    for (const record of metaRecords) {
+        if (!record.key.startsWith(versionPrefix)) continue;
+        const entryID = parseInt(record.key.substring(versionPrefix.length), 10);
+        if (entryIDs.has(entryID)) cachedVersions[entryID] = record.value;
+        else await deleteOfflineRecord("meta", record.key);
+    }
+    return {cachedEntryIDs, cachedVersions};
 }
 
-function offlineEntryNeedsRefresh(entryID, cachedEntryIDs, previousVersions, currentVersions, lastRefresh = 0) {
+function offlineEntryNeedsRefresh(entryID, cachedEntryIDs, cachedVersions, currentVersions, lastRefresh = 0) {
     if (!cachedEntryIDs.has(entryID)) return true;
-    const previousVersion = previousVersions?.[entryID];
+    const cachedVersion = cachedVersions?.[entryID];
     const currentVersion = currentVersions?.[entryID];
-    if (previousVersion) return previousVersion !== currentVersion;
+    if (cachedVersion) return cachedVersion !== currentVersion;
     return !currentVersion || !lastRefresh || Date.parse(currentVersion) > lastRefresh;
 }
 
@@ -617,28 +628,26 @@ async function refreshOfflineContent(force = false) {
         const pageCache = await caches.open(offlinePageCacheName(userID));
         const mediaCache = await caches.open(offlineMediaCacheName(userID));
         const entryIDs = offlineManifestEntryIDs(manifest);
-        const cachedEntryIDs = await removeExpiredOfflineEntries(pageCache, mediaCache, entryIDs);
+        const {cachedEntryIDs, cachedVersions} = await removeExpiredOfflineEntries(pageCache, mediaCache, entryIDs);
         const previousManifest = await getOfflineRecord("meta", `manifest:${userID}`);
         const entriesToRefresh = Array.from(entryIDs).filter((entryID) => offlineEntryNeedsRefresh(
             entryID,
             cachedEntryIDs,
-            previousManifest?.value?.entry_versions,
+            cachedVersions,
             manifest.entry_versions,
             lastRefresh?.value,
         ));
-        const entriesToRefreshSet = new Set(entriesToRefresh);
-        const synchronizedEntryIDs = new Set(Array.from(cachedEntryIDs).filter((entryID) => !entriesToRefreshSet.has(entryID)));
-        offlineRefreshProgress = {completed: synchronizedEntryIDs.size, total: entryIDs.size};
+        offlineRefreshProgress = {completed: cachedEntryIDs.size, total: entryIDs.size};
         updateOfflineProgress();
 
         let refreshFailures = 0;
         const refreshedEntryIDs = [];
         await runOfflineBatches(entriesToRefresh, OFFLINE_ENTRY_BATCH_SIZE, async (entryID) => {
             try {
-                if (await cacheOfflineEntry(entryID, pageCache, mediaCache)) {
+                if (await cacheOfflineEntry(entryID, manifest.entry_versions?.[entryID], pageCache, mediaCache)) {
                     refreshedEntryIDs.push(entryID);
-                    if (!synchronizedEntryIDs.has(entryID)) {
-                        synchronizedEntryIDs.add(entryID);
+                    if (!cachedEntryIDs.has(entryID)) {
+                        cachedEntryIDs.add(entryID);
                         offlineRefreshProgress.completed += 1;
                         updateOfflineProgress();
                     }
@@ -843,7 +852,7 @@ function updateOfflineProgress() {
         progress.textContent = offlineProgressText(
             offlineRefreshProgress.completed,
             offlineRefreshProgress.total,
-            status.dataset.labelArticlesSynchronized,
+            status.dataset.labelArticlesCached,
         );
     }
 }
@@ -925,7 +934,10 @@ async function clearOfflineData() {
     for (const patch of patches) if (patch.userId === userID) await deleteOfflineRecord("patches", patch.key);
     const meta = await getOfflineRecords("meta");
     for (const record of meta) {
-        if (record.key.endsWith(`:${userID}`) || record.key === "activeUser") await deleteOfflineRecord("meta", record.key);
+        if (record.key.endsWith(`:${userID}`) || record.key.startsWith(`entryMedia:${userID}:`) ||
+            record.key.startsWith(`entryVersion:${userID}:`) || record.key === "activeUser") {
+            await deleteOfflineRecord("meta", record.key);
+        }
     }
     await updateOfflineStatus();
 }
@@ -935,7 +947,8 @@ async function clearPreviousOfflineUser(previousUserID) {
     await caches.delete(offlineMediaCacheName(previousUserID));
     const meta = await getOfflineRecords("meta");
     for (const record of meta) {
-        if (record.key.endsWith(`:${previousUserID}`) || record.key.startsWith(`entryMedia:${previousUserID}:`)) {
+        if (record.key.endsWith(`:${previousUserID}`) || record.key.startsWith(`entryMedia:${previousUserID}:`) ||
+            record.key.startsWith(`entryVersion:${previousUserID}:`)) {
             await deleteOfflineRecord("meta", record.key);
         }
     }

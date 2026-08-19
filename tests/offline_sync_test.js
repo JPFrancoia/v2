@@ -37,7 +37,7 @@ test("status and saved-for-later conflicts stay coupled", () => {
 });
 
 test("formats offline article progress", () => {
-    assert.equal(context.offlineProgressText(12, 40, "articles synchronized"), "12/40 articles synchronized");
+    assert.equal(context.offlineProgressText(12, 40, "articles cached"), "12/40 articles cached");
 });
 
 test("limits offline batch concurrency", async () => {

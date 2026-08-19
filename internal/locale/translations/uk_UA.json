@@ -471,7 +471,7 @@
     "offline.conflict.title": "Offline changes need review",
     "offline.conflict.use_phone": "Use this phone",
     "offline.conflict.use_server": "Use server",
-    "offline.status.articles_synchronized": "articles synchronized",
+    "offline.status.articles_cached": "articles cached",
     "offline.status.conflicts": "Conflicts",
     "offline.status.last_sync": "Last sync",
     "offline.status.media_skipped": "Skipped media",
