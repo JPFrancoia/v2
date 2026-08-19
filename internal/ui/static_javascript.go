@@ -31,6 +31,7 @@ func (h *handler) showJavascript(w http.ResponseWriter, r *http.Request) {
 		if filename == "service-worker.js" {
 			variables := fmt.Sprintf(`const OFFLINE_URL=%q;`, h.routePath("/offline"))
 			contents = append([]byte(variables), contents...)
+			b.WithHeader("Service-Worker-Allowed", h.routePath("/"))
 		}
 
 		// cloning the prefix since `append` mutates its first argument

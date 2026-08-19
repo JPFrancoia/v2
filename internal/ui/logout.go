@@ -23,5 +23,6 @@ func (h *handler) logout(w http.ResponseWriter, r *http.Request) {
 		s.SetTheme(user.Theme)
 	}
 
+	w.Header().Set("Clear-Site-Data", `"cache", "storage"`)
 	response.HTMLRedirect(w, r, h.routePath("/"))
 }

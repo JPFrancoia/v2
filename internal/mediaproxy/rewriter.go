@@ -24,6 +24,36 @@ func RewriteDocumentWithAbsoluteProxyURL(htmlDocument string) string {
 	return genericProxyRewriter(ProxifyAbsoluteURL, htmlDocument)
 }
 
+// RewriteDocumentWithForcedRelativeProxyURL proxies every absolute HTTP media URL.
+func RewriteDocumentWithForcedRelativeProxyURL(htmlDocument string) string {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlDocument))
+	if err != nil {
+		return htmlDocument
+	}
+
+	doc.Find("img, picture source, audio, audio source, video, video source").Each(func(i int, media *goquery.Selection) {
+		if value, ok := media.Attr("src"); ok && shouldProxifyURL(value, "all") {
+			media.SetAttr("src", ProxifyRelativeURL(value))
+		}
+	})
+	doc.Find("img, picture source").Each(func(i int, media *goquery.Selection) {
+		if value, ok := media.Attr("srcset"); ok {
+			proxifySourceSet(media, ProxifyRelativeURL, "all", value)
+		}
+	})
+	doc.Find("video").Each(func(i int, media *goquery.Selection) {
+		if value, ok := media.Attr("poster"); ok && shouldProxifyURL(value, "all") {
+			media.SetAttr("poster", ProxifyRelativeURL(value))
+		}
+	})
+
+	output, err := doc.FindMatcher(goquery.Single("body")).Html()
+	if err != nil {
+		return htmlDocument
+	}
+	return output
+}
+
 func genericProxyRewriter(proxifyFunction urlProxyRewriter, htmlDocument string) string {
 	proxyOption := config.Opts.MediaProxyMode()
 	if proxyOption == "none" {

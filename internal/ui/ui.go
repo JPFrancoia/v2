@@ -179,8 +179,11 @@ func Serve(store *storage.Storage, pool *worker.Pool) http.Handler {
 		mux.HandleFunc("GET /oauth2/{provider}/callback", handler.oauth2Callback)
 	}
 
-	// Offline page.
+	// Offline pages and synchronization.
 	mux.HandleFunc("GET /offline", handler.showOfflinePage)
+	mux.HandleFunc("GET /offline/manifest", handler.showOfflineManifest)
+	mux.HandleFunc("GET /offline/entry/{entryID}", handler.showOfflineEntry)
+	mux.HandleFunc("POST /offline/sync", handler.syncOfflineEntries)
 
 	// Authentication pages.
 	mux.HandleFunc("POST /login", handler.checkLogin)

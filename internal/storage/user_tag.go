@@ -184,6 +184,9 @@ func (s *Storage) EntryUserTagIDs(userID, entryID int64) ([]int64, error) {
 		}
 		tagIDs = append(tagIDs, tagID)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf(`store: unable to iterate entry user tag ID rows: %v`, err)
+	}
 
 	return tagIDs, nil
 }
@@ -193,6 +196,21 @@ func (s *Storage) SetEntryUserTags(userID, entryID int64, tagIDs []int64) error 
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf(`store: unable to begin transaction: %v`, err)
+	}
+
+	result, err := tx.Exec(`UPDATE entries SET changed_at=now() WHERE id=$1 AND user_id=$2`, entryID, userID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf(`store: unable to update entry user tag timestamp: %v`, err)
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf(`store: unable to count updated entry user tag timestamps: %v`, err)
+	}
+	if count == 0 {
+		tx.Rollback()
+		return errors.New(`store: entry not found`)
 	}
 
 	// Delete existing user tag associations for this entry (scoped to user's tags).

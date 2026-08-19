@@ -715,15 +715,22 @@ function handleRefreshAllFeedsAction() {
  * @param {string} status - The new status to set for the entries (e.g., "read", "unread").
  */
 function updateEntriesStatus(entryIDs, status, callback) {
-    const url = document.body.dataset.entriesStatusUrl;
-    sendPOSTRequest(url, { entry_ids: entryIDs, status: status }).then((resp) => {
-        resp.json().then(count => {
-            if (callback) {
-                callback(resp);
-            }
-            updateUnreadCounterValue(status === "read" ? -count : count);
-        });
+    let changedCount = 0;
+    const updates = entryIDs.map((entryID) => {
+        const entry = document.querySelector(`[data-id="${entryID}"]`);
+        const statusButton = entry?.querySelector(":is(a, button)[data-toggle-status]");
+        const savedButton = entry?.querySelector(":is(a, button)[data-save-for-later-entry]");
+        const baseStatus = statusButton?.dataset.value || (entry?.classList.contains("item-status-read") ? "read" : "unread");
+        const baseSaved = savedButton?.dataset.completed === "true";
+        if (baseStatus !== status) changedCount += 1;
+        return queueOfflineEntryPatch(entryID,
+            {status: baseStatus, saved_for_later: baseSaved},
+            {status: status, saved_for_later: status === "read" ? false : baseSaved});
     });
+    Promise.all(updates).then(() => {
+        if (callback) callback({ok: true});
+        updateUnreadCounterValue(status === "read" ? -changedCount : changedCount);
+    }).catch((error) => console.error("Unable to queue entry status:", error));
 }
 
 /**
@@ -760,30 +767,29 @@ function handleSaveForLaterAction(element = null) {
     const buttonElement = currentEntry.querySelector(":is(a, button)[data-save-for-later-entry]");
     if (!buttonElement) return;
 
+    const statusButton = currentEntry.querySelector(":is(a, button)[data-toggle-status]");
+    const currentStatus = statusButton?.dataset.value || "unread";
+    const wasSavedForLater = buttonElement.dataset.completed === "true";
+    const savedForLater = !wasSavedForLater;
+    const newStatus = savedForLater ? "unread" : currentStatus;
     setButtonToLoadingState(buttonElement);
 
-    sendPOSTRequest(buttonElement.dataset.saveForLaterUrl).then((resp) => {
-        resp.json().then((result) => {
-            const savedForLater = result.saved_for_later === true;
-            const statusButton = currentEntry.querySelector(":is(a, button)[data-toggle-status]");
-            if (savedForLater && statusButton?.dataset.value === "read") {
-                setReadStatusButtonState(statusButton, "unread");
-                currentEntry.classList.replace("item-status-read", "item-status-unread");
-            }
+    queueOfflineEntryPatch(parseInt(currentEntry.dataset.id, 10),
+        {status: currentStatus, saved_for_later: wasSavedForLater},
+        {status: newStatus, saved_for_later: savedForLater}).then(() => {
+        if (savedForLater && statusButton?.dataset.value === "read") {
+            setReadStatusButtonState(statusButton, "unread");
+            currentEntry.classList.replace("item-status-read", "item-status-unread");
+            updateUnreadCounterValue(1);
+        }
 
-            updateUnreadCounterValue(result.unread_count_delta || 0);
-            setSaveForLaterButtonState(buttonElement, savedForLater);
+        setSaveForLaterButtonState(buttonElement, savedForLater);
+        if (!savedForLater && isSavedForLaterView() && isListView()) currentEntry.remove();
 
-            if (!savedForLater && isSavedForLaterView()) {
-                window.location.reload();
-                return;
-            }
-
-            if (isEntryView()) {
-                showToastNotification("save-for-later", savedForLater ? buttonElement.dataset.toastDone : buttonElement.dataset.toastRemoved);
-            }
-        });
-    });
+        if (isEntryView()) {
+            showToastNotification("save-for-later", savedForLater ? buttonElement.dataset.toastDone : buttonElement.dataset.toastRemoved);
+        }
+    }).catch((error) => console.error("Unable to queue saved-for-later state:", error));
 }
 
 /**
@@ -798,19 +804,19 @@ function handleStarAction(element) {
     const buttonElement = currentEntry.querySelector(":is(a, button)[data-toggle-starred]");
     if (!buttonElement) return;
 
+    const currentState = buttonElement.dataset.value;
+    const isStarred = currentState === "star";
+    const newStarStatus = isStarred ? "unstar" : "star";
     setButtonToLoadingState(buttonElement);
 
-    sendPOSTRequest(buttonElement.dataset.starUrl).then(() => {
-        const currentState = buttonElement.dataset.value;
-        const isStarred = currentState === "star";
-        const newStarStatus = isStarred ? "unstar" : "star";
-
+    queueOfflineEntryPatch(parseInt(currentEntry.dataset.id, 10),
+        {starred: isStarred}, {starred: !isStarred}).then(() => {
         setStarredButtonState(buttonElement, newStarStatus);
 
         if (isEntryView()) {
             showToastNotification(currentState, buttonElement.dataset[isStarred ? "toastUnstar" : "toastStar"]);
         }
-    });
+    }).catch((error) => console.error("Unable to queue starred state:", error));
 }
 
 /**
@@ -832,10 +838,8 @@ function handleVoteAction(element) {
     // Calculate new vote: if clicking the same vote, toggle to 0, otherwise set to new vote
     const newVote = (currentVote === voteValue) ? 0 : voteValue;
 
-    // Build the URL with the new vote value
-    const baseUrl = buttonElement.dataset.voteUrl.replace(/\/[-]?\d+$/, '/' + newVote);
-
-    sendPOSTRequest(baseUrl).then(() => {
+    queueOfflineEntryPatch(parseInt(currentEntry.dataset.id, 10),
+        {vote: currentVote}, {vote: newVote}).then(() => {
         // Update all vote buttons in this entry
         const voteButtons = currentEntry.querySelectorAll(":is(a, button)[data-vote-entry]");
         voteButtons.forEach(btn => {
@@ -847,7 +851,7 @@ function handleVoteAction(element) {
                 btn.classList.add('vote-active');
             }
         });
-    });
+    }).catch((error) => console.error("Unable to queue vote:", error));
 }
 
 /**
@@ -868,8 +872,7 @@ function handleFetchOriginalContentAction() {
 
         response.json().then((data) => {
             if (data.content && data.reading_time) {
-                const ttpolicy = trustedTypes.createPolicy('html', {createHTML: html => html});
-                document.querySelector(".entry-content").innerHTML = ttpolicy.createHTML(data.content);
+                document.querySelector(".entry-content").innerHTML = trustedOfflineHTML(data.content);
                 const entryReadingtimeElement = document.querySelector(".entry-reading-time");
                 if (entryReadingtimeElement) {
                     entryReadingtimeElement.textContent = data.reading_time;
@@ -1202,8 +1205,10 @@ function initializeServiceWorker() {
         const serviceWorkerURL = document.body.dataset.serviceWorkerUrl;
         if (serviceWorkerURL) {
             const ttpolicy = trustedTypes.createPolicy('url', {createScriptURL: src => src});
+            const basePath = document.body.dataset.basePath || "";
             navigator.serviceWorker.register(ttpolicy.createScriptURL(serviceWorkerURL), {
-                type: "module"
+                type: "module",
+                scope: `${basePath}/`,
             }).catch((error) => {
                 console.error("Service Worker registration failed:", error);
             });
@@ -1354,7 +1359,6 @@ function handleSaveUserTags(buttonElement) {
 
     const dropdown = buttonElement.closest(".entry-user-tags-dropdown");
     const container = buttonElement.closest(".entry-user-tags");
-    const url = buttonElement.dataset.saveTagsUrl;
 
     // Collect checked tag IDs and labels.
     const checkedTags = [];
@@ -1365,51 +1369,34 @@ function handleSaveUserTags(buttonElement) {
         });
     });
 
-    // Build form data.
-    const formData = new URLSearchParams();
-    formData.append("csrf", document.body.dataset.csrfToken || "");
-    checkedTags.forEach((tag) => formData.append("user_tag_ids", tag.id));
+    const assignedSpan = container.querySelector(".entry-user-tags-assigned");
+    const currentTagIDs = new Set(Array.from(assignedSpan?.querySelectorAll("[data-user-tag-id]") || [])
+        .map((element) => parseInt(element.dataset.userTagId, 10)));
+    const selectedTagIDs = new Set(checkedTags.map((tag) => parseInt(tag.id, 10)));
+    const addedTagIDs = Array.from(selectedTagIDs).filter((tagID) => !currentTagIDs.has(tagID));
+    const removedTagIDs = Array.from(currentTagIDs).filter((tagID) => !selectedTagIDs.has(tagID));
+    const entry = buttonElement.closest(".entry");
 
-    // Show loading state.
     const originalText = buttonElement.textContent;
-    if (buttonElement.dataset.labelLoading) {
-        buttonElement.textContent = buttonElement.dataset.labelLoading;
-    }
+    if (buttonElement.dataset.labelLoading) buttonElement.textContent = buttonElement.dataset.labelLoading;
     buttonElement.disabled = true;
 
-    fetch(url, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "X-Csrf-Token": document.body.dataset.csrfToken || "",
-            "Accept": "application/json",
-        },
-        body: formData.toString(),
-    }).then((response) => {
-        if (response.ok) {
-            // Update the inline tag labels.
-            const assignedSpan = container.querySelector(".entry-user-tags-assigned");
-            if (assignedSpan) {
-                assignedSpan.replaceChildren();
-                checkedTags.forEach((tag) => {
-                    const span = document.createElement("span");
-                    span.className = "entry-user-tag-label";
-                    span.dataset.userTagId = tag.id;
-                    span.textContent = tag.label;
-                    assignedSpan.appendChild(span);
-                });
-            }
-
-            // Close the dropdown.
-            if (dropdown) {
-                dropdown.removeAttribute("open");
-            }
+    queueOfflineEntryPatch(parseInt(entry.dataset.id, 10), {}, {}, addedTagIDs, removedTagIDs).then(() => {
+        if (assignedSpan) {
+            assignedSpan.replaceChildren();
+            checkedTags.forEach((tag) => {
+                const span = document.createElement("span");
+                span.className = "entry-user-tag-label";
+                span.dataset.userTagId = tag.id;
+                span.textContent = tag.label;
+                assignedSpan.appendChild(span);
+            });
         }
-
-        // Restore button state.
+        if (dropdown) dropdown.removeAttribute("open");
         buttonElement.textContent = buttonElement.dataset.labelDone || originalText;
         buttonElement.disabled = false;
-    }).catch(() => {
+    }).catch((error) => {
+        console.error("Unable to queue user tags:", error);
         buttonElement.textContent = originalText;
         buttonElement.disabled = false;
     });
@@ -1796,6 +1783,7 @@ initializeClickHandlers();
 initializeUserTagsDropdown();
 initializeAIMetricsCharts();
 initializeServiceWorker();
+initializeOfflineSync().catch((error) => console.error("Unable to initialize offline synchronization:", error));
 
 // Reload the page if it was restored from the back-forward cache and mark entries as read is enabled.
 window.addEventListener("pageshow", (event) => {

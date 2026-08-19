@@ -1824,6 +1824,30 @@ audio, video {
     margin-top: 15px;
 }
 
+.offline-sync-status {
+    align-items: center;
+    border: 1px solid var(--table-border-color);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin: 8px auto;
+    max-width: 95%;
+    padding: 8px 12px;
+}
+
+.offline-sync-status[data-offline="true"] {
+    font-weight: 700;
+}
+
+.offline-conflict {
+    border-bottom: 1px solid var(--table-border-color);
+    padding: 8px 0 16px;
+}
+
+.offline-conflict:last-child {
+    border-bottom: 0;
+}
+
 .hidden {
     display: none;
 }

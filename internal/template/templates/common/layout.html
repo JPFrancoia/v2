@@ -41,6 +41,10 @@
 <body
     data-service-worker-url="{{ routePath "/js/%s/%s.js" .sw_js_checksum "service-worker" }}"
     {{ if .csrf }}data-csrf-token="{{ .csrf }}"{{ end }}
+    data-base-path="{{ routePath "" }}"
+    data-offline-manifest-url="{{ routePath "/offline/manifest" }}"
+    data-offline-entry-url="{{ routePath "/offline/entry" }}"
+    data-offline-sync-url="{{ routePath "/offline/sync" }}"
     data-add-subscription-url="{{ routePath "/subscribe" }}"
     data-entries-status-url="{{ routePath "/entry/status" }}"
     data-refresh-all-feeds-url="{{ routePath "/feeds/refresh" }}"
@@ -52,12 +56,43 @@
     data-webauthn-delete-all-url="{{ routePath "/webauthn/deleteall" }}"
     {{ end }}
     {{ if .user }}
+        data-user-id="{{ .user.ID }}"
         {{ if not .user.KeyboardShortcuts }}data-disable-keyboard-shortcuts="true"{{ end }}
         data-mark-as-read-on-view="{{ if .user.MarkReadOnView }}true{{ else }}false{{ end }}"
     {{ end }}>
 
     {{ if .user }}
     <a class="skip-to-content-link" href="#main">{{ t "skip_to_content" }}</a>
+    <aside id="offline-sync-status"
+        class="offline-sync-status"
+        role="status"
+        aria-live="polite"
+        hidden
+        data-label-online="{{ t "offline.status.online" }}"
+        data-label-offline="{{ t "offline.status.offline" }}"
+        data-label-syncing="{{ t "offline.status.syncing" }}"
+        data-label-never="{{ t "offline.status.never" }}"
+        data-label-clear-confirm="{{ t "offline.clear.confirm" }}">
+        <span data-offline-state></span>
+        <span>{{ t "offline.status.queued" }}: <strong data-offline-queued>0</strong></span>
+        <span>{{ t "offline.status.conflicts" }}: <strong data-offline-conflicts>0</strong></span>
+        <span>{{ t "offline.status.last_sync" }}: <time data-offline-last-sync></time></span>
+        <span>{{ t "offline.status.media_skipped" }}: <strong data-offline-media-skipped>0</strong></span>
+        <button type="button" class="button button-small" data-offline-refresh>{{ t "offline.action.refresh" }}</button>
+        <button type="button" class="button button-small" data-offline-review hidden>{{ t "offline.action.review" }}</button>
+        <button type="button" class="button button-small" data-offline-clear>{{ t "offline.action.clear" }}</button>
+    </aside>
+    <dialog id="offline-conflict-dialog"
+        aria-labelledby="offline-conflict-title"
+        data-label-entry="{{ t "offline.conflict.entry" }}"
+        data-label-server="{{ t "offline.conflict.server" }}"
+        data-label-phone="{{ t "offline.conflict.phone" }}"
+        data-label-use-phone="{{ t "offline.conflict.use_phone" }}"
+        data-label-use-server="{{ t "offline.conflict.use_server" }}">
+        <h2 id="offline-conflict-title">{{ t "offline.conflict.title" }}</h2>
+        <div data-offline-conflict-list></div>
+        <button type="button" class="button" data-offline-conflict-close>{{ t "action.cancel" }}</button>
+    </dialog>
     <header class="header">
         <nav>
             <div class="logo" data-toggle-button-label="{{ t "menu.title" }}">

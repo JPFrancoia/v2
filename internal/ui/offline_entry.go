@@ -1,0 +1,57 @@
+// SPDX-FileCopyrightText: Copyright The Miniflux Authors. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package ui // import "miniflux.app/v2/internal/ui"
+
+import (
+	"net/http"
+
+	"miniflux.app/v2/internal/http/request"
+	"miniflux.app/v2/internal/http/response"
+	"miniflux.app/v2/internal/ui/view"
+)
+
+func (h *handler) showOfflineEntry(w http.ResponseWriter, r *http.Request) {
+	user, err := h.store.UserByID(request.UserID(r))
+	if err != nil {
+		response.HTMLServerError(w, r, err)
+		return
+	}
+
+	entryID := request.RouteInt64Param(r, "entryID")
+	builder := h.store.NewEntryQueryBuilder(user.ID)
+	builder.WithEntryID(entryID)
+	entry, err := builder.GetEntry()
+	if err != nil {
+		response.HTMLServerError(w, r, err)
+		return
+	}
+	if entry == nil {
+		response.HTMLNotFound(w, r)
+		return
+	}
+
+	userTags, err := h.store.UserTags(user.ID)
+	if err != nil {
+		response.HTMLServerError(w, r, err)
+		return
+	}
+	entryUserTagIDs, err := h.store.EntryUserTagIDs(user.ID, entry.ID)
+	if err != nil {
+		response.HTMLServerError(w, r, err)
+		return
+	}
+
+	view := view.New(h.tpl, r)
+	view.Set("entry", entry)
+	view.Set("offlineSnapshot", true)
+	view.Set("menu", "unread")
+	view.Set("user", user)
+	view.Set("countUnread", h.store.CountUnreadEntries(user.ID))
+	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
+	view.Set("hasSaveEntry", h.store.HasSaveEntry(user.ID))
+	view.Set("userTags", userTags)
+	view.Set("entryUserTagIDs", entryUserTagIDs)
+
+	response.HTML(w, r, view.Render("entry"))
+}

@@ -123,6 +123,7 @@ func GenerateJavascriptBundles(webauthnEnabled bool) error {
 		"app": {
 			"js/touch_handler.js",
 			"js/keyboard_handler.js",
+			"js/offline.js",
 			"js/app.js",
 		},
 		"service-worker": {

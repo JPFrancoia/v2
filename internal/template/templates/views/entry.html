@@ -324,7 +324,9 @@
                             {{ if $.user }}data-save-url="{{ routePath "/entry/enclosure/%d/save-progression" .ID }}"{{ end }}
                             data-enclosure-id="{{ .ID }}"
                             >
-                            {{ if (and $.user (mustBeProxyfied "audio")) }}
+                            {{ if $.offlineSnapshot }}
+                            <source src="{{ offlineProxyURL .URL }}" type="{{ .Html5MimeType }}">
+                            {{ else if (and $.user (mustBeProxyfied "audio")) }}
                             <source src="{{ proxyURL .URL }}" type="{{ .Html5MimeType }}">
                             {{ else }}
                             <source src="{{ .URL | safeURL }}" type="{{ .Html5MimeType }}">
@@ -341,7 +343,9 @@
                             {{ if $.user }}data-save-url="{{ routePath "/entry/enclosure/%d/save-progression" .ID }}"{{ end }}
                             data-enclosure-id="{{ .ID }}"
                             >
-                            {{ if (and $.user (mustBeProxyfied "video")) }}
+                            {{ if $.offlineSnapshot }}
+                            <source src="{{ offlineProxyURL .URL }}" type="{{ .Html5MimeType }}">
+                            {{ else if (and $.user (mustBeProxyfied "video")) }}
                             <source src="{{ proxyURL .URL }}" type="{{ .Html5MimeType }}">
                             {{ else }}
                             <source src="{{ .URL | safeURL }}" type="{{ .Html5MimeType }}">
@@ -354,7 +358,9 @@
         {{ end }}
     {{ end }}
 
-    {{ if .user }}
+    {{ if .offlineSnapshot }}
+        {{ safeHTML (offlineProxyFilter .entry.Content) }}
+    {{ else if .user }}
         {{ safeHTML (proxyFilter .entry.Content) }}
     {{ else }}
         {{ safeHTML .entry.Content }}
@@ -368,7 +374,9 @@
     <div class="entry-enclosure">
         {{ if .IsImage }}
         <div class="enclosure-image">
-            {{ if (and $.user (mustBeProxyfied "image")) }}
+            {{ if $.offlineSnapshot }}
+            <img src="{{ offlineProxyURL .URL }}" title="{{ .URL }} ({{ .MimeType }})" loading="lazy" alt="{{ .URL }} ({{ .MimeType }})">
+            {{ else if (and $.user (mustBeProxyfied "image")) }}
             <img src="{{ proxyURL .URL }}" title="{{ .URL }} ({{ .MimeType }})" loading="lazy" alt="{{ .URL }} ({{ .MimeType }})">
             {{ else }}
             <img src="{{ .URL | safeURL }}" title="{{ .URL }} ({{ .MimeType }})" loading="lazy" alt="{{ .URL }} ({{ .MimeType }})">
