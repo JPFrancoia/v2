@@ -3,7 +3,8 @@ const OFFLINE_DB_VERSION = 1;
 const OFFLINE_CACHE_VERSION = 2;
 const OFFLINE_MEDIA_LIMIT = 4000000;
 const OFFLINE_REFRESH_INTERVAL = 15 * 60 * 1000;
-const OFFLINE_ENTRY_BATCH_SIZE = 8;
+const OFFLINE_ENTRY_REQUEST_BATCH_SIZE = 25;
+const OFFLINE_ENTRY_REQUEST_CONCURRENCY = 4;
 const OFFLINE_MEDIA_BATCH_SIZE = 4;
 let offlineFlushPromise = null;
 let offlineRefreshPromise = null;
@@ -542,15 +543,20 @@ async function deleteUnreferencedOfflineMedia(previousURLs, currentURLs, current
     }
 }
 
-async function cacheOfflineEntry(entryID, version, snapshotVersion, pageCache, mediaCache) {
+function offlineEntryBatches(entryIDs) {
+    const batches = [];
+    for (let offset = 0; offset < entryIDs.length; offset += OFFLINE_ENTRY_REQUEST_BATCH_SIZE) {
+        batches.push(entryIDs.slice(offset, offset + OFFLINE_ENTRY_REQUEST_BATCH_SIZE));
+    }
+    return batches;
+}
+
+async function cacheOfflineEntryHTML(entryID, html, version, snapshotVersion, pageCache, mediaCache) {
     const prefix = document.body.dataset.offlineEntryUrl;
     const userID = offlineUserID();
     if (!prefix || !userID) return false;
     const url = `${prefix}/${entryID}`;
-    const response = await fetch(url, {credentials: "same-origin", headers: {"Accept": "text/html"}});
-    if (!response.ok || response.redirected) return false;
-    const html = await response.clone().text();
-    await pageCache.put(url, response);
+    await pageCache.put(url, new Response(html, {headers: {"Content-Type": "text/html"}}));
     const parsed = new DOMParser().parseFromString(trustedOfflineHTML(html), "text/html");
     const mediaURLs = mediaURLsFromDocument(parsed);
     const mediaKey = `entryMedia:${userID}:${entryID}`;
@@ -562,6 +568,51 @@ async function cacheOfflineEntry(entryID, version, snapshotVersion, pageCache, m
         value: {entry_version: version, snapshot_version: snapshotVersion},
     });
     return true;
+}
+
+async function cacheOfflineEntry(entryID, version, snapshotVersion, pageCache, mediaCache) {
+    const prefix = document.body.dataset.offlineEntryUrl;
+    const userID = offlineUserID();
+    if (!prefix || !userID) return false;
+    const response = await fetch(`${prefix}/${entryID}`, {credentials: "same-origin", headers: {"Accept": "text/html"}});
+    if (!response.ok || response.redirected) return false;
+    return cacheOfflineEntryHTML(entryID, await response.text(), version, snapshotVersion, pageCache, mediaCache);
+}
+
+async function cacheOfflineEntries(entryIDs, versions, snapshotVersion, pageCache, mediaCache) {
+    const entriesURL = document.body.dataset.offlineEntriesUrl;
+    if (!entriesURL) {
+        const cached = await Promise.all(entryIDs.map((entryID) => cacheOfflineEntry(
+            entryID, versions?.[entryID], snapshotVersion, pageCache, mediaCache,
+        )));
+        return entryIDs.filter((_entryID, index) => cached[index]);
+    }
+    const response = await fetch(entriesURL, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "X-Csrf-Token": document.body.dataset.csrfToken || "",
+        },
+        body: JSON.stringify({entry_ids: entryIDs}),
+    });
+    if (!response.ok || response.redirected || !response.headers.get("Content-Type")?.includes("application/json")) {
+        throw new Error(`Offline snapshots failed with HTTP ${response.status}`);
+    }
+    const snapshots = new Map((await response.json()).entries?.map((entry) => [entry.entry_id, entry.html]));
+    const cached = [];
+    for (const entryID of entryIDs) {
+        const html = snapshots.get(entryID);
+        try {
+            if (typeof html === "string" && await cacheOfflineEntryHTML(
+                entryID, html, versions?.[entryID], snapshotVersion, pageCache, mediaCache,
+            )) cached.push(entryID);
+        } catch (error) {
+            console.debug("Unable to cache bulk offline entry:", entryID, error);
+        }
+    }
+    return cached;
 }
 
 function offlineMediaURLs(records, userID, entryIDs) {
@@ -772,19 +823,21 @@ async function refreshOfflineContent(force = false) {
 
         let refreshFailures = 0;
         const refreshedEntryIDs = [];
-        await runOfflineBatches(entriesToRefresh, OFFLINE_ENTRY_BATCH_SIZE, async (entryID) => {
+        await runOfflineBatches(offlineEntryBatches(entriesToRefresh), OFFLINE_ENTRY_REQUEST_CONCURRENCY, async (entryIDs) => {
             try {
-                if (await cacheOfflineEntry(entryID, manifest.entry_versions?.[entryID], manifest.snapshot_version, pageCache, mediaCache)) {
+                const refreshed = await cacheOfflineEntries(
+                    entryIDs, manifest.entry_versions, manifest.snapshot_version, pageCache, mediaCache,
+                );
+                refreshed.forEach((entryID) => {
                     refreshedEntryIDs.push(entryID);
                     cachedEntryIDs.add(entryID);
                     offlineRefreshProgress.completed += 1;
-                    updateOfflineProgress();
-                } else {
-                    refreshFailures += 1;
-                }
+                });
+                refreshFailures += entryIDs.length - refreshed.length;
+                updateOfflineProgress();
             } catch (error) {
-                refreshFailures += 1;
-                console.debug("Unable to cache offline entry:", entryID, error);
+                refreshFailures += entryIDs.length;
+                console.debug("Unable to cache offline entries:", entryIDs, error);
             }
         });
 

@@ -262,6 +262,15 @@ test("shows queued change retry failures", () => {
     vm.runInContext("offlineFlushError = false", context);
 });
 
+test("groups offline snapshots into bounded requests", () => {
+    const batches = context.offlineEntryBatches(Array.from({length: 51}, (_value, index) => index + 1));
+    assert.deepEqual(Array.from(batches, (batch) => Array.from(batch)), [
+        Array.from({length: 25}, (_value, index) => index + 1),
+        Array.from({length: 25}, (_value, index) => index + 26),
+        [51],
+    ]);
+});
+
 test("limits offline batch concurrency", async () => {
     let active = 0;
     let maximum = 0;

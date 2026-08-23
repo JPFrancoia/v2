@@ -9,6 +9,23 @@ import (
 	"miniflux.app/v2/internal/model"
 )
 
+func TestValidateOfflineSnapshotRequest(t *testing.T) {
+	valid := &model.OfflineSnapshotRequest{EntryIDs: []int64{1, 2}}
+	if err := ValidateOfflineSnapshotRequest(valid); err != nil {
+		t.Fatalf(`Unexpected validation error: %v`, err)
+	}
+
+	for _, request := range []*model.OfflineSnapshotRequest{
+		{EntryIDs: nil},
+		{EntryIDs: []int64{0}},
+		{EntryIDs: make([]int64, maxOfflineSnapshotBatchSize+1)},
+	} {
+		if err := ValidateOfflineSnapshotRequest(request); err == nil {
+			t.Fatal(`Expected an invalid snapshot request error`)
+		}
+	}
+}
+
 func TestValidateOfflineSyncRequest(t *testing.T) {
 	baseStatus, setStatus := model.EntryStatusUnread, model.EntryStatusRead
 	baseSaved, setSaved := true, false

@@ -183,6 +183,7 @@ func Serve(store *storage.Storage, pool *worker.Pool) http.Handler {
 	mux.HandleFunc("GET /offline", handler.showOfflinePage)
 	mux.HandleFunc("GET /offline/manifest", handler.showOfflineManifest)
 	mux.HandleFunc("GET /offline/entry/{entryID}", handler.showOfflineEntry)
+	mux.HandleFunc("POST /offline/entries", handler.showOfflineEntries)
 	mux.HandleFunc("POST /offline/sync", handler.syncOfflineEntries)
 
 	// Authentication pages.

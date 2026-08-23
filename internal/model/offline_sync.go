@@ -71,6 +71,22 @@ type OfflineManifestUserTag struct {
 	EntryIDs []int64 `json:"entry_ids"`
 }
 
+// OfflineSnapshotRequest identifies entries for one bounded offline snapshot request.
+type OfflineSnapshotRequest struct {
+	EntryIDs []int64 `json:"entry_ids"`
+}
+
+// OfflineSnapshot contains one rendered entry snapshot.
+type OfflineSnapshot struct {
+	EntryID int64  `json:"entry_id"`
+	HTML    string `json:"html"`
+}
+
+// OfflineSnapshotResponse contains the rendered snapshots for one request.
+type OfflineSnapshotResponse struct {
+	Entries []OfflineSnapshot `json:"entries"`
+}
+
 // OfflineManifest identifies the entries that belong in the offline cache.
 type OfflineManifest struct {
 	UserID                int64                    `json:"user_id"`

@@ -11,9 +11,26 @@ import (
 )
 
 const (
-	maxOfflineSyncBatchSize = 100
-	maxOfflineTagChanges    = 100
+	maxOfflineSyncBatchSize     = 100
+	maxOfflineSnapshotBatchSize = 25
+	maxOfflineTagChanges        = 100
 )
+
+// ValidateOfflineSnapshotRequest validates a bounded offline snapshot request.
+func ValidateOfflineSnapshotRequest(request *model.OfflineSnapshotRequest) error {
+	if len(request.EntryIDs) == 0 {
+		return errors.New(`the offline snapshot request cannot be empty`)
+	}
+	if len(request.EntryIDs) > maxOfflineSnapshotBatchSize {
+		return fmt.Errorf(`the offline snapshot request cannot contain more than %d entries`, maxOfflineSnapshotBatchSize)
+	}
+	for _, entryID := range request.EntryIDs {
+		if entryID <= 0 {
+			return errors.New(`entry IDs must be greater than zero`)
+		}
+	}
+	return nil
+}
 
 // ValidateOfflineSyncRequest validates an offline synchronization batch.
 func ValidateOfflineSyncRequest(request *model.OfflineSyncRequest) error {

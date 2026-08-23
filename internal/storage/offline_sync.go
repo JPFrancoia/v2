@@ -202,6 +202,41 @@ func offlineEntryUserTagIDs(ctx context.Context, tx *sql.Tx, userID, entryID int
 	return tagIDs, nil
 }
 
+// OfflineEntryUserTagIDs returns user-tag IDs for the requested entries.
+func (s *Storage) OfflineEntryUserTagIDs(ctx context.Context, userID int64, entryIDs []int64) (map[int64][]int64, error) {
+	tagIDsByEntryID := make(map[int64][]int64, len(entryIDs))
+	for _, entryID := range entryIDs {
+		tagIDsByEntryID[entryID] = make([]int64, 0)
+	}
+	if len(entryIDs) == 0 {
+		return tagIDsByEntryID, nil
+	}
+
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT eut.entry_id, eut.user_tag_id
+		FROM entry_user_tags eut
+		JOIN user_tags ut ON ut.id=eut.user_tag_id
+		WHERE ut.user_id=$1 AND eut.entry_id=ANY($2)
+		ORDER BY eut.entry_id, eut.user_tag_id
+	`, userID, pq.Array(entryIDs))
+	if err != nil {
+		return nil, fmt.Errorf(`store: unable to fetch offline entry user tag IDs: %v`, err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var entryID, tagID int64
+		if err := rows.Scan(&entryID, &tagID); err != nil {
+			return nil, fmt.Errorf(`store: unable to scan offline entry user tag ID: %v`, err)
+		}
+		tagIDsByEntryID[entryID] = append(tagIDsByEntryID[entryID], tagID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf(`store: unable to iterate offline entry user tag IDs: %v`, err)
+	}
+	return tagIDsByEntryID, nil
+}
+
 // OfflineManifest returns the entries that belong in a user's offline cache.
 func (s *Storage) OfflineManifest(ctx context.Context, userID int64, now time.Time) (*model.OfflineManifest, error) {
 	manifest := &model.OfflineManifest{
