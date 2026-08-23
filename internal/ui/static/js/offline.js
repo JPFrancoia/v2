@@ -905,13 +905,22 @@ function applyOfflinePatchToElement(element, patch) {
             button.classList.toggle("vote-active", parseInt(button.dataset.voteValue, 10) === patch.set.vote);
         });
     }
+    const assignedTags = element.querySelector(".entry-user-tags-assigned");
     (patch.add_user_tag_ids || []).forEach((tagID) => {
         const checkbox = element.querySelector(`input[name="user_tag_ids"][value="${tagID}"]`);
         if (checkbox) checkbox.checked = true;
+        if (checkbox && assignedTags && !assignedTags.querySelector(`[data-user-tag-id="${tagID}"]`)) {
+            const label = document.createElement("span");
+            label.className = "entry-user-tag-label";
+            label.dataset.userTagId = String(tagID);
+            label.textContent = checkbox.closest("label")?.textContent.trim() || "";
+            assignedTags.appendChild(label);
+        }
     });
     (patch.remove_user_tag_ids || []).forEach((tagID) => {
         const checkbox = element.querySelector(`input[name="user_tag_ids"][value="${tagID}"]`);
         if (checkbox) checkbox.checked = false;
+        assignedTags?.querySelector(`[data-user-tag-id="${tagID}"]`)?.remove();
     });
 
     const path = location.pathname;

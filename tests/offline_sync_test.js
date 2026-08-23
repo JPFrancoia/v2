@@ -82,6 +82,34 @@ test("starts media progress from files already cached", () => {
     assert.deepEqual(Array.from(work.pending), ["https://example.test/b"]);
 });
 
+test("offline tag patches restore assigned labels", () => {
+    let removed = false;
+    const assignedLabels = new Map();
+    const assigned = {
+        querySelector: (selector) => assignedLabels.get(selector.match(/\"(\d+)\"/)?.[1]) || null,
+        appendChild: (label) => assignedLabels.set(label.dataset.userTagId, label),
+    };
+    const checkbox = {checked: false, closest: () => ({textContent: " Research "})};
+    const element = {
+        querySelector: (selector) => {
+            if (selector === ".entry-user-tags-assigned") return assigned;
+            if (selector.includes('input[name="user_tag_ids"]')) return checkbox;
+            return null;
+        },
+        querySelectorAll: () => [],
+    };
+    context.document = {createElement: () => ({dataset: {}, remove: () => { removed = true; }})};
+    context.location = {pathname: "/history/entry/1"};
+
+    context.applyOfflinePatchToElement(element, {set: {}, add_user_tag_ids: [7], remove_user_tag_ids: []});
+    assert.equal(checkbox.checked, true);
+    assert.equal(assignedLabels.get("7").textContent, "Research");
+
+    context.applyOfflinePatchToElement(element, {set: {}, add_user_tag_ids: [], remove_user_tag_ids: [7]});
+    assert.equal(checkbox.checked, false);
+    assert.equal(removed, true);
+});
+
 test("status and saved-for-later conflicts stay coupled", () => {
     const fields = context.conflictPatchFields([{field: "status_saved_for_later"}]);
     assert.deepEqual(Array.from(fields).sort(), ["saved_for_later", "status"]);
