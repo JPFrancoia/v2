@@ -982,6 +982,27 @@ function applyOfflineManifestToPage(manifest) {
     });
 }
 
+function offlineEntryShouldMarkReadOnView(body, path, entry) {
+    if (body.dataset.offlineSnapshot !== "true" || body.dataset.markAsReadOnView !== "true" ||
+        !/\/entry\/\d+$/.test(path) || !entry || entry.querySelector("[data-mark-read-on-completion]")) return false;
+    return entry.querySelector(":is(a, button)[data-toggle-status]")?.dataset.value === "unread";
+}
+
+async function markOfflineEntryAsReadOnView() {
+    const entry = document.querySelector(".entry[data-id]");
+    if (!offlineEntryShouldMarkReadOnView(document.body, location.pathname, entry)) return;
+    const statusButton = entry.querySelector(":is(a, button)[data-toggle-status]");
+    const savedButton = entry.querySelector(":is(a, button)[data-save-for-later-entry]");
+    const savedForLater = savedButton?.dataset.completed === "true";
+    const patch = await queueOfflineEntryPatch(
+        parseInt(entry.dataset.id, 10),
+        {status: statusButton.dataset.value, saved_for_later: savedForLater},
+        {status: "read", saved_for_later: false},
+    );
+    applyOfflinePatchToElement(entry, patch);
+    updateUnreadCounterValue(-1);
+}
+
 async function applyOfflinePatchesToPage() {
     const userID = offlineUserID();
     if (!userID) return;
@@ -1157,6 +1178,7 @@ async function initializeOfflineSync() {
         navigator.serviceWorker.ready.then((registration) => notifyWorker(registration.active));
     }
     await applyOfflinePatchesToPage();
+    await markOfflineEntryAsReadOnView();
     await updateOfflineStatus();
     await flushOfflineChanges();
     refreshOfflineContent();

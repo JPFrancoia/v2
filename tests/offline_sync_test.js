@@ -82,6 +82,46 @@ test("starts media progress from files already cached", () => {
     assert.deepEqual(Array.from(work.pending), ["https://example.test/b"]);
 });
 
+test("offline entry views preserve mark-as-read behavior", () => {
+    const unreadEntry = {
+        querySelector: (selector) => selector === ":is(a, button)[data-toggle-status]" ? {dataset: {value: "unread"}} : null,
+    };
+    const mediaEntry = {
+        querySelector: (selector) => selector === "[data-mark-read-on-completion]"
+            ? {}
+            : unreadEntry.querySelector(selector),
+    };
+    const readEntry = {
+        querySelector: (selector) => selector === ":is(a, button)[data-toggle-status]" ? {dataset: {value: "read"}} : null,
+    };
+
+    assert.equal(context.offlineEntryShouldMarkReadOnView(
+        {dataset: {offlineSnapshot: "true", markAsReadOnView: "true"}},
+        "/unread/entry/7",
+        unreadEntry,
+    ), true);
+    assert.equal(context.offlineEntryShouldMarkReadOnView(
+        {dataset: {offlineSnapshot: "true", markAsReadOnView: "true"}},
+        "/unread/entry/7",
+        mediaEntry,
+    ), false);
+    assert.equal(context.offlineEntryShouldMarkReadOnView(
+        {dataset: {offlineSnapshot: "true", markAsReadOnView: "false"}},
+        "/unread/entry/7",
+        unreadEntry,
+    ), false);
+    assert.equal(context.offlineEntryShouldMarkReadOnView(
+        {dataset: {offlineSnapshot: "true", markAsReadOnView: "true"}},
+        "/unread/entry/7",
+        readEntry,
+    ), false);
+    assert.equal(context.offlineEntryShouldMarkReadOnView(
+        {dataset: {offlineSnapshot: "true", markAsReadOnView: "true"}},
+        "/unread",
+        unreadEntry,
+    ), false);
+});
+
 test("offline tag patches restore assigned labels", () => {
     let removed = false;
     const assignedLabels = new Map();
