@@ -42,6 +42,16 @@ test("selects unique media for retained entries", () => {
     assert.deepEqual(Array.from(context.offlineMediaURLs(records, 7, new Set([2]))), ["b", "c"]);
 });
 
+test("starts media progress from files already cached", () => {
+    const work = context.offlineMediaWork(
+        ["https://example.test/a", "https://example.test/b", "https://example.test/c"],
+        [{url: "https://example.test/a"}, {url: "https://example.test/c"}],
+    );
+    assert.equal(work.completed, 2);
+    assert.equal(work.total, 3);
+    assert.deepEqual(Array.from(work.pending), ["https://example.test/b"]);
+});
+
 test("status and saved-for-later conflicts stay coupled", () => {
     const fields = context.conflictPatchFields([{field: "status_saved_for_later"}]);
     assert.deepEqual(Array.from(fields).sort(), ["saved_for_later", "status"]);

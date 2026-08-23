@@ -482,8 +482,8 @@ async function responseBelowOfflineMediaLimit(response) {
     });
 }
 
-async function cacheOfflineMedia(url, cache) {
-    if (await cache.match(url)) return true;
+async function cacheOfflineMedia(url, cache, knownMissing = false) {
+    if (!knownMissing && await cache.match(url)) return true;
     if (offlineMediaStorageFull) return false;
     if (navigator.storage?.estimate) {
         const estimate = await navigator.storage.estimate();
@@ -575,6 +575,12 @@ function offlineMediaURLs(records, userID, entryIDs) {
     const urls = new Set();
     for (const entryID of entryIDs) for (const url of mediaByEntryID.get(entryID) || []) urls.add(url);
     return Array.from(urls);
+}
+
+function offlineMediaWork(mediaURLs, cachedRequests) {
+    const cachedURLs = new Set(cachedRequests.map((request) => request.url));
+    const pending = mediaURLs.filter((url) => !cachedURLs.has(url));
+    return {pending, completed: mediaURLs.length - pending.length, total: mediaURLs.length};
 }
 
 async function removeExpiredOfflineTagPages(pageCache, basePath, allowedPaths, userID) {
@@ -833,10 +839,11 @@ async function refreshOfflineContent(force = false) {
         }
         offlineRefreshPhase = "media";
         const mediaURLs = offlineMediaURLs(await getOfflineRecords("meta"), userID, entryIDs);
-        offlineRefreshProgress = {completed: 0, total: mediaURLs.length};
+        const mediaWork = offlineMediaWork(mediaURLs, await mediaCache.keys());
+        offlineRefreshProgress = {completed: mediaWork.completed, total: mediaWork.total};
         updateOfflineActivity();
-        await runOfflineBatches(mediaURLs, OFFLINE_MEDIA_BATCH_SIZE, async (mediaURL) => {
-            if (!await cacheOfflineMedia(mediaURL, mediaCache)) offlineSkippedMedia += 1;
+        await runOfflineBatches(mediaWork.pending, OFFLINE_MEDIA_BATCH_SIZE, async (mediaURL) => {
+            if (!await cacheOfflineMedia(mediaURL, mediaCache, true)) offlineSkippedMedia += 1;
             offlineRefreshProgress.completed += 1;
             updateOfflineProgress();
         });
