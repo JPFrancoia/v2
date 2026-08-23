@@ -75,6 +75,7 @@ type OfflineManifestUserTag struct {
 type OfflineManifest struct {
 	UserID                int64                    `json:"user_id"`
 	GeneratedAt           time.Time                `json:"generated_at"`
+	SnapshotVersion       string                   `json:"snapshot_version"`
 	UnreadEntryIDs        []int64                  `json:"unread_entry_ids"`
 	SavedForLaterEntryIDs []int64                  `json:"saved_for_later_entry_ids"`
 	StarredEntryIDs       []int64                  `json:"starred_entry_ids"`

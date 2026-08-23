@@ -542,7 +542,7 @@ async function deleteUnreferencedOfflineMedia(previousURLs, currentURLs, current
     }
 }
 
-async function cacheOfflineEntry(entryID, version, pageCache, mediaCache) {
+async function cacheOfflineEntry(entryID, version, snapshotVersion, pageCache, mediaCache) {
     const prefix = document.body.dataset.offlineEntryUrl;
     const userID = offlineUserID();
     if (!prefix || !userID) return false;
@@ -557,7 +557,10 @@ async function cacheOfflineEntry(entryID, version, pageCache, mediaCache) {
     const previousMedia = await getOfflineRecord("meta", mediaKey);
     if (previousMedia) await deleteUnreferencedOfflineMedia(previousMedia.value || [], mediaURLs, mediaKey, mediaCache);
     await putOfflineRecord("meta", {key: mediaKey, value: mediaURLs});
-    await putOfflineRecord("meta", {key: `entryVersion:${userID}:${entryID}`, value: version});
+    await putOfflineRecord("meta", {
+        key: `entryVersion:${userID}:${entryID}`,
+        value: {entry_version: version, snapshot_version: snapshotVersion},
+    });
     return true;
 }
 
@@ -568,12 +571,13 @@ async function cacheOfflineEntryMedia(entryID, mediaCache) {
     }
 }
 
-async function removeExpiredOfflineTagPages(pageCache, basePath, allowedPaths) {
+async function removeExpiredOfflineTagPages(pageCache, basePath, allowedPaths, userID) {
     const tagPathPrefix = `${basePath}/user-tag/`;
     for (const request of await pageCache.keys()) {
         const path = new URL(request.url).pathname;
         if (path.startsWith(tagPathPrefix) && path.endsWith("/entries") && !allowedPaths.has(path)) {
             await pageCache.delete(request);
+            await deleteOfflineRecord("meta", `listSnapshotVersion:${userID}:${request.url}`);
         }
     }
 }
@@ -620,6 +624,16 @@ function offlineListNeedsRefresh(allowedEntryIDs, previousEntryIDs, refreshedEnt
     }
     for (const entryID of refreshedEntryIDs) if (allowedEntryIDs.has(entryID)) return true;
     return false;
+}
+
+function offlineListSnapshotNeedsRefresh(allowedEntryIDs, previousEntryIDs, refreshedEntryIDs, hasCachedPage, cachedSnapshotVersion, currentSnapshotVersion, metadataChanged = false) {
+    return offlineListNeedsRefresh(
+        allowedEntryIDs,
+        previousEntryIDs,
+        refreshedEntryIDs,
+        hasCachedPage,
+        metadataChanged || cachedSnapshotVersion !== currentSnapshotVersion,
+    );
 }
 
 function offlineManifestEntryIDs(manifest) {
@@ -671,10 +685,14 @@ async function removeExpiredOfflineEntries(pageCache, mediaCache, entryIDs) {
     return {cachedEntryIDs, cachedVersions};
 }
 
-function offlineEntryNeedsRefresh(entryID, cachedEntryIDs, cachedVersions, currentVersions, lastRefresh = 0) {
+function offlineEntryNeedsRefresh(entryID, cachedEntryIDs, cachedVersions, currentVersions, snapshotVersion = "", lastRefresh = 0) {
     if (!cachedEntryIDs.has(entryID)) return true;
     const cachedVersion = cachedVersions?.[entryID];
     const currentVersion = currentVersions?.[entryID];
+    if (cachedVersion && typeof cachedVersion === "object") {
+        return cachedVersion.entry_version !== currentVersion || cachedVersion.snapshot_version !== snapshotVersion;
+    }
+    if (snapshotVersion) return true;
     if (cachedVersion) return cachedVersion !== currentVersion;
     return !currentVersion || !lastRefresh || Date.parse(currentVersion) > lastRefresh;
 }
@@ -719,13 +737,14 @@ async function refreshOfflineContent(force = false) {
         const entryIDs = offlineManifestEntryIDs(manifest);
         const {cachedEntryIDs, cachedVersions} = await removeExpiredOfflineEntries(pageCache, mediaCache, entryIDs);
         offlineRefreshPhase = "articles";
-        updateOfflineStatus();
+        updateOfflineActivity();
         const previousManifest = await getOfflineRecord("meta", `manifest:${userID}`);
         const entriesToRefresh = Array.from(entryIDs).filter((entryID) => offlineEntryNeedsRefresh(
             entryID,
             cachedEntryIDs,
             cachedVersions,
             manifest.entry_versions,
+            manifest.snapshot_version,
             lastRefresh?.value,
         ));
         offlineRefreshProgress = {completed: entryIDs.size - entriesToRefresh.length, total: entryIDs.size};
@@ -735,7 +754,7 @@ async function refreshOfflineContent(force = false) {
         const refreshedEntryIDs = [];
         await runOfflineBatches(entriesToRefresh, OFFLINE_ENTRY_BATCH_SIZE, async (entryID) => {
             try {
-                if (await cacheOfflineEntry(entryID, manifest.entry_versions?.[entryID], pageCache, mediaCache)) {
+                if (await cacheOfflineEntry(entryID, manifest.entry_versions?.[entryID], manifest.snapshot_version, pageCache, mediaCache)) {
                     refreshedEntryIDs.push(entryID);
                     cachedEntryIDs.add(entryID);
                     offlineRefreshProgress.completed += 1;
@@ -750,7 +769,7 @@ async function refreshOfflineContent(force = false) {
         });
 
         offlineRefreshPhase = "lists";
-        updateOfflineStatus();
+        updateOfflineActivity();
         const basePath = document.body.dataset.basePath || "";
         const previous = previousManifest?.value;
         const previousTags = new Map((previous?.user_tags || []).map((tag) => [tag.id, tag]));
@@ -770,21 +789,35 @@ async function refreshOfflineContent(force = false) {
             ]);
         });
         const allowedTagPaths = new Set((manifest.user_tags || []).map((tag) => `${basePath}/user-tag/${tag.id}/entries`));
-        await removeExpiredOfflineTagPages(pageCache, basePath, allowedTagPaths);
+        await removeExpiredOfflineTagPages(pageCache, basePath, allowedTagPaths, userID);
         const refreshedEntryIDSet = new Set(refreshedEntryIDs);
         for (const [path, allowed, previousIDs, metadataChanged] of listSpecs) {
             const listURL = new URL(basePath + path, location.origin).href;
             const hasCachedPage = Boolean(await pageCache.match(listURL));
-            if (!offlineListNeedsRefresh(allowed, previousIDs, refreshedEntryIDSet, hasCachedPage, metadataChanged)) continue;
+            const snapshotKey = `listSnapshotVersion:${userID}:${listURL}`;
+            const cachedSnapshot = await getOfflineRecord("meta", snapshotKey);
+            if (!offlineListSnapshotNeedsRefresh(
+                allowed,
+                previousIDs,
+                refreshedEntryIDSet,
+                hasCachedPage,
+                cachedSnapshot?.value,
+                manifest.snapshot_version,
+                metadataChanged,
+            )) continue;
             try {
-                if (!await cacheOfflineListPages(listURL, allowed, pageCache)) refreshFailures += 1;
+                if (await cacheOfflineListPages(listURL, allowed, pageCache)) {
+                    await putOfflineRecord("meta", {key: snapshotKey, value: manifest.snapshot_version});
+                } else {
+                    refreshFailures += 1;
+                }
             } catch (error) {
                 refreshFailures += 1;
                 console.debug("Unable to cache offline list:", listURL, error);
             }
         }
         offlineRefreshPhase = "media";
-        updateOfflineStatus();
+        updateOfflineActivity();
         await runOfflineBatches(refreshedEntryIDs, OFFLINE_MEDIA_BATCH_SIZE, (entryID) => cacheOfflineEntryMedia(entryID, mediaCache));
 
         if (refreshFailures === 0) {
@@ -803,8 +836,10 @@ async function refreshOfflineContent(force = false) {
         offlineRefreshPromise = null;
         offlineRefreshProgress = null;
         offlineRefreshPhase = null;
+        updateOfflineActivity();
         await updateOfflineStatus();
     });
+    updateOfflineActivity();
     updateOfflineStatus();
     return offlineRefreshPromise;
 }
@@ -961,6 +996,14 @@ function offlineStateLabel(status) {
     return navigator.onLine === false ? status.dataset.labelOffline : status.dataset.labelOnline;
 }
 
+function updateOfflineActivity() {
+    const status = document.getElementById("offline-sync-status");
+    if (!status) return;
+    status.hidden = false;
+    status.querySelector("[data-offline-state]").textContent = offlineStateLabel(status);
+    updateOfflineProgress();
+}
+
 async function updateOfflineStatus() {
     const status = document.getElementById("offline-sync-status");
     const userID = offlineUserID();
@@ -974,12 +1017,11 @@ async function updateOfflineStatus() {
     const skippedMedia = await getOfflineRecord("meta", `mediaSkipped:${userID}`);
     status.hidden = false;
     status.dataset.offline = navigator.onLine === false ? "true" : "false";
-    status.querySelector("[data-offline-state]").textContent = offlineStateLabel(status);
     status.querySelector("[data-offline-queued]").textContent = String(queued);
     status.querySelector("[data-offline-conflicts]").textContent = String(conflicts);
     status.querySelector("[data-offline-last-sync]").textContent = lastSyncAt ? new Date(lastSyncAt).toLocaleString() : status.dataset.labelNever;
     status.querySelector("[data-offline-media-skipped]").textContent = String(skippedMedia?.value || 0);
-    updateOfflineProgress();
+    updateOfflineActivity();
     const review = status.querySelector("[data-offline-review]");
     if (review) review.hidden = conflicts === 0;
 }
@@ -1041,7 +1083,8 @@ async function clearOfflineData() {
     const meta = await getOfflineRecords("meta");
     for (const record of meta) {
         if (record.key.endsWith(`:${userID}`) || record.key.startsWith(`entryMedia:${userID}:`) ||
-            record.key.startsWith(`entryVersion:${userID}:`) || record.key === "activeUser") {
+            record.key.startsWith(`entryVersion:${userID}:`) || record.key.startsWith(`listSnapshotVersion:${userID}:`) ||
+            record.key === "activeUser") {
             await deleteOfflineRecord("meta", record.key);
         }
     }
@@ -1054,7 +1097,7 @@ async function clearPreviousOfflineUser(previousUserID) {
     const meta = await getOfflineRecords("meta");
     for (const record of meta) {
         if (record.key.endsWith(`:${previousUserID}`) || record.key.startsWith(`entryMedia:${previousUserID}:`) ||
-            record.key.startsWith(`entryVersion:${previousUserID}:`)) {
+            record.key.startsWith(`entryVersion:${previousUserID}:`) || record.key.startsWith(`listSnapshotVersion:${previousUserID}:`)) {
             await deleteOfflineRecord("meta", record.key);
         }
     }

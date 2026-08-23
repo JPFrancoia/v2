@@ -86,6 +86,32 @@ test("identifies the media caching phase", () => {
     vm.runInContext("offlineRefreshPhase = null", context);
 });
 
+test("clears completed offline activity immediately", () => {
+    const state = {textContent: ""};
+    const progress = {hidden: false};
+    const status = {
+        dataset: {
+            labelCachingArticles: "Caching articles",
+            labelOnline: "Online",
+        },
+        hidden: true,
+        querySelector: (selector) => selector === "[data-offline-state]" ? state : progress,
+    };
+    context.document = {getElementById: () => status};
+    context.navigator = {onLine: true};
+
+    vm.runInContext('offlineRefreshPromise = {}; offlineRefreshPhase = "articles"; offlineRefreshProgress = {completed: 1, total: 1}', context);
+    context.updateOfflineActivity();
+    assert.equal(state.textContent, "Caching articles");
+    assert.equal(status.dataset.syncing, "true");
+
+    vm.runInContext("offlineRefreshPromise = null; offlineRefreshPhase = null; offlineRefreshProgress = null", context);
+    context.updateOfflineActivity();
+    assert.equal(state.textContent, "Online");
+    assert.equal(status.dataset.syncing, "false");
+    assert.equal(progress.hidden, true);
+});
+
 test("shows queued change retry failures", () => {
     vm.runInContext("offlineFlushError = true", context);
     assert.equal(context.offlineStateLabel({dataset: {labelRetryingChanges: "Retrying changes"}}), "Retrying changes");
@@ -110,7 +136,15 @@ test("refreshes only missing or changed offline entries", () => {
     assert.equal(context.offlineEntryNeedsRefresh(1, cached, {1: "v1"}, {1: "v1"}), false);
     assert.equal(context.offlineEntryNeedsRefresh(1, cached, {1: "v1"}, {1: "v2"}), true);
     assert.equal(context.offlineEntryNeedsRefresh(2, cached, undefined, {2: "2026-08-19T10:00:00Z"}), true);
-    assert.equal(context.offlineEntryNeedsRefresh(2, cached, undefined, {2: "2026-08-19T10:00:00Z"}, Date.parse("2026-08-19T11:00:00Z")), false);
+    assert.equal(context.offlineEntryNeedsRefresh(2, cached, undefined, {2: "2026-08-19T10:00:00Z"}, "", Date.parse("2026-08-19T11:00:00Z")), false);
+});
+
+test("refreshes stale snapshots without repeating completed entries", () => {
+    const cached = new Set([1]);
+    const current = {1: "entry-v1"};
+    assert.equal(context.offlineEntryNeedsRefresh(1, cached, {1: "entry-v1"}, current, "ui-v2"), true);
+    assert.equal(context.offlineEntryNeedsRefresh(1, cached, {1: {entry_version: "entry-v1", snapshot_version: "ui-v1"}}, current, "ui-v2"), true);
+    assert.equal(context.offlineEntryNeedsRefresh(1, cached, {1: {entry_version: "entry-v1", snapshot_version: "ui-v2"}}, current, "ui-v2"), false);
 });
 
 test("refreshes offline lists only when needed", () => {
@@ -119,4 +153,6 @@ test("refreshes offline lists only when needed", () => {
     assert.equal(context.offlineListNeedsRefresh(allowed, [1], new Set(), true), true);
     assert.equal(context.offlineListNeedsRefresh(allowed, [1, 2], new Set([2]), true), true);
     assert.equal(context.offlineListNeedsRefresh(allowed, [1, 2], new Set(), false), true);
+    assert.equal(context.offlineListSnapshotNeedsRefresh(allowed, [1, 2], new Set(), true, "ui-v1", "ui-v2"), true);
+    assert.equal(context.offlineListSnapshotNeedsRefresh(allowed, [1, 2], new Set(), true, "ui-v2", "ui-v2"), false);
 });
