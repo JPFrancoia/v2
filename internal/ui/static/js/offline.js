@@ -691,12 +691,21 @@ async function removeExpiredOfflineEntries(pageCache, mediaCache, entryIDs) {
     return {cachedEntryIDs, cachedVersions};
 }
 
+function offlineSnapshotVersionsMatch(cachedVersion, currentVersion) {
+    if (cachedVersion === currentVersion) return true;
+    const cached = String(cachedVersion || "").split(":");
+    const current = String(currentVersion || "").split(":");
+    return cached.length === 4 && current.length === 4 && cached[0] === current[0] &&
+        cached[2] === current[2] && cached[3] === current[3];
+}
+
 function offlineEntryNeedsRefresh(entryID, cachedEntryIDs, cachedVersions, currentVersions, snapshotVersion = "", lastRefresh = 0) {
     if (!cachedEntryIDs.has(entryID)) return true;
     const cachedVersion = cachedVersions?.[entryID];
     const currentVersion = currentVersions?.[entryID];
     if (cachedVersion && typeof cachedVersion === "object") {
-        return cachedVersion.entry_version !== currentVersion || cachedVersion.snapshot_version !== snapshotVersion;
+        return cachedVersion.entry_version !== currentVersion ||
+            !offlineSnapshotVersionsMatch(cachedVersion.snapshot_version, snapshotVersion);
     }
     if (snapshotVersion) return true;
     if (cachedVersion) return cachedVersion !== currentVersion;

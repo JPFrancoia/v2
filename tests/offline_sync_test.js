@@ -166,6 +166,16 @@ test("refreshes stale snapshots without repeating completed entries", () => {
     assert.equal(context.offlineEntryNeedsRefresh(1, cached, {1: {entry_version: "entry-v1", snapshot_version: "ui-v2"}}, current, "ui-v2"), false);
 });
 
+test("keeps article snapshots across JavaScript-only deployments", () => {
+    const cached = new Set([1]);
+    const current = {1: "entry-v1"};
+    const version = {1: {entry_version: "entry-v1", snapshot_version: "1:old-js:light-css:en_US"}};
+    assert.equal(context.offlineEntryNeedsRefresh(1, cached, version, current, "1:new-js:light-css:en_US"), false);
+    assert.equal(context.offlineEntryNeedsRefresh(1, cached, version, current, "2:new-js:light-css:en_US"), true);
+    assert.equal(context.offlineEntryNeedsRefresh(1, cached, version, current, "1:new-js:dark-css:en_US"), true);
+    assert.equal(context.offlineEntryNeedsRefresh(1, cached, version, current, "1:new-js:light-css:fr_FR"), true);
+});
+
 test("refreshes offline lists only when needed", () => {
     const allowed = new Set([1, 2]);
     assert.equal(context.offlineListNeedsRefresh(allowed, [1, 2], new Set(), true), false);
