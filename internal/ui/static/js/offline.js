@@ -564,11 +564,17 @@ async function cacheOfflineEntry(entryID, version, snapshotVersion, pageCache, m
     return true;
 }
 
-async function cacheOfflineEntryMedia(entryID, mediaCache) {
-    const media = await getOfflineRecord("meta", `entryMedia:${offlineUserID()}:${entryID}`);
-    for (const mediaURL of media?.value || []) {
-        if (!await cacheOfflineMedia(mediaURL, mediaCache)) offlineSkippedMedia += 1;
+function offlineMediaURLs(records, userID, entryIDs) {
+    const prefix = `entryMedia:${userID}:`;
+    const mediaByEntryID = new Map();
+    for (const record of records) {
+        if (record.key.startsWith(prefix)) {
+            mediaByEntryID.set(parseInt(record.key.substring(prefix.length), 10), record.value || []);
+        }
     }
+    const urls = new Set();
+    for (const entryID of entryIDs) for (const url of mediaByEntryID.get(entryID) || []) urls.add(url);
+    return Array.from(urls);
 }
 
 async function removeExpiredOfflineTagPages(pageCache, basePath, allowedPaths, userID) {
@@ -817,9 +823,14 @@ async function refreshOfflineContent(force = false) {
             }
         }
         offlineRefreshPhase = "media";
+        const mediaURLs = offlineMediaURLs(await getOfflineRecords("meta"), userID, entryIDs);
+        offlineRefreshProgress = {completed: 0, total: mediaURLs.length};
         updateOfflineActivity();
-        // Retry every entry because article snapshots can finish before their media phase.
-        await runOfflineBatches(Array.from(entryIDs), OFFLINE_MEDIA_BATCH_SIZE, (entryID) => cacheOfflineEntryMedia(entryID, mediaCache));
+        await runOfflineBatches(mediaURLs, OFFLINE_MEDIA_BATCH_SIZE, async (mediaURL) => {
+            if (!await cacheOfflineMedia(mediaURL, mediaCache)) offlineSkippedMedia += 1;
+            offlineRefreshProgress.completed += 1;
+            updateOfflineProgress();
+        });
 
         if (refreshFailures === 0) {
             await putOfflineRecord("meta", {key: `manifest:${userID}`, value: manifest});
@@ -982,7 +993,7 @@ function updateOfflineProgress() {
         progress.textContent = offlineProgressText(
             offlineRefreshProgress.completed,
             offlineRefreshProgress.total,
-            status.dataset.labelArticlesCached,
+            offlineRefreshPhase === "media" ? status.dataset.labelCachingMedia : status.dataset.labelArticlesCached,
         );
     }
 }

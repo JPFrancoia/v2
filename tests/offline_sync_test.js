@@ -31,6 +31,17 @@ test("offline media rejects responses at four million bytes", async () => {
     assert.equal(cached, null);
 });
 
+test("selects unique media for retained entries", () => {
+    const records = [
+        {key: "entryMedia:7:1", value: ["a", "b"]},
+        {key: "entryMedia:7:2", value: ["b", "c"]},
+        {key: "entryMedia:8:1", value: ["d"]},
+    ];
+    assert.deepEqual(Array.from(context.offlineMediaURLs(records, 7, new Set([1, 2]))), ["a", "b", "c"]);
+    assert.deepEqual(Array.from(context.offlineMediaURLs(records, 7, new Set([2, 1]))), ["b", "c", "a"]);
+    assert.deepEqual(Array.from(context.offlineMediaURLs(records, 7, new Set([2]))), ["b", "c"]);
+});
+
 test("status and saved-for-later conflicts stay coupled", () => {
     const fields = context.conflictPatchFields([{field: "status_saved_for_later"}]);
     assert.deepEqual(Array.from(fields).sort(), ["saved_for_later", "status"]);
@@ -80,10 +91,18 @@ test("formats offline article progress", () => {
     assert.equal(context.offlineProgressText(12, 40, "articles cached"), "12/40 articles cached");
 });
 
-test("identifies the media caching phase", () => {
-    vm.runInContext('offlineRefreshPhase = "media"', context);
-    assert.equal(context.offlineStateLabel({dataset: {labelCachingMedia: "Caching media"}}), "Caching media");
-    vm.runInContext("offlineRefreshPhase = null", context);
+test("identifies and counts the media caching phase", () => {
+    const progress = {hidden: true, textContent: ""};
+    const status = {
+        dataset: {labelCachingMedia: "Caching media", labelArticlesCached: "articles cached"},
+        querySelector: () => progress,
+    };
+    context.document = {getElementById: () => status};
+    vm.runInContext('offlineRefreshPromise = {}; offlineRefreshPhase = "media"; offlineRefreshProgress = {completed: 12, total: 40}', context);
+    assert.equal(context.offlineStateLabel(status), "Caching media");
+    context.updateOfflineProgress();
+    assert.equal(progress.textContent, "12/40 Caching media");
+    vm.runInContext("offlineRefreshPromise = null; offlineRefreshPhase = null; offlineRefreshProgress = null", context);
 });
 
 test("clears completed offline activity immediately", () => {
