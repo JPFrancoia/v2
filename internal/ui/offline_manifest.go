@@ -13,8 +13,8 @@ import (
 	"miniflux.app/v2/internal/ui/static"
 )
 
-// Increment this version when cached page rendering or media extraction changes.
-const offlineSnapshotSchemaVersion = "2"
+// Increment this version when cached page rendering or client behavior changes.
+const offlineSnapshotSchemaVersion = "3"
 
 func (h *handler) showOfflineManifest(w http.ResponseWriter, r *http.Request) {
 	manifest, err := h.store.OfflineManifest(r.Context(), request.UserID(r), time.Now())
