@@ -1173,7 +1173,10 @@ async function initializeOfflineSync() {
     document.querySelector("[data-offline-conflict-close]")?.addEventListener("click", () => document.getElementById("offline-conflict-dialog")?.close());
     document.querySelector("[data-offline-clear]")?.addEventListener("click", async () => {
         const status = document.getElementById("offline-sync-status");
-        if (confirm(status?.dataset.labelClearConfirm || "Clear offline data?")) await clearOfflineData();
+        if (confirm(status?.dataset.labelClearConfirm || "Clear offline data?")) {
+            await clearOfflineData();
+            location.reload();
+        }
     });
 
     document.querySelectorAll('a[href$="/logout"]').forEach((link) => {

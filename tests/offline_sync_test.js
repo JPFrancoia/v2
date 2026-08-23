@@ -13,10 +13,15 @@ const context = vm.createContext({
     console,
     setTimeout,
 });
-vm.runInContext(fs.readFileSync("internal/ui/static/js/offline.js", "utf8"), context);
+const offlineSource = fs.readFileSync("internal/ui/static/js/offline.js", "utf8");
+vm.runInContext(offlineSource, context);
 
 test("service worker script parses", () => {
     assert.doesNotThrow(() => new vm.Script(fs.readFileSync("internal/ui/static/js/service_worker.js", "utf8")));
+});
+
+test("clear offline data reloads into a fresh sync", () => {
+    assert.match(offlineSource, /await clearOfflineData\(\);\s*location\.reload\(\);/);
 });
 
 test("offline media accepts responses below four million bytes", async () => {
