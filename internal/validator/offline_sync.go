@@ -12,7 +12,7 @@ import (
 
 const (
 	maxOfflineSyncBatchSize     = 100
-	maxOfflineSnapshotBatchSize = 25
+	maxOfflineSnapshotBatchSize = 50
 	maxOfflineTagChanges        = 100
 )
 

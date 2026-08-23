@@ -265,8 +265,7 @@ test("shows queued change retry failures", () => {
 test("groups offline snapshots into bounded requests", () => {
     const batches = context.offlineEntryBatches(Array.from({length: 51}, (_value, index) => index + 1));
     assert.deepEqual(Array.from(batches, (batch) => Array.from(batch)), [
-        Array.from({length: 25}, (_value, index) => index + 1),
-        Array.from({length: 25}, (_value, index) => index + 26),
+        Array.from({length: 50}, (_value, index) => index + 1),
         [51],
     ]);
 });
