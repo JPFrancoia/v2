@@ -860,6 +860,8 @@ async function refreshOfflineContent(force = false) {
                 Boolean(previousTag && previousTag.title !== tag.title),
             ]);
         });
+        offlineRefreshProgress = {completed: 0, total: listSpecs.length};
+        updateOfflineProgress();
         const allowedTagPaths = new Set((manifest.user_tags || []).map((tag) => `${basePath}/user-tag/${tag.id}/entries`));
         await removeExpiredOfflineTagPages(pageCache, basePath, allowedTagPaths, userID);
         const refreshedEntryIDSet = new Set(refreshedEntryIDs);
@@ -876,7 +878,11 @@ async function refreshOfflineContent(force = false) {
                 cachedSnapshot?.value,
                 manifest.snapshot_version,
                 metadataChanged,
-            )) continue;
+            )) {
+                offlineRefreshProgress.completed += 1;
+                updateOfflineProgress();
+                continue;
+            }
             try {
                 if (await cacheOfflineListPages(listURL, allowed, pageCache)) {
                     await putOfflineRecord("meta", {key: snapshotKey, value: manifest.snapshot_version});
@@ -887,8 +893,12 @@ async function refreshOfflineContent(force = false) {
                 refreshFailures += 1;
                 console.debug("Unable to cache offline list:", listURL, error);
             }
+            offlineRefreshProgress.completed += 1;
+            updateOfflineProgress();
         }
         startOfflineRefreshPhase("media");
+        offlineRefreshProgress = {completed: 0, total: 1};
+        updateOfflineProgress();
         const mediaURLs = offlineMediaURLs(await getOfflineRecords("meta"), userID, entryIDs);
         const mediaWork = offlineMediaWork(mediaURLs, await mediaCache.keys());
         offlineRefreshProgress = {completed: mediaWork.completed, total: mediaWork.total};
@@ -1087,11 +1097,12 @@ function updateOfflineProgress() {
     if (!progress) return;
     progress.hidden = !offlineRefreshProgress;
     if (offlineRefreshProgress) {
-        progress.textContent = offlineProgressText(
-            offlineRefreshProgress.completed,
-            offlineRefreshProgress.total,
-            offlineRefreshPhase === "media" ? status.dataset.labelCachingMedia : status.dataset.labelArticlesCached,
-        );
+        const label = offlineRefreshPhase === "media"
+            ? status.dataset.labelCachingMedia
+            : offlineRefreshPhase === "lists"
+                ? status.dataset.labelCachingLists
+                : status.dataset.labelArticlesCached;
+        progress.textContent = offlineProgressText(offlineRefreshProgress.completed, offlineRefreshProgress.total, label);
     }
 }
 
