@@ -757,8 +757,7 @@ async function refreshOfflineContent(force = false) {
         const mediaCache = await caches.open(offlineMediaCacheName(userID));
         const entryIDs = offlineManifestEntryIDs(manifest);
         const {cachedEntryIDs, cachedVersions} = await removeExpiredOfflineEntries(pageCache, mediaCache, entryIDs);
-        offlineRefreshPhase = "articles";
-        updateOfflineActivity();
+        startOfflineRefreshPhase("articles");
         const previousManifest = await getOfflineRecord("meta", `manifest:${userID}`);
         const entriesToRefresh = Array.from(entryIDs).filter((entryID) => offlineEntryNeedsRefresh(
             entryID,
@@ -789,8 +788,7 @@ async function refreshOfflineContent(force = false) {
             }
         });
 
-        offlineRefreshPhase = "lists";
-        updateOfflineActivity();
+        startOfflineRefreshPhase("lists");
         const basePath = document.body.dataset.basePath || "";
         const previous = previousManifest?.value;
         const previousTags = new Map((previous?.user_tags || []).map((tag) => [tag.id, tag]));
@@ -837,11 +835,11 @@ async function refreshOfflineContent(force = false) {
                 console.debug("Unable to cache offline list:", listURL, error);
             }
         }
-        offlineRefreshPhase = "media";
+        startOfflineRefreshPhase("media");
         const mediaURLs = offlineMediaURLs(await getOfflineRecords("meta"), userID, entryIDs);
         const mediaWork = offlineMediaWork(mediaURLs, await mediaCache.keys());
         offlineRefreshProgress = {completed: mediaWork.completed, total: mediaWork.total};
-        updateOfflineActivity();
+        updateOfflineProgress();
         await runOfflineBatches(mediaWork.pending, OFFLINE_MEDIA_BATCH_SIZE, async (mediaURL) => {
             if (!await cacheOfflineMedia(mediaURL, mediaCache, true)) offlineSkippedMedia += 1;
             offlineRefreshProgress.completed += 1;
@@ -1022,6 +1020,12 @@ function offlineStateLabel(status) {
     if (offlineRefreshPhase === "media") return status.dataset.labelCachingMedia;
     if (offlineRefreshPromise) return status.dataset.labelSyncing;
     return navigator.onLine === false ? status.dataset.labelOffline : status.dataset.labelOnline;
+}
+
+function startOfflineRefreshPhase(phase) {
+    offlineRefreshPhase = phase;
+    offlineRefreshProgress = null;
+    updateOfflineActivity();
 }
 
 function updateOfflineActivity() {

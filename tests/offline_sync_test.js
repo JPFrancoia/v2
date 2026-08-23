@@ -115,6 +115,23 @@ test("identifies and counts the media caching phase", () => {
     vm.runInContext("offlineRefreshPromise = null; offlineRefreshPhase = null; offlineRefreshProgress = null", context);
 });
 
+test("clears stale progress when a new phase starts", () => {
+    const state = {textContent: ""};
+    const progress = {hidden: false, textContent: "7972/7972 articles cached"};
+    const status = {
+        dataset: {labelCachingMedia: "Caching media"},
+        querySelector: (selector) => selector === "[data-offline-state]" ? state : progress,
+    };
+    context.document = {getElementById: () => status};
+    vm.runInContext('offlineRefreshPromise = {}; offlineRefreshPhase = "articles"; offlineRefreshProgress = {completed: 7972, total: 7972}', context);
+
+    context.startOfflineRefreshPhase("media");
+
+    assert.equal(state.textContent, "Caching media");
+    assert.equal(progress.hidden, true);
+    vm.runInContext("offlineRefreshPromise = null; offlineRefreshPhase = null; offlineRefreshProgress = null", context);
+});
+
 test("clears completed offline activity immediately", () => {
     const state = {textContent: ""};
     const progress = {hidden: false};
