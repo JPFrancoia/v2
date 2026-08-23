@@ -151,6 +151,17 @@ slog.Info("Description",
 - Integration tests in `internal/api/api_integration_test.go` require a running server + PostgreSQL
 - Benchmarks (`BenchmarkXxx`) and fuzz tests (`FuzzXxx`) exist in sanitizer package
 
+### Regression Tests
+
+- Reproduce each reported failure before an edit.
+- If reproduction is impossible, record the reason before an edit.
+- Add an automated regression test for every confirmed bug fix.
+- Make sure that the test fails with the faulty code and passes with the fix.
+- Test the root cause or user-visible behavior. Do not test source text or incidental implementation details.
+- Run the focused test and the relevant test suite before completion.
+- Do not mark a bug fix complete if its regression test is absent or fails.
+- If automation is impossible, stop and request explicit user approval for an exception.
+
 ## Philosophy
 
 From CONTRIBUTING.md — Miniflux follows a **minimalist philosophy**:
