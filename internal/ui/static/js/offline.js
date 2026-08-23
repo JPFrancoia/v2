@@ -818,7 +818,8 @@ async function refreshOfflineContent(force = false) {
         }
         offlineRefreshPhase = "media";
         updateOfflineActivity();
-        await runOfflineBatches(refreshedEntryIDs, OFFLINE_MEDIA_BATCH_SIZE, (entryID) => cacheOfflineEntryMedia(entryID, mediaCache));
+        // Retry every entry because article snapshots can finish before their media phase.
+        await runOfflineBatches(Array.from(entryIDs), OFFLINE_MEDIA_BATCH_SIZE, (entryID) => cacheOfflineEntryMedia(entryID, mediaCache));
 
         if (refreshFailures === 0) {
             await putOfflineRecord("meta", {key: `manifest:${userID}`, value: manifest});
