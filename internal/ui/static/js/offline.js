@@ -638,7 +638,7 @@ function offlineListSnapshotNeedsRefresh(allowedEntryIDs, previousEntryIDs, refr
         previousEntryIDs,
         refreshedEntryIDs,
         hasCachedPage,
-        metadataChanged || cachedSnapshotVersion !== currentSnapshotVersion,
+        metadataChanged || !offlineSnapshotVersionsMatch(cachedSnapshotVersion, currentSnapshotVersion),
     );
 }
 

@@ -184,4 +184,12 @@ test("refreshes offline lists only when needed", () => {
     assert.equal(context.offlineListNeedsRefresh(allowed, [1, 2], new Set(), false), true);
     assert.equal(context.offlineListSnapshotNeedsRefresh(allowed, [1, 2], new Set(), true, "ui-v1", "ui-v2"), true);
     assert.equal(context.offlineListSnapshotNeedsRefresh(allowed, [1, 2], new Set(), true, "ui-v2", "ui-v2"), false);
+    assert.equal(context.offlineListSnapshotNeedsRefresh(
+        allowed,
+        [1, 2],
+        new Set(),
+        true,
+        "1:old-js:light-css:en_US",
+        "1:new-js:light-css:en_US",
+    ), false);
 });
