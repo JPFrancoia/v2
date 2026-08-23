@@ -511,7 +511,7 @@ async function cacheOfflineMedia(url, cache, knownMissing = false) {
 
 function mediaURLsFromDocument(documentNode) {
     const urls = new Set();
-    documentNode.querySelectorAll("img[src], source[src], video[poster]").forEach((element) => {
+    documentNode.querySelectorAll("img[src], audio[src], video[src], source[src], video[poster]").forEach((element) => {
         const value = element.getAttribute("src") || element.getAttribute("poster");
         if (value) urls.add(new URL(value, location.origin).href);
     });

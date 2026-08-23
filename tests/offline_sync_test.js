@@ -9,6 +9,7 @@ const vm = require("node:vm");
 const context = vm.createContext({
     Blob,
     Response,
+    URL,
     console,
     setTimeout,
 });
@@ -29,6 +30,30 @@ test("offline media rejects responses at four million bytes", async () => {
     const response = new Response(new Uint8Array(4000000));
     const cached = await context.responseBelowOfflineMediaLimit(response);
     assert.equal(cached, null);
+});
+
+test("extracts direct audio and video media", () => {
+    const element = (attributes) => ({getAttribute: (name) => attributes[name] || null});
+    const image = element({src: "/image.jpg"});
+    const audio = element({src: "/audio.mp3"});
+    const video = element({src: "/video.mp4"});
+    const poster = element({poster: "/poster.jpg"});
+    const documentNode = {
+        querySelectorAll: (selector) => [
+            ...(selector.includes("img[src]") ? [image] : []),
+            ...(selector.includes("audio[src]") ? [audio] : []),
+            ...(selector.includes("video[src]") ? [video] : []),
+            ...(selector.includes("video[poster]") ? [poster] : []),
+        ],
+    };
+    context.location = {origin: "https://miniflux.test"};
+
+    assert.deepEqual(Array.from(context.mediaURLsFromDocument(documentNode)), [
+        "https://miniflux.test/image.jpg",
+        "https://miniflux.test/audio.mp3",
+        "https://miniflux.test/video.mp4",
+        "https://miniflux.test/poster.jpg",
+    ]);
 });
 
 test("selects unique media for retained entries", () => {
