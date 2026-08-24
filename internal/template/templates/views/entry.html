@@ -47,6 +47,9 @@
         <h1 id="page-header-title" dir="auto">
             <a href="{{ .entry.URL | safeURL }}" {{ if $.user.OpenExternalLinksInNewTab }}target="_blank"{{ else }}rel="noopener"{{ end }}>{{ .entry.Title }}</a>
         </h1>
+        {{ with .entry.OneLineSummary }}
+        <p class="item-preview" dir="auto">{{ . }}</p>
+        {{ end }}
         {{ if .user }}
         <div class="entry-actions">
             <ul>

@@ -253,26 +253,27 @@ type Feeds []*Feed
 
 // Entry represents a subscription item in the system.
 type Entry struct {
-	ID          int64      `json:"id"`
-	Date        time.Time  `json:"published_at"`
-	ChangedAt   time.Time  `json:"changed_at"`
-	CreatedAt   time.Time  `json:"created_at"`
-	Feed        *Feed      `json:"feed,omitempty"`
-	Hash        string     `json:"hash"`
-	URL         string     `json:"url"`
-	CommentsURL string     `json:"comments_url"`
-	Title       string     `json:"title"`
-	Status      string     `json:"status"`
-	Content     string     `json:"content"`
-	Author      string     `json:"author"`
-	ShareCode   string     `json:"share_code"`
-	Enclosures  Enclosures `json:"enclosures,omitempty"`
-	Tags        []string   `json:"tags"`
-	ReadingTime int        `json:"reading_time"`
-	UserID      int64      `json:"user_id"`
-	FeedID      int64      `json:"feed_id"`
-	Starred     bool       `json:"starred"`
-	Vote        int        `json:"vote"`
+	ID             int64      `json:"id"`
+	Date           time.Time  `json:"published_at"`
+	ChangedAt      time.Time  `json:"changed_at"`
+	CreatedAt      time.Time  `json:"created_at"`
+	Feed           *Feed      `json:"feed,omitempty"`
+	Hash           string     `json:"hash"`
+	URL            string     `json:"url"`
+	CommentsURL    string     `json:"comments_url"`
+	Title          string     `json:"title"`
+	Status         string     `json:"status"`
+	Content        string     `json:"content"`
+	OneLineSummary string     `json:"one_line_summary"`
+	Author         string     `json:"author"`
+	ShareCode      string     `json:"share_code"`
+	Enclosures     Enclosures `json:"enclosures,omitempty"`
+	Tags           []string   `json:"tags"`
+	ReadingTime    int        `json:"reading_time"`
+	UserID         int64      `json:"user_id"`
+	FeedID         int64      `json:"feed_id"`
+	Starred        bool       `json:"starred"`
+	Vote           int        `json:"vote"`
 }
 
 // EntryModificationRequest represents a request to modify an entry.

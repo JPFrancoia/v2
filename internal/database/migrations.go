@@ -1685,4 +1685,11 @@ var migrations = [...]func(tx *sql.Tx) error{
 		`)
 		return err
 	},
+	func(tx *sql.Tx) (err error) {
+		_, err = tx.Exec(`
+			ALTER TABLE entries
+				ADD COLUMN one_line_summary text NOT NULL DEFAULT '';
+		`)
+		return err
+	},
 }

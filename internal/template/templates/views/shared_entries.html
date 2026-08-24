@@ -60,8 +60,12 @@
                 </h2>
                 <span class="category"><a href="{{ routePath "/category/%d/entries" .Feed.Category.ID }}">{{ .Feed.Category.Title }}</a></span>
             </header>
+            {{ with .OneLineSummary }}
+            <p class="item-preview" dir="auto">{{ . }}</p>
+            {{ else }}
             {{ with truncateHTML .Content 320 }}
             <p class="item-preview" dir="auto">{{ . }}</p>
+            {{ end }}
             {{ end }}
             <div class="item-meta">
                 <ul class="item-meta-info">

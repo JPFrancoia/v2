@@ -1,6 +1,10 @@
 {{ define "item_meta" -}}
+{{ with .entry.OneLineSummary }}
+<p class="item-preview" dir="auto">{{ . }}</p>
+{{ else }}
 {{ with truncateHTML .entry.Content 320 }}
 <p class="item-preview" dir="auto">{{ . }}</p>
+{{ end }}
 {{ end }}
 <div class="item-meta">
     <ul class="item-meta-info">
