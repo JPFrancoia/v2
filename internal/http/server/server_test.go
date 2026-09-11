@@ -131,6 +131,24 @@ func TestDetermineListenTargets(t *testing.T) {
 	}
 }
 
+func TestIsTraceablePath(t *testing.T) {
+	tests := map[string]bool{
+		"/":                   true,
+		"/v1/entries":         true,
+		"/liveness":           false,
+		"/healthz":            false,
+		"/readiness":          false,
+		"/readyz":             false,
+		"/reader/healthcheck": false,
+	}
+
+	for requestPath, expected := range tests {
+		if result := isTraceablePath(requestPath, "/reader/healthcheck"); result != expected {
+			t.Errorf("isTraceablePath(%q) = %v, want %v", requestPath, result, expected)
+		}
+	}
+}
+
 func TestAnyTLS(t *testing.T) {
 	tests := []struct {
 		name     string

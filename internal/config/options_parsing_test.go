@@ -1042,6 +1042,22 @@ func TestOAuth2UserCreationOptionParsing(t *testing.T) {
 	}
 }
 
+func TestOtelEndpointOptionParsing(t *testing.T) {
+	configParser := NewConfigParser()
+
+	if configParser.options.OtelEndpoint() != "" {
+		t.Fatal("Expected OTEL_ENDPOINT to be empty by default")
+	}
+
+	if err := configParser.parseLines([]string{"OTEL_ENDPOINT=http://collector:4318"}); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if configParser.options.OtelEndpoint() != "http://collector:4318" {
+		t.Fatalf("Expected OTEL_ENDPOINT to be 'http://collector:4318'")
+	}
+}
+
 func TestPollingLimitPerHostOptionParsing(t *testing.T) {
 	configParser := NewConfigParser()
 

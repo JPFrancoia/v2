@@ -6,6 +6,8 @@ package server // import "miniflux.app/v2/internal/http/server"
 import (
 	"net/http"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	"miniflux.app/v2/internal/api"
 	"miniflux.app/v2/internal/config"
 	"miniflux.app/v2/internal/fever"
@@ -70,5 +72,16 @@ func newRouter(store *storage.Storage, pool *worker.Pool) http.Handler {
 		rootMux.Handle("/", appHandler)
 	}
 
-	return rootMux
+	return otelhttp.NewHandler(rootMux, "miniflux.http", otelhttp.WithFilter(func(r *http.Request) bool {
+		return isTraceablePath(r.URL.Path, basePath+"/healthcheck")
+	}))
+}
+
+func isTraceablePath(requestPath, healthcheckPath string) bool {
+	switch requestPath {
+	case "/liveness", "/healthz", "/readiness", "/readyz":
+		return false
+	default:
+		return requestPath != healthcheckPath
+	}
 }

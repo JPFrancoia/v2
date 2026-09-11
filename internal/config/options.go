@@ -479,6 +479,11 @@ func NewConfigOptions() *configOptions {
 				rawValue:        "0",
 				valueType:       boolType,
 			},
+			"OTEL_ENDPOINT": {
+				parsedStringValue: "",
+				rawValue:          "",
+				valueType:         stringType,
+			},
 			"POLLING_FREQUENCY": {
 				parsedDuration: 60 * time.Minute,
 				rawValue:       "60",
@@ -924,6 +929,10 @@ func (c *configOptions) OAuth2RedirectURL() string {
 
 func (c *configOptions) OAuth2UserCreation() bool {
 	return c.options["OAUTH2_USER_CREATION"].parsedBoolValue
+}
+
+func (c *configOptions) OtelEndpoint() string {
+	return c.options["OTEL_ENDPOINT"].parsedStringValue
 }
 
 func (c *configOptions) PollingFrequency() time.Duration {
