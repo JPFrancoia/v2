@@ -14,14 +14,14 @@ import (
 )
 
 func (h *handler) showUserTagEntryPage(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	userTagID := request.RouteInt64Param(r, "userTagID")
-	tag, err := h.store.UserTagByID(user.ID, userTagID)
+	tag, err := h.store.UserTagByID(r.Context(), user.ID, userTagID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -34,7 +34,7 @@ func (h *handler) showUserTagEntryPage(w http.ResponseWriter, r *http.Request) {
 
 	entryID := request.RouteInt64Param(r, "entryID")
 
-	builder := h.store.NewEntryQueryBuilder(user.ID)
+	builder := h.store.NewEntryQueryBuilder(r.Context(), user.ID)
 	builder.WithUserTagID(userTagID)
 	builder.WithEntryID(entryID)
 
@@ -50,7 +50,7 @@ func (h *handler) showUserTagEntryPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if entry.ShouldMarkAsReadOnView(user) {
-		err = h.store.SetEntriesStatus(user.ID, []int64{entry.ID}, model.EntryStatusRead)
+		err = h.store.SetEntriesStatus(r.Context(), user.ID, []int64{entry.ID}, model.EntryStatusRead)
 		if err != nil {
 			response.HTMLServerError(w, r, err)
 			return
@@ -59,7 +59,7 @@ func (h *handler) showUserTagEntryPage(w http.ResponseWriter, r *http.Request) {
 		entry.Status = model.EntryStatusRead
 	}
 
-	entryPaginationBuilder := storage.NewEntryPaginationBuilder(h.store, user.ID, entry.ID, user.EntryOrder, user.EntryDirection)
+	entryPaginationBuilder := storage.NewEntryPaginationBuilder(r.Context(), h.store, user.ID, entry.ID, user.EntryOrder, user.EntryDirection)
 	entryPaginationBuilder.WithUserTagID(userTagID)
 	prevEntry, nextEntry, err := entryPaginationBuilder.Entries()
 	if err != nil {
@@ -78,13 +78,13 @@ func (h *handler) showUserTagEntryPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch user tags for the checkbox section on the entry detail page.
-	userTags, err := h.store.UserTags(user.ID)
+	userTags, err := h.store.UserTags(r.Context(), user.ID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
 
-	entryUserTagIDs, err := h.store.EntryUserTagIDs(user.ID, entry.ID)
+	entryUserTagIDs, err := h.store.EntryUserTagIDs(r.Context(), user.ID, entry.ID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -97,9 +97,9 @@ func (h *handler) showUserTagEntryPage(w http.ResponseWriter, r *http.Request) {
 	v.Set("nextEntryRoute", nextEntryRoute)
 	v.Set("prevEntryRoute", prevEntryRoute)
 	v.Set("user", user)
-	v.Set("countUnread", h.store.CountUnreadEntries(user.ID))
-	v.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
-	v.Set("hasSaveEntry", h.store.HasSaveEntry(user.ID))
+	v.Set("countUnread", h.store.CountUnreadEntries(r.Context(), user.ID))
+	v.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), user.ID))
+	v.Set("hasSaveEntry", h.store.HasSaveEntry(r.Context(), user.ID))
 	v.Set("userTags", userTags)
 	v.Set("entryUserTagIDs", entryUserTagIDs)
 

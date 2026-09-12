@@ -49,7 +49,7 @@ func (h *handler) checkLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.CheckPassword(authForm.Username, authForm.Password); err != nil {
+	if err := h.store.CheckPassword(r.Context(), authForm.Username, authForm.Password); err != nil {
 		slog.Warn("Incorrect username or password",
 			slog.Bool("authentication_failed", true),
 			slog.String("client_ip", clientIP),
@@ -61,7 +61,7 @@ func (h *handler) checkLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.store.UserByUsername(authForm.Username)
+	user, err := h.store.UserByUsername(r.Context(), authForm.Username)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -79,7 +79,7 @@ func (h *handler) checkLogin(w http.ResponseWriter, r *http.Request) {
 		slog.String("username", authForm.Username),
 	)
 
-	h.store.SetLastLogin(user.ID)
+	h.store.SetLastLogin(r.Context(), user.ID)
 	if err := authenticateWebSession(w, r, h.store, user); err != nil {
 		response.HTMLServerError(w, r, err)
 		return

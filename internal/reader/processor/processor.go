@@ -4,6 +4,7 @@
 package processor // import "miniflux.app/v2/internal/reader/processor"
 
 import (
+	"context"
 	"log/slog"
 	"net/url"
 	"slices"
@@ -24,10 +25,10 @@ import (
 )
 
 // ProcessFeedEntries downloads original web page for entries and apply filters.
-func ProcessFeedEntries(store *storage.Storage, feed *model.Feed, userID int64, forceRefresh bool) {
+func ProcessFeedEntries(ctx context.Context, store *storage.Storage, feed *model.Feed, userID int64, forceRefresh bool) {
 	var filteredEntries model.Entries
 
-	user, storeErr := store.UserByID(userID)
+	user, storeErr := store.UserByID(ctx, userID)
 	if storeErr != nil {
 		slog.Error("Database error", slog.Any("error", storeErr))
 		return
@@ -92,7 +93,7 @@ func ProcessFeedEntries(store *storage.Storage, feed *model.Feed, userID int64, 
 
 		webpageBaseURL := ""
 		entry.URL = rewrite.RewriteEntryURL(feed, entry)
-		entryIsNew := store.IsNewEntry(feed.ID, entry.Hash)
+		entryIsNew := store.IsNewEntry(ctx, feed.ID, entry.Hash)
 		contentExtractedSuccessfully := false
 		if feed.Crawler && (entryIsNew || forceRefresh) {
 			slog.Debug("Scraping entry",
@@ -164,7 +165,7 @@ func ProcessFeedEntries(store *storage.Storage, feed *model.Feed, userID int64, 
 		// The sanitizer should always run at the end of the process to make sure unsafe HTML is filtered out.
 		entry.Content = sanitizer.SanitizeHTML(webpageBaseURL, entry.Content, &sanitizer.SanitizerOptions{OpenLinksInNewTab: user.OpenExternalLinksInNewTab})
 
-		updateEntryReadingTime(store, feed, entry, entryIsNew, user)
+		updateEntryReadingTime(ctx, store, feed, entry, entryIsNew, user)
 
 		filteredEntries = append(filteredEntries, entry)
 	}

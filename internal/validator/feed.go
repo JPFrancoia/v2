@@ -4,6 +4,8 @@
 package validator // import "miniflux.app/v2/internal/validator"
 
 import (
+	"context"
+
 	"miniflux.app/v2/internal/locale"
 	"miniflux.app/v2/internal/model"
 	"miniflux.app/v2/internal/storage"
@@ -11,7 +13,7 @@ import (
 )
 
 // ValidateFeedCreation validates feed creation.
-func ValidateFeedCreation(store *storage.Storage, userID int64, request *model.FeedCreationRequest) *locale.LocalizedError {
+func ValidateFeedCreation(ctx context.Context, store *storage.Storage, userID int64, request *model.FeedCreationRequest) *locale.LocalizedError {
 	if request.FeedURL == "" || request.CategoryID <= 0 {
 		return locale.NewLocalizedError("error.feed_mandatory_fields")
 	}
@@ -20,11 +22,11 @@ func ValidateFeedCreation(store *storage.Storage, userID int64, request *model.F
 		return locale.NewLocalizedError("error.invalid_feed_url")
 	}
 
-	if store.FeedURLExists(userID, request.FeedURL) {
+	if store.FeedURLExists(ctx, userID, request.FeedURL) {
 		return locale.NewLocalizedError("error.feed_already_exists")
 	}
 
-	if !store.CategoryIDExists(userID, request.CategoryID) {
+	if !store.CategoryIDExists(ctx, userID, request.CategoryID) {
 		return locale.NewLocalizedError("error.feed_category_not_found")
 	}
 
@@ -44,7 +46,7 @@ func ValidateFeedCreation(store *storage.Storage, userID int64, request *model.F
 }
 
 // ValidateFeedModification validates feed modification.
-func ValidateFeedModification(store *storage.Storage, userID, feedID int64, request *model.FeedModificationRequest) *locale.LocalizedError {
+func ValidateFeedModification(ctx context.Context, store *storage.Storage, userID, feedID int64, request *model.FeedModificationRequest) *locale.LocalizedError {
 	if request.FeedURL != nil {
 		if *request.FeedURL == "" {
 			return locale.NewLocalizedError("error.feed_url_not_empty")
@@ -54,7 +56,7 @@ func ValidateFeedModification(store *storage.Storage, userID, feedID int64, requ
 			return locale.NewLocalizedError("error.invalid_feed_url")
 		}
 
-		if store.AnotherFeedURLExists(userID, feedID, *request.FeedURL) {
+		if store.AnotherFeedURLExists(ctx, userID, feedID, *request.FeedURL) {
 			return locale.NewLocalizedError("error.feed_already_exists")
 		}
 	}
@@ -76,7 +78,7 @@ func ValidateFeedModification(store *storage.Storage, userID, feedID int64, requ
 	}
 
 	if request.CategoryID != nil {
-		if !store.CategoryIDExists(userID, *request.CategoryID) {
+		if !store.CategoryIDExists(ctx, userID, *request.CategoryID) {
 			return locale.NewLocalizedError("error.feed_category_not_found")
 		}
 	}

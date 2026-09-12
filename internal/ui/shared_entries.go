@@ -12,14 +12,14 @@ import (
 )
 
 func (h *handler) sharedEntries(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	offset := request.QueryIntParam(r, "offset", 0)
-	builder := h.store.NewEntryQueryBuilder(user.ID)
+	builder := h.store.NewEntryQueryBuilder(r.Context(), user.ID)
 	builder.WithShareCodeNotEmpty()
 	builder.WithSorting(user.EntryOrder, user.EntryDirection)
 	builder.WithSorting("id", user.EntryDirection)
@@ -39,9 +39,9 @@ func (h *handler) sharedEntries(w http.ResponseWriter, r *http.Request) {
 	view.Set("pagination", getPagination(h.routePath("/shares"), count, offset, user.EntriesPerPage))
 	view.Set("menu", "history")
 	view.Set("user", user)
-	view.Set("countUnread", h.store.CountUnreadEntries(user.ID))
-	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
-	view.Set("hasSaveEntry", h.store.HasSaveEntry(user.ID))
+	view.Set("countUnread", h.store.CountUnreadEntries(r.Context(), user.ID))
+	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), user.ID))
+	view.Set("hasSaveEntry", h.store.HasSaveEntry(r.Context(), user.ID))
 
 	response.HTML(w, r, view.Render("shared_entries"))
 }

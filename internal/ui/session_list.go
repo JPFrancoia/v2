@@ -12,13 +12,13 @@ import (
 )
 
 func (h *handler) showSessionsPage(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
 
-	sessions, err := h.store.WebSessionsByUserID(user.ID)
+	sessions, err := h.store.WebSessionsByUserID(r.Context(), user.ID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -33,8 +33,8 @@ func (h *handler) showSessionsPage(w http.ResponseWriter, r *http.Request) {
 	view.Set("sessions", sessions)
 	view.Set("menu", "settings")
 	view.Set("user", user)
-	view.Set("countUnread", h.store.CountUnreadEntries(user.ID))
-	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
+	view.Set("countUnread", h.store.CountUnreadEntries(r.Context(), user.ID))
+	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), user.ID))
 
 	response.HTML(w, r, view.Render("sessions"))
 }

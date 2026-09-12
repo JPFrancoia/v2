@@ -12,7 +12,7 @@ import (
 
 func (h *handler) removeSession(w http.ResponseWriter, r *http.Request) {
 	sessionID := request.RouteStringParam(r, "sessionID")
-	err := h.store.RemoveUserWebSession(request.UserID(r), sessionID)
+	err := h.store.RemoveUserWebSession(r.Context(), request.UserID(r), sessionID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return

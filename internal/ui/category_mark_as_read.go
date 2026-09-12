@@ -15,7 +15,7 @@ func (h *handler) markCategoryAsRead(w http.ResponseWriter, r *http.Request) {
 	userID := request.UserID(r)
 	categoryID := request.RouteInt64Param(r, "categoryID")
 
-	category, err := h.store.Category(userID, categoryID)
+	category, err := h.store.Category(r.Context(), userID, categoryID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -26,7 +26,7 @@ func (h *handler) markCategoryAsRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = h.store.MarkCategoryAsRead(userID, categoryID, time.Now()); err != nil {
+	if err = h.store.MarkCategoryAsRead(r.Context(), userID, categoryID, time.Now()); err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}

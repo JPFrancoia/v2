@@ -4,6 +4,7 @@
 package storage // import "miniflux.app/v2/internal/storage"
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -14,17 +15,17 @@ import (
 var ErrAPIKeyNotFound = errors.New("store: API Key not found")
 
 // APIKeyExists checks if an API Key with the same description exists.
-func (s *Storage) APIKeyExists(userID int64, description string) bool {
+func (s *Storage) APIKeyExists(ctx context.Context, userID int64, description string) bool {
 	var result bool
 	query := `SELECT true FROM api_keys WHERE user_id=$1 AND lower(description)=lower($2) LIMIT 1`
-	s.db.QueryRow(query, userID, description).Scan(&result)
+	s.db.QueryRowContext(ctx, query, userID, description).Scan(&result)
 	return result
 }
 
 // SetAPIKeyUsedTimestamp updates the last used date of an API Key.
-func (s *Storage) SetAPIKeyUsedTimestamp(userID int64, token string) error {
+func (s *Storage) SetAPIKeyUsedTimestamp(ctx context.Context, userID int64, token string) error {
 	query := `UPDATE api_keys SET last_used_at=now() WHERE user_id=$1 and token=$2`
-	_, err := s.db.Exec(query, userID, token)
+	_, err := s.db.ExecContext(ctx, query, userID, token)
 	if err != nil {
 		return fmt.Errorf(`store: unable to update last used date for API key: %v`, err)
 	}
@@ -33,7 +34,7 @@ func (s *Storage) SetAPIKeyUsedTimestamp(userID int64, token string) error {
 }
 
 // APIKeys returns all API Keys that belongs to the given user.
-func (s *Storage) APIKeys(userID int64) (model.APIKeys, error) {
+func (s *Storage) APIKeys(ctx context.Context, userID int64) (model.APIKeys, error) {
 	query := `
 		SELECT
 			id, user_id, token, description, last_used_at, created_at
@@ -43,7 +44,7 @@ func (s *Storage) APIKeys(userID int64) (model.APIKeys, error) {
 			user_id=$1
 		ORDER BY description ASC
 	`
-	rows, err := s.db.Query(query, userID)
+	rows, err := s.db.QueryContext(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf(`store: unable to fetch API Keys: %v`, err)
 	}
@@ -70,7 +71,7 @@ func (s *Storage) APIKeys(userID int64) (model.APIKeys, error) {
 }
 
 // CreateAPIKey inserts a new API key.
-func (s *Storage) CreateAPIKey(userID int64, description string) (*model.APIKey, error) {
+func (s *Storage) CreateAPIKey(ctx context.Context, userID int64, description string) (*model.APIKey, error) {
 	query := `
 		INSERT INTO api_keys
 			(user_id, token, description)
@@ -80,7 +81,7 @@ func (s *Storage) CreateAPIKey(userID int64, description string) (*model.APIKey,
 			id, user_id, token, description, last_used_at, created_at
 	`
 	var apiKey model.APIKey
-	err := s.db.QueryRow(
+	err := s.db.QueryRowContext(ctx,
 		query,
 		userID,
 		crypto.GenerateRandomStringHex(32),
@@ -101,8 +102,8 @@ func (s *Storage) CreateAPIKey(userID int64, description string) (*model.APIKey,
 }
 
 // DeleteAPIKey deletes an API Key.
-func (s *Storage) DeleteAPIKey(userID, keyID int64) error {
-	result, err := s.db.Exec(`DELETE FROM api_keys WHERE id = $1 AND user_id = $2`, keyID, userID)
+func (s *Storage) DeleteAPIKey(ctx context.Context, userID, keyID int64) error {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM api_keys WHERE id = $1 AND user_id = $2`, keyID, userID)
 	if err != nil {
 		return fmt.Errorf(`store: unable to delete this API Key: %v`, err)
 	}

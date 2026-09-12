@@ -15,14 +15,14 @@ import (
 )
 
 func (h *handler) showOfflineEntry(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	entryID := request.RouteInt64Param(r, "entryID")
-	builder := h.store.NewEntryQueryBuilder(user.ID)
+	builder := h.store.NewEntryQueryBuilder(r.Context(), user.ID)
 	builder.WithEntryID(entryID)
 	entry, err := builder.GetEntry()
 	if err != nil {
@@ -34,18 +34,18 @@ func (h *handler) showOfflineEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userTags, err := h.store.UserTags(user.ID)
+	userTags, err := h.store.UserTags(r.Context(), user.ID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
-	entryUserTagIDs, err := h.store.EntryUserTagIDs(user.ID, entry.ID)
+	entryUserTagIDs, err := h.store.EntryUserTagIDs(r.Context(), user.ID, entry.ID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
 
-	response.HTML(w, r, h.renderOfflineEntrySnapshot(r, user, userTags, entry, entryUserTagIDs, h.store.HasSaveEntry(user.ID)))
+	response.HTML(w, r, h.renderOfflineEntrySnapshot(r, user, userTags, entry, entryUserTagIDs, h.store.HasSaveEntry(r.Context(), user.ID)))
 }
 
 func (h *handler) showOfflineEntries(w http.ResponseWriter, r *http.Request) {
@@ -60,17 +60,17 @@ func (h *handler) showOfflineEntries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}
-	userTags, err := h.store.UserTags(user.ID)
+	userTags, err := h.store.UserTags(r.Context(), user.ID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}
-	entries, err := h.store.NewEntryQueryBuilder(user.ID).WithEntryIDs(snapshotRequest.EntryIDs).GetEntries()
+	entries, err := h.store.NewEntryQueryBuilder(r.Context(), user.ID).WithEntryIDs(snapshotRequest.EntryIDs).GetEntries()
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -80,11 +80,11 @@ func (h *handler) showOfflineEntries(w http.ResponseWriter, r *http.Request) {
 		response.JSONServerError(w, r, err)
 		return
 	}
-	hasSaveEntry := h.store.HasSaveEntry(user.ID)
+	hasSaveEntry := h.store.HasSaveEntry(r.Context(), user.ID)
 
 	snapshotResponse := model.OfflineSnapshotResponse{Entries: make([]model.OfflineSnapshot, 0, len(entries))}
 	for _, entry := range entries {
-		entry.Enclosures, err = h.store.GetEnclosures(entry.ID)
+		entry.Enclosures, err = h.store.GetEnclosures(r.Context(), entry.ID)
 		if err != nil {
 			response.JSONServerError(w, r, err)
 			return

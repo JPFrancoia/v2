@@ -4,6 +4,7 @@
 package storage // import "miniflux.app/v2/internal/storage"
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -14,7 +15,7 @@ import (
 const defaultModelEvalLimit = 200
 
 // ModelEvals returns recent Feedoscope model evaluation results.
-func (s *Storage) ModelEvals(limit int) (model.ModelEvals, error) {
+func (s *Storage) ModelEvals(ctx context.Context, limit int) (model.ModelEvals, error) {
 	if limit <= 0 {
 		limit = defaultModelEvalLimit
 	}
@@ -33,7 +34,7 @@ func (s *Storage) ModelEvals(limit int) (model.ModelEvals, error) {
 		ORDER BY eval_date DESC, created_at DESC, model ASC
 		LIMIT $1
 	`
-	rows, err := s.db.Query(query, limit)
+	rows, err := s.db.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, fmt.Errorf(`store: unable to fetch model evaluations: %v`, err)
 	}

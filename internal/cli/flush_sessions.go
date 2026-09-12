@@ -4,6 +4,7 @@
 package cli // import "miniflux.app/v2/internal/cli"
 
 import (
+	"context"
 	"fmt"
 
 	"miniflux.app/v2/internal/storage"
@@ -11,7 +12,7 @@ import (
 
 func flushSessions(store *storage.Storage) {
 	fmt.Println("Flushing all sessions (disconnect users)")
-	if err := store.FlushAllSessions(); err != nil {
+	if err := store.FlushAllSessions(context.Background()); err != nil {
 		printErrorAndExit(err)
 	}
 }

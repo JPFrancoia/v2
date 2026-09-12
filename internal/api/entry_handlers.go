@@ -4,6 +4,7 @@
 package api // import "miniflux.app/v2/internal/api"
 
 import (
+	"context"
 	json_parser "encoding/json"
 	"errors"
 	"net/http"
@@ -55,7 +56,7 @@ func (h *handler) getFeedEntryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	builder := h.store.NewEntryQueryBuilder(request.UserID(r))
+	builder := h.store.NewEntryQueryBuilder(r.Context(), request.UserID(r))
 	builder.WithFeedID(feedID)
 	builder.WithEntryID(entryID)
 
@@ -75,7 +76,7 @@ func (h *handler) getCategoryEntryHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	builder := h.store.NewEntryQueryBuilder(request.UserID(r))
+	builder := h.store.NewEntryQueryBuilder(r.Context(), request.UserID(r))
 	builder.WithCategoryID(categoryID)
 	builder.WithEntryID(entryID)
 
@@ -89,7 +90,7 @@ func (h *handler) getEntryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	builder := h.store.NewEntryQueryBuilder(request.UserID(r))
+	builder := h.store.NewEntryQueryBuilder(r.Context(), request.UserID(r))
 	builder.WithEntryID(entryID)
 
 	h.getEntryFromBuilder(w, r, builder)
@@ -148,20 +149,20 @@ func (h *handler) findEntries(w http.ResponseWriter, r *http.Request, feedID int
 
 	userID := request.UserID(r)
 	categoryID = request.QueryInt64Param(r, "category_id", categoryID)
-	if categoryID > 0 && !h.store.CategoryIDExists(userID, categoryID) {
+	if categoryID > 0 && !h.store.CategoryIDExists(r.Context(), userID, categoryID) {
 		response.JSONBadRequest(w, r, errors.New("invalid category ID"))
 		return
 	}
 
 	feedID = request.QueryInt64Param(r, "feed_id", feedID)
-	if feedID > 0 && !h.store.FeedExists(userID, feedID) {
+	if feedID > 0 && !h.store.FeedExists(r.Context(), userID, feedID) {
 		response.JSONBadRequest(w, r, errors.New("invalid feed ID"))
 		return
 	}
 
 	tags := request.QueryStringParamList(r, "tags")
 
-	builder := h.store.NewEntryQueryBuilder(userID)
+	builder := h.store.NewEntryQueryBuilder(r.Context(), userID)
 	builder.WithFeedID(feedID)
 	builder.WithCategoryID(categoryID)
 	builder.WithStatuses(statuses)
@@ -206,7 +207,7 @@ func (h *handler) setEntryStatusHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := h.store.SetEntriesStatus(request.UserID(r), entriesStatusUpdateRequest.EntryIDs, entriesStatusUpdateRequest.Status); err != nil {
+	if err := h.store.SetEntriesStatus(r.Context(), request.UserID(r), entriesStatusUpdateRequest.EntryIDs, entriesStatusUpdateRequest.Status); err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}
@@ -221,7 +222,7 @@ func (h *handler) toggleStarredHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.ToggleStarred(request.UserID(r), entryID); err != nil {
+	if err := h.store.ToggleStarred(r.Context(), request.UserID(r), entryID); err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}
@@ -236,10 +237,10 @@ func (h *handler) saveEntryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	builder := h.store.NewEntryQueryBuilder(request.UserID(r))
+	builder := h.store.NewEntryQueryBuilder(r.Context(), request.UserID(r))
 	builder.WithEntryID(entryID)
 
-	if !h.store.HasSaveEntry(request.UserID(r)) {
+	if !h.store.HasSaveEntry(r.Context(), request.UserID(r)) {
 		response.JSONBadRequest(w, r, errors.New("no third-party integration enabled"))
 		return
 	}
@@ -255,7 +256,7 @@ func (h *handler) saveEntryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	settings, err := h.store.Integration(request.UserID(r))
+	settings, err := h.store.Integration(r.Context(), request.UserID(r))
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -285,7 +286,7 @@ func (h *handler) updateEntryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	loggedUserID := request.UserID(r)
-	entryBuilder := h.store.NewEntryQueryBuilder(loggedUserID)
+	entryBuilder := h.store.NewEntryQueryBuilder(r.Context(), loggedUserID)
 	entryBuilder.WithEntryID(entryID)
 
 	entry, err := entryBuilder.GetEntry()
@@ -299,7 +300,7 @@ func (h *handler) updateEntryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.store.UserByID(loggedUserID)
+	user, err := h.store.UserByID(r.Context(), loggedUserID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -320,7 +321,7 @@ func (h *handler) updateEntryHandler(w http.ResponseWriter, r *http.Request) {
 		entry.ReadingTime = readingtime.EstimateReadingTime(entry.Content, user.DefaultReadingSpeed, user.CJKReadingSpeed)
 	}
 
-	if err := h.store.UpdateEntryTitleAndContent(entry); err != nil {
+	if err := h.store.UpdateEntryTitleAndContent(r.Context(), entry); err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}
@@ -337,7 +338,7 @@ func (h *handler) importFeedEntryHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if !h.store.FeedExists(userID, feedID) {
+	if !h.store.FeedExists(r.Context(), userID, feedID) {
 		response.JSONBadRequest(w, r, errors.New("feed does not exist"))
 		return
 	}
@@ -386,7 +387,7 @@ func (h *handler) importFeedEntryHandler(w http.ResponseWriter, r *http.Request)
 	}
 	entry.Hash = crypto.HashFromBytes([]byte(hashInput))
 
-	user, err := h.store.UserByID(userID)
+	user, err := h.store.UserByID(r.Context(), userID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -405,7 +406,7 @@ func (h *handler) importFeedEntryHandler(w http.ResponseWriter, r *http.Request)
 		entry.ReadingTime = readingtime.EstimateReadingTime(entry.Content, user.DefaultReadingSpeed, user.CJKReadingSpeed)
 	}
 
-	created, err := h.store.InsertEntryForFeed(userID, feedID, entry)
+	created, err := h.store.InsertEntryForFeed(r.Context(), userID, feedID, entry)
 	if errors.Is(err, storage.ErrEntryTombstoned) {
 		response.JSONBadRequest(w, r, err)
 		return
@@ -415,14 +416,14 @@ func (h *handler) importFeedEntryHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := h.store.SetEntriesStatus(userID, []int64{entry.ID}, importRequest.Status); err != nil {
+	if err := h.store.SetEntriesStatus(r.Context(), userID, []int64{entry.ID}, importRequest.Status); err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}
 	entry.Status = importRequest.Status
 
 	if importRequest.Starred {
-		if err := h.store.SetEntriesStarredState(userID, []int64{entry.ID}, true); err != nil {
+		if err := h.store.SetEntriesStarredState(r.Context(), userID, []int64{entry.ID}, true); err != nil {
 			response.JSONServerError(w, r, err)
 			return
 		}
@@ -445,7 +446,7 @@ func (h *handler) fetchContentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	entryBuilder := h.store.NewEntryQueryBuilder(loggedUserID)
+	entryBuilder := h.store.NewEntryQueryBuilder(r.Context(), loggedUserID)
 	entryBuilder.WithEntryID(entryID)
 
 	entry, err := entryBuilder.GetEntry()
@@ -459,7 +460,7 @@ func (h *handler) fetchContentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.store.UserByID(loggedUserID)
+	user, err := h.store.UserByID(r.Context(), loggedUserID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -470,7 +471,7 @@ func (h *handler) fetchContentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	feedBuilder := storage.NewFeedQueryBuilder(h.store, loggedUserID)
+	feedBuilder := storage.NewFeedQueryBuilder(r.Context(), h.store, loggedUserID)
 	feedBuilder.WithFeedID(entry.FeedID)
 	feed, err := feedBuilder.GetFeed()
 	if err != nil {
@@ -490,7 +491,7 @@ func (h *handler) fetchContentHandler(w http.ResponseWriter, r *http.Request) {
 
 	shouldUpdateContent := request.QueryBoolParam(r, "update_content", false)
 	if shouldUpdateContent {
-		if err := h.store.UpdateEntryTitleAndContent(entry); err != nil {
+		if err := h.store.UpdateEntryTitleAndContent(r.Context(), entry); err != nil {
 			response.JSONServerError(w, r, err)
 			return
 		}
@@ -501,7 +502,7 @@ func (h *handler) fetchContentHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *handler) flushHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	loggedUserID := request.UserID(r)
-	go h.store.FlushHistory(loggedUserID)
+	go h.store.FlushHistory(context.Background(), loggedUserID)
 	response.JSONAccepted(w, r)
 }
 
@@ -524,7 +525,7 @@ func (h *handler) updateEntryVote(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := request.UserID(r)
-	builder := h.store.NewEntryQueryBuilder(userID)
+	builder := h.store.NewEntryQueryBuilder(r.Context(), userID)
 	builder.WithEntryID(entryID)
 
 	entry, err := builder.GetEntry()
@@ -538,7 +539,7 @@ func (h *handler) updateEntryVote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.UpdateEntryVote(userID, entryID, req.Vote); err != nil {
+	if err := h.store.UpdateEntryVote(r.Context(), userID, entryID, req.Vote); err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}

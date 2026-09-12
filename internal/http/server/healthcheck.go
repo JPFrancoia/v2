@@ -17,7 +17,7 @@ func livenessProbe(w http.ResponseWriter, r *http.Request) {
 
 func newReadinessProbe(store *storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := store.Ping(); err != nil {
+		if err := store.Ping(r.Context()); err != nil {
 			http.Error(w, fmt.Sprintf("Database Connection Error: %q", err), http.StatusServiceUnavailable)
 			return
 		}

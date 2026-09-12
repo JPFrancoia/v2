@@ -57,7 +57,7 @@ func (m *authProxyMiddleware) handle(next http.Handler) http.Handler {
 			slog.String("username", username),
 		)
 
-		user, err := m.store.UserByUsername(username)
+		user, err := m.store.UserByUsername(r.Context(), username)
 		if err != nil {
 			response.HTMLServerError(w, r, err)
 			return
@@ -76,7 +76,7 @@ func (m *authProxyMiddleware) handle(next http.Handler) http.Handler {
 				return
 			}
 
-			if user, err = m.store.CreateUser(&model.UserCreationRequest{Username: username}); err != nil {
+			if user, err = m.store.CreateUser(r.Context(), &model.UserCreationRequest{Username: username}); err != nil {
 				response.HTMLServerError(w, r, err)
 				return
 			}
@@ -91,7 +91,7 @@ func (m *authProxyMiddleware) handle(next http.Handler) http.Handler {
 			slog.String("username", user.Username),
 		)
 
-		m.store.SetLastLogin(user.ID)
+		m.store.SetLastLogin(r.Context(), user.ID)
 		if err := authenticateWebSession(w, r, m.store, user); err != nil {
 			response.HTMLServerError(w, r, err)
 			return

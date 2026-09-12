@@ -66,13 +66,13 @@ func (h *handler) oauth2Callback(w http.ResponseWriter, r *http.Request) {
 	printer := locale.NewPrinter(sess.Language())
 
 	if request.IsAuthenticated(r) {
-		loggedUser, err := h.store.UserByID(request.UserID(r))
+		loggedUser, err := h.store.UserByID(r.Context(), request.UserID(r))
 		if err != nil {
 			response.HTMLServerError(w, r, err)
 			return
 		}
 
-		if h.store.AnotherUserWithFieldExists(loggedUser.ID, profile.Key, profile.ID) {
+		if h.store.AnotherUserWithFieldExists(r.Context(), loggedUser.ID, profile.Key, profile.ID) {
 			slog.Error("Oauth2 user cannot be associated because it is already associated with another user",
 				slog.Int64("user_id", loggedUser.ID),
 				slog.String("oauth2_provider", provider),
@@ -97,7 +97,7 @@ func (h *handler) oauth2Callback(w http.ResponseWriter, r *http.Request) {
 		}
 
 		authProvider.PopulateUserWithProfileID(loggedUser, profile)
-		if err := h.store.UpdateUser(loggedUser); err != nil {
+		if err := h.store.UpdateUser(r.Context(), loggedUser); err != nil {
 			response.HTMLServerError(w, r, err)
 			return
 		}
@@ -107,7 +107,7 @@ func (h *handler) oauth2Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.store.UserByField(profile.Key, profile.ID)
+	user, err := h.store.UserByField(r.Context(), profile.Key, profile.ID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -119,7 +119,7 @@ func (h *handler) oauth2Callback(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if h.store.UserExists(profile.Username) {
+		if h.store.UserExists(r.Context(), profile.Username) {
 			response.HTMLBadRequest(w, r, errors.New(printer.Print("error.user_already_exists")))
 			return
 		}
@@ -127,7 +127,7 @@ func (h *handler) oauth2Callback(w http.ResponseWriter, r *http.Request) {
 		userCreationRequest := &model.UserCreationRequest{Username: profile.Username}
 		authProvider.PopulateUserCreationWithProfileID(userCreationRequest, profile)
 
-		user, err = h.store.CreateUser(userCreationRequest)
+		user, err = h.store.CreateUser(r.Context(), userCreationRequest)
 		if err != nil {
 			response.HTMLServerError(w, r, err)
 			return
@@ -142,7 +142,7 @@ func (h *handler) oauth2Callback(w http.ResponseWriter, r *http.Request) {
 		slog.String("username", user.Username),
 	)
 
-	h.store.SetLastLogin(user.ID)
+	h.store.SetLastLogin(r.Context(), user.ID)
 	if err := authenticateWebSession(w, r, h.store, user); err != nil {
 		response.HTMLServerError(w, r, err)
 		return

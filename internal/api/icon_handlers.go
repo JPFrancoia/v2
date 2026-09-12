@@ -18,7 +18,7 @@ func (h *handler) getIconByFeedIDHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	icon, err := h.store.IconByFeedID(request.UserID(r), feedID)
+	icon, err := h.store.IconByFeedID(r.Context(), request.UserID(r), feedID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -43,7 +43,7 @@ func (h *handler) getIconByIconIDHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	icon, err := h.store.IconByID(iconID)
+	icon, err := h.store.IconByID(r.Context(), iconID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return

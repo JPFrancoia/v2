@@ -13,14 +13,14 @@ import (
 )
 
 func (h *handler) showHistoryPage(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	offset := request.QueryIntParam(r, "offset", 0)
-	builder := h.store.NewEntryQueryBuilder(user.ID)
+	builder := h.store.NewEntryQueryBuilder(r.Context(), user.ID)
 	builder.WithStatus(model.EntryStatusRead)
 	builder.WithSorting("changed_at", "DESC")
 	builder.WithSorting("published_at", "DESC")
@@ -40,9 +40,9 @@ func (h *handler) showHistoryPage(w http.ResponseWriter, r *http.Request) {
 	view.Set("pagination", getPagination(h.routePath("/history"), count, offset, user.EntriesPerPage))
 	view.Set("menu", "history")
 	view.Set("user", user)
-	view.Set("countUnread", h.store.CountUnreadEntries(user.ID))
-	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
-	view.Set("hasSaveEntry", h.store.HasSaveEntry(user.ID))
+	view.Set("countUnread", h.store.CountUnreadEntries(r.Context(), user.ID))
+	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), user.ID))
+	view.Set("hasSaveEntry", h.store.HasSaveEntry(r.Context(), user.ID))
 
 	response.HTML(w, r, view.Render("history_entries"))
 }

@@ -4,11 +4,15 @@
 package worker // import "miniflux.app/v2/internal/worker"
 
 import (
+	"context"
 	"log/slog"
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"miniflux.app/v2/internal/config"
+	"miniflux.app/v2/internal/locale"
 	"miniflux.app/v2/internal/metric"
 	"miniflux.app/v2/internal/model"
 	feedHandler "miniflux.app/v2/internal/reader/handler"
@@ -37,7 +41,7 @@ func (w *worker) Run(c <-chan model.Job, wg *sync.WaitGroup) {
 		)
 
 		startTime := time.Now()
-		localizedError := feedHandler.RefreshFeed(w.store, job.UserID, job.FeedID, false)
+		localizedError := w.refreshFeed(job)
 
 		if config.Opts.HasMetricsCollector() {
 			status := metric.StatusSuccess
@@ -47,4 +51,17 @@ func (w *worker) Run(c <-chan model.Job, wg *sync.WaitGroup) {
 			metric.BackgroundFeedRefreshDuration.WithLabelValues(status).Observe(time.Since(startTime).Seconds())
 		}
 	}
+}
+
+func (w *worker) refreshFeed(job model.Job) *locale.LocalizedErrorWrapper {
+	ctx, span := otel.Tracer("miniflux.app/worker").Start(context.Background(), "miniflux.feed.refresh")
+	defer span.End()
+
+	localizedError := feedHandler.RefreshFeed(ctx, w.store, job.UserID, job.FeedID, false)
+	if localizedError != nil {
+		err := localizedError.Error()
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	}
+	return localizedError
 }

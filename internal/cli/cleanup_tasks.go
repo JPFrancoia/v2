@@ -4,6 +4,7 @@
 package cli // import "miniflux.app/v2/internal/cli"
 
 import (
+	"context"
 	"log/slog"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 )
 
 func runCleanupTasks(store *storage.Storage) {
-	if nbWebSessions, err := store.CleanOldWebSessions(config.Opts.CleanupRemoveSessionsInterval()); err != nil {
+	if nbWebSessions, err := store.CleanOldWebSessions(context.Background(), config.Opts.CleanupRemoveSessionsInterval()); err != nil {
 		slog.Error("Unable to clean old web sessions", slog.Any("error", err))
 	} else {
 		slog.Info("Sessions cleanup completed",
@@ -23,7 +24,7 @@ func runCleanupTasks(store *storage.Storage) {
 	}
 
 	startTime := time.Now()
-	if rowsAffected, err := store.ArchiveEntries(model.EntryStatusRead, config.Opts.CleanupArchiveReadInterval(), config.Opts.CleanupArchiveBatchSize()); err != nil {
+	if rowsAffected, err := store.ArchiveEntries(context.Background(), model.EntryStatusRead, config.Opts.CleanupArchiveReadInterval(), config.Opts.CleanupArchiveBatchSize()); err != nil {
 		slog.Error("Unable to archive read entries", slog.Any("error", err))
 	} else {
 		slog.Info("Archiving read entries completed",
@@ -36,7 +37,7 @@ func runCleanupTasks(store *storage.Storage) {
 	}
 
 	startTime = time.Now()
-	if rowsAffected, err := store.ArchiveEntries(model.EntryStatusUnread, config.Opts.CleanupArchiveUnreadInterval(), config.Opts.CleanupArchiveBatchSize()); err != nil {
+	if rowsAffected, err := store.ArchiveEntries(context.Background(), model.EntryStatusUnread, config.Opts.CleanupArchiveUnreadInterval(), config.Opts.CleanupArchiveBatchSize()); err != nil {
 		slog.Error("Unable to archive unread entries", slog.Any("error", err))
 	} else {
 		slog.Info("Archiving unread entries completed",

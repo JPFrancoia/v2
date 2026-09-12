@@ -31,7 +31,7 @@ func (h *handler) updateEntryVote(w http.ResponseWriter, r *http.Request) {
 
 	voteValue := int(voteValue64)
 
-	if err := h.store.UpdateEntryVote(request.UserID(r), entryID, voteValue); err != nil {
+	if err := h.store.UpdateEntryVote(r.Context(), request.UserID(r), entryID, voteValue); err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}

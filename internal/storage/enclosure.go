@@ -4,6 +4,7 @@
 package storage // import "miniflux.app/v2/internal/storage"
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -14,7 +15,7 @@ import (
 )
 
 // GetEnclosures returns all attachments for the given entry.
-func (s *Storage) GetEnclosures(entryID int64) (model.EnclosureList, error) {
+func (s *Storage) GetEnclosures(ctx context.Context, entryID int64) (model.EnclosureList, error) {
 	query := `
 		SELECT
 			id,
@@ -31,7 +32,7 @@ func (s *Storage) GetEnclosures(entryID int64) (model.EnclosureList, error) {
 		ORDER BY id ASC
 	`
 
-	rows, err := s.db.Query(query, entryID)
+	rows, err := s.db.QueryContext(ctx, query, entryID)
 	if err != nil {
 		return nil, fmt.Errorf(`store: unable to fetch enclosures: %v`, err)
 	}
@@ -60,7 +61,7 @@ func (s *Storage) GetEnclosures(entryID int64) (model.EnclosureList, error) {
 	return enclosures, nil
 }
 
-func (s *Storage) GetEnclosuresForEntries(entryIDs []int64) (map[int64]model.EnclosureList, error) {
+func (s *Storage) GetEnclosuresForEntries(ctx context.Context, entryIDs []int64) (map[int64]model.EnclosureList, error) {
 	query := `
 		SELECT
 			id,
@@ -77,7 +78,7 @@ func (s *Storage) GetEnclosuresForEntries(entryIDs []int64) (map[int64]model.Enc
 		ORDER BY id ASC
 	`
 
-	rows, err := s.db.Query(query, pq.Array(entryIDs))
+	rows, err := s.db.QueryContext(ctx, query, pq.Array(entryIDs))
 	if err != nil {
 		return nil, fmt.Errorf("store: unable to fetch enclosures: %w", err)
 	}
@@ -105,7 +106,7 @@ func (s *Storage) GetEnclosuresForEntries(entryIDs []int64) (map[int64]model.Enc
 	return enclosuresMap, nil
 }
 
-func (s *Storage) GetEnclosure(enclosureID int64) (*model.Enclosure, error) {
+func (s *Storage) GetEnclosure(ctx context.Context, enclosureID int64) (*model.Enclosure, error) {
 	query := `
 		SELECT
 			id,
@@ -122,7 +123,7 @@ func (s *Storage) GetEnclosure(enclosureID int64) (*model.Enclosure, error) {
 		ORDER BY id ASC
 	`
 
-	row := s.db.QueryRow(query, enclosureID)
+	row := s.db.QueryRowContext(ctx, query, enclosureID)
 
 	var enclosure model.Enclosure
 	err := row.Scan(
@@ -144,7 +145,7 @@ func (s *Storage) GetEnclosure(enclosureID int64) (*model.Enclosure, error) {
 	return &enclosure, nil
 }
 
-func (s *Storage) createEnclosure(tx *sql.Tx, enclosure *model.Enclosure) error {
+func (s *Storage) createEnclosure(ctx context.Context, tx *sql.Tx, enclosure *model.Enclosure) error {
 	enclosureURL := strings.TrimSpace(enclosure.URL)
 	if enclosureURL == "" {
 		return nil
@@ -159,7 +160,7 @@ func (s *Storage) createEnclosure(tx *sql.Tx, enclosure *model.Enclosure) error 
 		RETURNING
 			id
 	`
-	if err := tx.QueryRow(
+	if err := tx.QueryRowContext(ctx,
 		query,
 		enclosureURL,
 		enclosure.Size,
@@ -174,7 +175,7 @@ func (s *Storage) createEnclosure(tx *sql.Tx, enclosure *model.Enclosure) error 
 	return nil
 }
 
-func (s *Storage) updateEnclosures(tx *sql.Tx, entry *model.Entry) error {
+func (s *Storage) updateEnclosures(ctx context.Context, tx *sql.Tx, entry *model.Entry) error {
 	if len(entry.Enclosures) == 0 {
 		// Do not keep any old enclosures if there is none in the updated entry.
 		query := `
@@ -184,7 +185,7 @@ func (s *Storage) updateEnclosures(tx *sql.Tx, entry *model.Entry) error {
 				user_id=$1 AND entry_id=$2
 		`
 
-		_, err := tx.Exec(query, entry.UserID, entry.ID)
+		_, err := tx.ExecContext(ctx, query, entry.UserID, entry.ID)
 		if err != nil {
 			return fmt.Errorf(`store: unable to delete old enclosures: %v`, err)
 		}
@@ -195,7 +196,7 @@ func (s *Storage) updateEnclosures(tx *sql.Tx, entry *model.Entry) error {
 	for _, enclosure := range entry.Enclosures {
 		sqlValues = append(sqlValues, strings.TrimSpace(enclosure.URL))
 
-		if err := s.createEnclosure(tx, enclosure); err != nil {
+		if err := s.createEnclosure(ctx, tx, enclosure); err != nil {
 			return err
 		}
 	}
@@ -207,7 +208,7 @@ func (s *Storage) updateEnclosures(tx *sql.Tx, entry *model.Entry) error {
 			user_id=$1 AND entry_id=$2 AND url <> ALL($3)
 	`
 
-	_, err := tx.Exec(query, entry.UserID, entry.ID, pq.Array(sqlValues))
+	_, err := tx.ExecContext(ctx, query, entry.UserID, entry.ID, pq.Array(sqlValues))
 	if err != nil {
 		return fmt.Errorf(`store: unable to delete old enclosures: %v`, err)
 	}
@@ -215,7 +216,7 @@ func (s *Storage) updateEnclosures(tx *sql.Tx, entry *model.Entry) error {
 	return nil
 }
 
-func (s *Storage) UpdateEnclosure(enclosure *model.Enclosure) error {
+func (s *Storage) UpdateEnclosure(ctx context.Context, enclosure *model.Enclosure) error {
 	query := `
 		UPDATE
 			enclosures
@@ -229,7 +230,7 @@ func (s *Storage) UpdateEnclosure(enclosure *model.Enclosure) error {
 		WHERE
 			id=$7
 	`
-	_, err := s.db.Exec(query,
+	_, err := s.db.ExecContext(ctx, query,
 		enclosure.URL,
 		enclosure.Size,
 		enclosure.MimeType,

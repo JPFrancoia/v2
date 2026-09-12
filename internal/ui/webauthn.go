@@ -78,14 +78,14 @@ func (h *handler) beginRegistration(w http.ResponseWriter, r *http.Request) {
 		response.JSONUnauthorized(w, r)
 		return
 	}
-	user, err := h.store.UserByID(uid)
+	user, err := h.store.UserByID(r.Context(), uid)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}
 	var creds []model.WebAuthnCredential
 
-	creds, err = h.store.WebAuthnCredentialsByUserID(user.ID)
+	creds, err = h.store.WebAuthnCredentialsByUserID(r.Context(), user.ID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -126,7 +126,7 @@ func (h *handler) finishRegistration(w http.ResponseWriter, r *http.Request) {
 		response.JSONUnauthorized(w, r)
 		return
 	}
-	user, err := h.store.UserByID(uid)
+	user, err := h.store.UserByID(r.Context(), uid)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -143,7 +143,7 @@ func (h *handler) finishRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.store.AddWebAuthnCredential(uid, sessionData.UserID, cred)
+	err = h.store.AddWebAuthnCredential(r.Context(), uid, sessionData.UserID, cred)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -164,7 +164,7 @@ func (h *handler) beginLogin(w http.ResponseWriter, r *http.Request) {
 	var user *model.User
 	username := request.QueryStringParam(r, "username", "")
 	if username != "" {
-		user, err = h.store.UserByUsername(username)
+		user, err = h.store.UserByUsername(r.Context(), username)
 		if err != nil {
 			response.JSONUnauthorized(w, r)
 			return
@@ -174,7 +174,7 @@ func (h *handler) beginLogin(w http.ResponseWriter, r *http.Request) {
 	var assertion *protocol.CredentialAssertion
 	var sessionData *webauthn.SessionData
 	if user != nil {
-		creds, err := h.store.WebAuthnCredentialsByUserID(user.ID)
+		creds, err := h.store.WebAuthnCredentialsByUserID(r.Context(), user.ID)
 		if err != nil {
 			response.JSONServerError(w, r, err)
 			return
@@ -226,7 +226,7 @@ func (h *handler) finishLogin(w http.ResponseWriter, r *http.Request) {
 	var user *model.User
 	username := request.QueryStringParam(r, "username", "")
 	if username != "" {
-		user, err = h.store.UserByUsername(username)
+		user, err = h.store.UserByUsername(r.Context(), username)
 		if err != nil {
 			response.JSONUnauthorized(w, r)
 			return
@@ -235,7 +235,7 @@ func (h *handler) finishLogin(w http.ResponseWriter, r *http.Request) {
 
 	var matchingCredential *model.WebAuthnCredential
 	if user != nil {
-		storedCredentials, err := h.store.WebAuthnCredentialsByUserID(user.ID)
+		storedCredentials, err := h.store.WebAuthnCredentialsByUserID(r.Context(), user.ID)
 		if err != nil {
 			response.JSONServerError(w, r, err)
 			return
@@ -280,14 +280,14 @@ func (h *handler) finishLogin(w http.ResponseWriter, r *http.Request) {
 	} else {
 		userByHandle := func(rawID, userHandle []byte) (webauthn.User, error) {
 			var uid int64
-			uid, matchingCredential, err = h.store.WebAuthnCredentialByHandle(userHandle)
+			uid, matchingCredential, err = h.store.WebAuthnCredentialByHandle(r.Context(), userHandle)
 			if err != nil {
 				return nil, err
 			}
 			if uid == 0 {
 				return nil, fmt.Errorf("no user found for handle %x", userHandle)
 			}
-			user, err = h.store.UserByID(uid)
+			user, err = h.store.UserByID(r.Context(), uid)
 			if err != nil {
 				return nil, err
 			}
@@ -311,7 +311,7 @@ func (h *handler) finishLogin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	h.store.WebAuthnSaveLogin(matchingCredential.Handle)
+	h.store.WebAuthnSaveLogin(r.Context(), matchingCredential.Handle)
 
 	slog.Info("User authenticated successfully with webauthn",
 		slog.Bool("authentication_successful", true),
@@ -320,7 +320,7 @@ func (h *handler) finishLogin(w http.ResponseWriter, r *http.Request) {
 		slog.Int64("user_id", user.ID),
 		slog.String("username", user.Username),
 	)
-	h.store.SetLastLogin(user.ID)
+	h.store.SetLastLogin(r.Context(), user.ID)
 
 	if err := authenticateWebSession(w, r, h.store, user); err != nil {
 		response.JSONServerError(w, r, err)
@@ -333,7 +333,7 @@ func (h *handler) finishLogin(w http.ResponseWriter, r *http.Request) {
 func (h *handler) renameCredential(w http.ResponseWriter, r *http.Request) {
 	view := view.New(h.tpl, r)
 
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -345,7 +345,7 @@ func (h *handler) renameCredential(w http.ResponseWriter, r *http.Request) {
 		response.HTMLServerError(w, r, err)
 		return
 	}
-	cred_uid, cred, err := h.store.WebAuthnCredentialByHandle(credentialHandle)
+	cred_uid, cred, err := h.store.WebAuthnCredentialByHandle(r.Context(), credentialHandle)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -362,14 +362,14 @@ func (h *handler) renameCredential(w http.ResponseWriter, r *http.Request) {
 	view.Set("cred", cred)
 	view.Set("menu", "settings")
 	view.Set("user", user)
-	view.Set("countUnread", h.store.CountUnreadEntries(user.ID))
-	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
+	view.Set("countUnread", h.store.CountUnreadEntries(r.Context(), user.ID))
+	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), user.ID))
 
 	response.HTML(w, r, view.Render("webauthn_rename"))
 }
 
 func (h *handler) saveCredential(w http.ResponseWriter, r *http.Request) {
-	_, err := h.store.UserByID(request.UserID(r))
+	_, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -383,7 +383,7 @@ func (h *handler) saveCredential(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newName := r.FormValue("name")
-	err = h.store.WebAuthnUpdateName(credentialHandle, newName)
+	err = h.store.WebAuthnUpdateName(r.Context(), credentialHandle, newName)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -406,7 +406,7 @@ func (h *handler) deleteCredential(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.store.DeleteCredentialByHandle(uid, credentialHandle)
+	err = h.store.DeleteCredentialByHandle(r.Context(), uid, credentialHandle)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -416,7 +416,7 @@ func (h *handler) deleteCredential(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) deleteAllCredentials(w http.ResponseWriter, r *http.Request) {
-	err := h.store.DeleteAllWebAuthnCredentialsByUserID(request.UserID(r))
+	err := h.store.DeleteAllWebAuthnCredentialsByUserID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return

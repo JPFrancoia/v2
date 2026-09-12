@@ -14,7 +14,7 @@ import (
 )
 
 func (h *handler) getUserTags(w http.ResponseWriter, r *http.Request) {
-	tags, err := h.store.UserTags(request.UserID(r))
+	tags, err := h.store.UserTags(r.Context(), request.UserID(r))
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -31,12 +31,12 @@ func (h *handler) createUserTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if validationErr := validator.ValidateUserTagCreation(h.store, userID, &tagCreationRequest); validationErr != nil {
+	if validationErr := validator.ValidateUserTagCreation(r.Context(), h.store, userID, &tagCreationRequest); validationErr != nil {
 		response.JSONBadRequest(w, r, validationErr.Error())
 		return
 	}
 
-	tag, err := h.store.CreateUserTag(userID, &tagCreationRequest)
+	tag, err := h.store.CreateUserTag(r.Context(), userID, &tagCreationRequest)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -49,7 +49,7 @@ func (h *handler) updateUserTag(w http.ResponseWriter, r *http.Request) {
 	userID := request.UserID(r)
 	tagID := request.RouteInt64Param(r, "userTagID")
 
-	tag, err := h.store.UserTagByID(userID, tagID)
+	tag, err := h.store.UserTagByID(r.Context(), userID, tagID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -66,14 +66,14 @@ func (h *handler) updateUserTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if validationErr := validator.ValidateUserTagModification(h.store, userID, tag.ID, &tagModificationRequest); validationErr != nil {
+	if validationErr := validator.ValidateUserTagModification(r.Context(), h.store, userID, tag.ID, &tagModificationRequest); validationErr != nil {
 		response.JSONBadRequest(w, r, validationErr.Error())
 		return
 	}
 
 	tagModificationRequest.Patch(tag)
 
-	if err := h.store.UpdateUserTag(tag); err != nil {
+	if err := h.store.UpdateUserTag(r.Context(), tag); err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}
@@ -85,12 +85,12 @@ func (h *handler) removeUserTag(w http.ResponseWriter, r *http.Request) {
 	userID := request.UserID(r)
 	tagID := request.RouteInt64Param(r, "userTagID")
 
-	if !h.store.UserTagIDExists(userID, tagID) {
+	if !h.store.UserTagIDExists(r.Context(), userID, tagID) {
 		response.JSONNotFound(w, r)
 		return
 	}
 
-	if err := h.store.RemoveUserTag(userID, tagID); err != nil {
+	if err := h.store.RemoveUserTag(r.Context(), userID, tagID); err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}
@@ -102,7 +102,7 @@ func (h *handler) getUserTagEntries(w http.ResponseWriter, r *http.Request) {
 	userID := request.UserID(r)
 	tagID := request.RouteInt64Param(r, "userTagID")
 
-	tag, err := h.store.UserTagByID(userID, tagID)
+	tag, err := h.store.UserTagByID(r.Context(), userID, tagID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -140,7 +140,7 @@ func (h *handler) getUserTagEntries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	builder := h.store.NewEntryQueryBuilder(userID)
+	builder := h.store.NewEntryQueryBuilder(r.Context(), userID)
 	builder.WithUserTagID(tagID)
 	builder.WithStatuses(statuses)
 	builder.WithSorting(order, direction)
@@ -177,7 +177,7 @@ func (h *handler) setEntryUserTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.SetEntryUserTags(userID, entryID, req.UserTagIDs); err != nil {
+	if err := h.store.SetEntryUserTags(r.Context(), userID, entryID, req.UserTagIDs); err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}

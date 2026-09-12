@@ -13,7 +13,7 @@ import (
 )
 
 func (h *handler) exportFeeds(w http.ResponseWriter, r *http.Request) {
-	opmlExport, err := opml.NewHandler(h.store).Export(request.UserID(r))
+	opmlExport, err := opml.NewHandler(h.store).Export(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return

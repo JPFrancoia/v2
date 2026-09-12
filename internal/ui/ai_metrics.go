@@ -63,7 +63,7 @@ type aiMetricRowView struct {
 }
 
 func (h *handler) showAIMetricsPage(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -74,13 +74,13 @@ func (h *handler) showAIMetricsPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	modelEvals, err := h.store.ModelEvals(aiMetricsEvalLimit)
+	modelEvals, err := h.store.ModelEvals(r.Context(), aiMetricsEvalLimit)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
 
-	discoveryWeeks, err := h.store.ImportantDiscoveryWeeks(user.ID, user.Timezone)
+	discoveryWeeks, err := h.store.ImportantDiscoveryWeeks(r.Context(), user.ID, user.Timezone)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -93,8 +93,8 @@ func (h *handler) showAIMetricsPage(w http.ResponseWriter, r *http.Request) {
 	view.Set("total", len(models))
 	view.Set("menu", "ai_metrics")
 	view.Set("user", user)
-	view.Set("countUnread", h.store.CountUnreadEntries(user.ID))
-	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
+	view.Set("countUnread", h.store.CountUnreadEntries(r.Context(), user.ID))
+	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), user.ID))
 
 	response.HTML(w, r, view.Render("ai_metrics"))
 }

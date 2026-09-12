@@ -14,14 +14,14 @@ import (
 )
 
 func (h *handler) showSavedForLaterEntryPage(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	entryID := request.RouteInt64Param(r, "entryID")
-	builder := h.store.NewEntryQueryBuilder(user.ID)
+	builder := h.store.NewEntryQueryBuilder(r.Context(), user.ID)
 	builder.WithEntryID(entryID)
 	builder.WithSavedForLater(true)
 	builder.WithStatus(model.EntryStatusUnread)
@@ -39,7 +39,7 @@ func (h *handler) showSavedForLaterEntryPage(w http.ResponseWriter, r *http.Requ
 	}
 
 	order, direction := entryListSorting(r, user)
-	entryPaginationBuilder := storage.NewEntryPaginationBuilder(h.store, user.ID, entry.ID, order, direction)
+	entryPaginationBuilder := storage.NewEntryPaginationBuilder(r.Context(), h.store, user.ID, entry.ID, order, direction)
 	entryPaginationBuilder.WithSavedForLater()
 	entryPaginationBuilder.WithStatus(model.EntryStatusUnread)
 	entryPaginationBuilder.WithGloballyVisible()
@@ -60,7 +60,7 @@ func (h *handler) showSavedForLaterEntryPage(w http.ResponseWriter, r *http.Requ
 	}
 
 	if entry.ShouldMarkAsReadOnView(user) {
-		err = h.store.SetEntriesStatus(user.ID, []int64{entry.ID}, model.EntryStatusRead)
+		err = h.store.SetEntriesStatus(r.Context(), user.ID, []int64{entry.ID}, model.EntryStatusRead)
 		if err != nil {
 			response.HTMLServerError(w, r, err)
 			return
@@ -75,13 +75,13 @@ func (h *handler) showSavedForLaterEntryPage(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	userTags, err := h.store.UserTags(user.ID)
+	userTags, err := h.store.UserTags(r.Context(), user.ID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
 
-	entryUserTagIDs, err := h.store.EntryUserTagIDs(user.ID, entry.ID)
+	entryUserTagIDs, err := h.store.EntryUserTagIDs(r.Context(), user.ID, entry.ID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -97,9 +97,9 @@ func (h *handler) showSavedForLaterEntryPage(w http.ResponseWriter, r *http.Requ
 	view.Set("sortDirection", direction)
 	view.Set("menu", "saved_for_later")
 	view.Set("user", user)
-	view.Set("countUnread", h.store.CountUnreadEntries(user.ID))
-	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
-	view.Set("hasSaveEntry", h.store.HasSaveEntry(user.ID))
+	view.Set("countUnread", h.store.CountUnreadEntries(r.Context(), user.ID))
+	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), user.ID))
+	view.Set("hasSaveEntry", h.store.HasSaveEntry(r.Context(), user.ID))
 	view.Set("userTags", userTags)
 	view.Set("entryUserTagIDs", entryUserTagIDs)
 

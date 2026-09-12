@@ -13,7 +13,7 @@ import (
 )
 
 func (h *handler) showUnreadPage(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -21,7 +21,7 @@ func (h *handler) showUnreadPage(w http.ResponseWriter, r *http.Request) {
 
 	offset := request.QueryIntParam(r, "offset", 0)
 	order, direction := entryListSorting(r, user)
-	builder := h.store.NewEntryQueryBuilder(user.ID)
+	builder := h.store.NewEntryQueryBuilder(r.Context(), user.ID)
 	builder.WithStatus(model.EntryStatusUnread)
 	builder.WithSorting(order, direction)
 	builder.WithSorting("id", direction)
@@ -38,7 +38,7 @@ func (h *handler) showUnreadPage(w http.ResponseWriter, r *http.Request) {
 
 	if offset >= countUnread && countUnread > 0 {
 		offset = 0
-		builder = h.store.NewEntryQueryBuilder(user.ID)
+		builder = h.store.NewEntryQueryBuilder(r.Context(), user.ID)
 		builder.WithStatus(model.EntryStatusUnread)
 		builder.WithSorting(order, direction)
 		builder.WithSorting("id", direction)
@@ -66,8 +66,8 @@ func (h *handler) showUnreadPage(w http.ResponseWriter, r *http.Request) {
 	view.Set("menu", "unread")
 	view.Set("user", user)
 	view.Set("countUnread", countUnread)
-	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
-	view.Set("hasSaveEntry", h.store.HasSaveEntry(user.ID))
+	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), user.ID))
+	view.Set("hasSaveEntry", h.store.HasSaveEntry(r.Context(), user.ID))
 
 	response.HTML(w, r, view.Render("unread_entries"))
 }

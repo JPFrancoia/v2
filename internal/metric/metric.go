@@ -182,19 +182,19 @@ func (c *collector) GatherStorageMetrics(ctx context.Context) {
 		}
 		slog.Debug("Collecting metrics from the database")
 
-		if usersCount, err := c.store.CountUsers(); err != nil {
+		if usersCount, err := c.store.CountUsers(ctx); err != nil {
 			slog.Warn("Unable to collect users metric", slog.Any("error", err))
 		} else {
 			usersGauge.Set(float64(usersCount))
 		}
 
-		if brokenFeedsCount, err := c.store.CountAllFeedsWithErrors(); err != nil {
+		if brokenFeedsCount, err := c.store.CountAllFeedsWithErrors(ctx); err != nil {
 			slog.Warn("Unable to collect broken feeds metric", slog.Any("error", err))
 		} else {
 			brokenFeedsGauge.Set(float64(brokenFeedsCount))
 		}
 
-		if feedsCount, err := c.store.CountAllFeeds(); err != nil {
+		if feedsCount, err := c.store.CountAllFeeds(ctx); err != nil {
 			slog.Warn("Unable to collect feeds metric", slog.Any("error", err))
 		} else {
 			for status, count := range feedsCount {
@@ -202,7 +202,7 @@ func (c *collector) GatherStorageMetrics(ctx context.Context) {
 			}
 		}
 
-		if entriesCount, err := c.store.CountAllEntries(); err != nil {
+		if entriesCount, err := c.store.CountAllEntries(ctx); err != nil {
 			slog.Warn("Unable to collect entries metric", slog.Any("error", err))
 		} else {
 			for status, count := range entriesCount {

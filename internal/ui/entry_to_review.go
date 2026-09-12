@@ -15,7 +15,7 @@ import (
 )
 
 func (h *handler) showToReviewEntryPage(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -23,7 +23,7 @@ func (h *handler) showToReviewEntryPage(w http.ResponseWriter, r *http.Request) 
 
 	entryID := request.RouteInt64Param(r, "entryID")
 	publishedAfter := toReviewPublishedAfter()
-	builder := h.store.NewEntryQueryBuilder(user.ID)
+	builder := h.store.NewEntryQueryBuilder(r.Context(), user.ID)
 	builder.WithEntryID(entryID)
 	builder.WithStatus(model.EntryStatusUnread)
 	builder.WithVote(0)
@@ -41,7 +41,7 @@ func (h *handler) showToReviewEntryPage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	entryPaginationBuilder := storage.NewEntryPaginationBuilder(h.store, user.ID, entry.ID, "id", "asc")
+	entryPaginationBuilder := storage.NewEntryPaginationBuilder(r.Context(), h.store, user.ID, entry.ID, "id", "asc")
 	entryPaginationBuilder.WithStatus(model.EntryStatusUnread)
 	entryPaginationBuilder.WithVote(0)
 	entryPaginationBuilder.AfterPublishedDate(publishedAfter)
@@ -64,7 +64,7 @@ func (h *handler) showToReviewEntryPage(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if entry.ShouldMarkAsReadOnView(user) {
-		err = h.store.SetEntriesStatus(user.ID, []int64{entry.ID}, model.EntryStatusRead)
+		err = h.store.SetEntriesStatus(r.Context(), user.ID, []int64{entry.ID}, model.EntryStatusRead)
 		if err != nil {
 			response.HTMLServerError(w, r, err)
 			return
@@ -78,13 +78,13 @@ func (h *handler) showToReviewEntryPage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	userTags, err := h.store.UserTags(user.ID)
+	userTags, err := h.store.UserTags(r.Context(), user.ID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
 
-	entryUserTagIDs, err := h.store.EntryUserTagIDs(user.ID, entry.ID)
+	entryUserTagIDs, err := h.store.EntryUserTagIDs(r.Context(), user.ID, entry.ID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -98,9 +98,9 @@ func (h *handler) showToReviewEntryPage(w http.ResponseWriter, r *http.Request) 
 	view.Set("prevEntryRoute", prevEntryRoute)
 	view.Set("menu", "to_review")
 	view.Set("user", user)
-	view.Set("countUnread", h.store.CountUnreadEntries(user.ID))
-	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
-	view.Set("hasSaveEntry", h.store.HasSaveEntry(user.ID))
+	view.Set("countUnread", h.store.CountUnreadEntries(r.Context(), user.ID))
+	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), user.ID))
+	view.Set("hasSaveEntry", h.store.HasSaveEntry(r.Context(), user.ID))
 	view.Set("userTags", userTags)
 	view.Set("entryUserTagIDs", entryUserTagIDs)
 

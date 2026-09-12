@@ -39,7 +39,7 @@ func (m *webSessionMiddleware) handle(next http.Handler) http.Handler {
 		if session == nil {
 			var secret string
 			session, secret = model.NewWebSession(r.UserAgent(), request.ClientIP(r))
-			if err := m.store.CreateWebSession(session); err != nil {
+			if err := m.store.CreateWebSession(r.Context(), session); err != nil {
 				response.HTMLServerError(w, r, err)
 				return
 			}
@@ -57,7 +57,7 @@ func (m *webSessionMiddleware) handle(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 
 		if session.IsDirty() {
-			if err := m.store.UpdateWebSession(session); err != nil {
+			if err := m.store.UpdateWebSession(r.Context(), session); err != nil {
 				slog.Error("Unable to persist web session changes",
 					slog.String("session_id", session.ID),
 					slog.Any("error", err),
@@ -78,7 +78,7 @@ func (m *webSessionMiddleware) loadWebSessionFromCookie(r *http.Request) (*model
 		return nil, nil
 	}
 
-	session, err := m.store.WebSessionByID(sessionID)
+	session, err := m.store.WebSessionByID(r.Context(), sessionID)
 	if err != nil {
 		return nil, err
 	}

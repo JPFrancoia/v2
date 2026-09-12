@@ -4,6 +4,7 @@
 package storage // import "miniflux.app/v2/internal/storage"
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -13,7 +14,7 @@ import (
 )
 
 // CreateWebSession persists a new web session built via model.NewWebSession.
-func (s *Storage) CreateWebSession(session *model.WebSession) error {
+func (s *Storage) CreateWebSession(ctx context.Context, session *model.WebSession) error {
 	if session == nil {
 		return errors.New(`store: web session is nil`)
 	}
@@ -35,7 +36,7 @@ func (s *Storage) CreateWebSession(session *model.WebSession) error {
 		RETURNING created_at
 	`
 
-	err = s.db.QueryRow(
+	err = s.db.QueryRowContext(ctx,
 		query,
 		session.ID,
 		session.SecretHash,
@@ -51,7 +52,7 @@ func (s *Storage) CreateWebSession(session *model.WebSession) error {
 }
 
 // WebSessionsByUserID returns web sessions for the given user.
-func (s *Storage) WebSessionsByUserID(userID int64) ([]model.WebSession, error) {
+func (s *Storage) WebSessionsByUserID(ctx context.Context, userID int64) ([]model.WebSession, error) {
 	query := `
 		SELECT
 			id,
@@ -69,7 +70,7 @@ func (s *Storage) WebSessionsByUserID(userID int64) ([]model.WebSession, error) 
 			created_at DESC
 	`
 
-	rows, err := s.db.Query(query, userID)
+	rows, err := s.db.QueryContext(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf(`store: unable to fetch web sessions: %v`, err)
 	}
@@ -94,12 +95,12 @@ func (s *Storage) WebSessionsByUserID(userID int64) ([]model.WebSession, error) 
 }
 
 // WebSessionByID returns the web session identified by id, or nil if not found.
-func (s *Storage) WebSessionByID(sessionID string) (*model.WebSession, error) {
+func (s *Storage) WebSessionByID(ctx context.Context, sessionID string) (*model.WebSession, error) {
 	if sessionID == "" {
 		return nil, nil
 	}
 
-	row := s.db.QueryRow(`
+	row := s.db.QueryRowContext(ctx, `
 		SELECT
 			id,
 			secret_hash,
@@ -127,7 +128,7 @@ func (s *Storage) WebSessionByID(sessionID string) (*model.WebSession, error) {
 
 // RotateWebSession persists a session whose identity has been rotated via
 // (*model.WebSession).Rotate(), updating the row previously keyed by oldID.
-func (s *Storage) RotateWebSession(oldID string, session *model.WebSession) error {
+func (s *Storage) RotateWebSession(ctx context.Context, oldID string, session *model.WebSession) error {
 	if session == nil {
 		return errors.New(`store: web session is nil`)
 	}
@@ -141,7 +142,7 @@ func (s *Storage) RotateWebSession(oldID string, session *model.WebSession) erro
 		return fmt.Errorf(`store: unable to serialize web session state: %v`, err)
 	}
 
-	err = s.db.QueryRow(`
+	err = s.db.QueryRowContext(ctx, `
 		UPDATE
 			web_sessions
 		SET
@@ -171,7 +172,7 @@ func (s *Storage) RotateWebSession(oldID string, session *model.WebSession) erro
 }
 
 // UpdateWebSession updates the mutable fields of a web session.
-func (s *Storage) UpdateWebSession(session *model.WebSession) error {
+func (s *Storage) UpdateWebSession(ctx context.Context, session *model.WebSession) error {
 	if session == nil {
 		return errors.New(`store: web session is nil`)
 	}
@@ -195,7 +196,7 @@ func (s *Storage) UpdateWebSession(session *model.WebSession) error {
 		return fmt.Errorf(`store: unable to serialize web session state: %v`, err)
 	}
 
-	result, err := s.db.Exec(
+	result, err := s.db.ExecContext(ctx,
 		query,
 		session.ID,
 		session.NullUserID(),
@@ -218,8 +219,8 @@ func (s *Storage) UpdateWebSession(session *model.WebSession) error {
 }
 
 // RemoveUserWebSession removes a web session for the given user if present.
-func (s *Storage) RemoveUserWebSession(userID int64, sessionID string) error {
-	if _, err := s.db.Exec(`DELETE FROM web_sessions WHERE user_id=$1 AND id=$2`, userID, sessionID); err != nil {
+func (s *Storage) RemoveUserWebSession(ctx context.Context, userID int64, sessionID string) error {
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM web_sessions WHERE user_id=$1 AND id=$2`, userID, sessionID); err != nil {
 		return fmt.Errorf(`store: unable to remove this web session: %v`, err)
 	}
 
@@ -227,7 +228,7 @@ func (s *Storage) RemoveUserWebSession(userID int64, sessionID string) error {
 }
 
 // CleanOldWebSessions removes web sessions older than the specified interval (24h minimum).
-func (s *Storage) CleanOldWebSessions(interval time.Duration) (int64, error) {
+func (s *Storage) CleanOldWebSessions(ctx context.Context, interval time.Duration) (int64, error) {
 	query := `
 		DELETE FROM
 			web_sessions
@@ -237,7 +238,7 @@ func (s *Storage) CleanOldWebSessions(interval time.Duration) (int64, error) {
 
 	days := max(int(interval/(24*time.Hour)), 1)
 
-	result, err := s.db.Exec(query, fmt.Sprintf("%d days", days))
+	result, err := s.db.ExecContext(ctx, query, fmt.Sprintf("%d days", days))
 	if err != nil {
 		return 0, fmt.Errorf(`store: unable to clean old web sessions: %v`, err)
 	}
@@ -247,8 +248,8 @@ func (s *Storage) CleanOldWebSessions(interval time.Duration) (int64, error) {
 }
 
 // FlushAllSessions removes all sessions from the database.
-func (s *Storage) FlushAllSessions() error {
-	if _, err := s.db.Exec(`DELETE FROM web_sessions`); err != nil {
+func (s *Storage) FlushAllSessions(ctx context.Context) error {
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM web_sessions`); err != nil {
 		return fmt.Errorf(`store: unable to delete all web sessions: %v`, err)
 	}
 	return nil

@@ -12,14 +12,14 @@ import (
 )
 
 func (h *handler) showUserTagEntriesPage(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	userTagID := request.RouteInt64Param(r, "userTagID")
-	tag, err := h.store.UserTagByID(user.ID, userTagID)
+	tag, err := h.store.UserTagByID(r.Context(), user.ID, userTagID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -31,7 +31,7 @@ func (h *handler) showUserTagEntriesPage(w http.ResponseWriter, r *http.Request)
 	}
 
 	offset := request.QueryIntParam(r, "offset", 0)
-	builder := h.store.NewEntryQueryBuilder(user.ID)
+	builder := h.store.NewEntryQueryBuilder(r.Context(), user.ID)
 	builder.WithUserTagID(userTagID)
 	builder.WithSorting("status", "asc")
 	builder.WithSorting(user.EntryOrder, user.EntryDirection)
@@ -59,9 +59,9 @@ func (h *handler) showUserTagEntriesPage(w http.ResponseWriter, r *http.Request)
 	v.Set("pagination", getPagination(h.routePath("/user-tag/%d/entries", userTagID), count, offset, user.EntriesPerPage))
 	v.Set("menu", "tags")
 	v.Set("user", user)
-	v.Set("countUnread", h.store.CountUnreadEntries(user.ID))
-	v.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
-	v.Set("hasSaveEntry", h.store.HasSaveEntry(user.ID))
+	v.Set("countUnread", h.store.CountUnreadEntries(r.Context(), user.ID))
+	v.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), user.ID))
+	v.Set("hasSaveEntry", h.store.HasSaveEntry(r.Context(), user.ID))
 	v.Set("showOnlyUnreadEntries", false)
 
 	response.HTML(w, r, v.Render("user_tag_entries"))

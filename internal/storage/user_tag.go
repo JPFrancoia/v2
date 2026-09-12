@@ -4,6 +4,7 @@
 package storage // import "miniflux.app/v2/internal/storage"
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -12,11 +13,11 @@ import (
 )
 
 // UserTagByID returns a user tag by its ID.
-func (s *Storage) UserTagByID(userID, tagID int64) (*model.UserTag, error) {
+func (s *Storage) UserTagByID(ctx context.Context, userID, tagID int64) (*model.UserTag, error) {
 	var tag model.UserTag
 
 	query := `SELECT id, user_id, title FROM user_tags WHERE user_id=$1 AND id=$2`
-	err := s.db.QueryRow(query, userID, tagID).Scan(&tag.ID, &tag.UserID, &tag.Title)
+	err := s.db.QueryRowContext(ctx, query, userID, tagID).Scan(&tag.ID, &tag.UserID, &tag.Title)
 
 	switch {
 	case err == sql.ErrNoRows:
@@ -29,11 +30,11 @@ func (s *Storage) UserTagByID(userID, tagID int64) (*model.UserTag, error) {
 }
 
 // UserTagByTitle returns a user tag by its title.
-func (s *Storage) UserTagByTitle(userID int64, title string) (*model.UserTag, error) {
+func (s *Storage) UserTagByTitle(ctx context.Context, userID int64, title string) (*model.UserTag, error) {
 	var tag model.UserTag
 
 	query := `SELECT id, user_id, title FROM user_tags WHERE user_id=$1 AND lower(title)=lower($2)`
-	err := s.db.QueryRow(query, userID, title).Scan(&tag.ID, &tag.UserID, &tag.Title)
+	err := s.db.QueryRowContext(ctx, query, userID, title).Scan(&tag.ID, &tag.UserID, &tag.Title)
 
 	switch {
 	case err == sql.ErrNoRows:
@@ -46,7 +47,7 @@ func (s *Storage) UserTagByTitle(userID int64, title string) (*model.UserTag, er
 }
 
 // UserTags returns all user tags with entry counts.
-func (s *Storage) UserTags(userID int64) (model.UserTags, error) {
+func (s *Storage) UserTags(ctx context.Context, userID int64) (model.UserTags, error) {
 	query := `
 		SELECT
 			ut.id,
@@ -57,7 +58,7 @@ func (s *Storage) UserTags(userID int64) (model.UserTags, error) {
 		WHERE ut.user_id = $1
 		ORDER BY ut.title ASC
 	`
-	rows, err := s.db.Query(query, userID)
+	rows, err := s.db.QueryContext(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf(`store: unable to fetch user tags: %v`, err)
 	}
@@ -76,31 +77,31 @@ func (s *Storage) UserTags(userID int64) (model.UserTags, error) {
 }
 
 // UserTagIDExists checks if the given user tag exists.
-func (s *Storage) UserTagIDExists(userID, tagID int64) bool {
+func (s *Storage) UserTagIDExists(ctx context.Context, userID, tagID int64) bool {
 	var result bool
 	query := `SELECT true FROM user_tags WHERE user_id=$1 AND id=$2 LIMIT 1`
-	s.db.QueryRow(query, userID, tagID).Scan(&result)
+	s.db.QueryRowContext(ctx, query, userID, tagID).Scan(&result)
 	return result
 }
 
 // UserTagTitleExists checks if a user tag with the given title exists.
-func (s *Storage) UserTagTitleExists(userID int64, title string) bool {
+func (s *Storage) UserTagTitleExists(ctx context.Context, userID int64, title string) bool {
 	var result bool
 	query := `SELECT true FROM user_tags WHERE user_id=$1 AND lower(title)=lower($2) LIMIT 1`
-	s.db.QueryRow(query, userID, title).Scan(&result)
+	s.db.QueryRowContext(ctx, query, userID, title).Scan(&result)
 	return result
 }
 
 // AnotherUserTagExists checks if another user tag exists with the same title.
-func (s *Storage) AnotherUserTagExists(userID, tagID int64, title string) bool {
+func (s *Storage) AnotherUserTagExists(ctx context.Context, userID, tagID int64, title string) bool {
 	var result bool
 	query := `SELECT true FROM user_tags WHERE user_id=$1 AND id != $2 AND lower(title)=lower($3) LIMIT 1`
-	s.db.QueryRow(query, userID, tagID, title).Scan(&result)
+	s.db.QueryRowContext(ctx, query, userID, tagID, title).Scan(&result)
 	return result
 }
 
 // CreateUserTag creates a new user tag.
-func (s *Storage) CreateUserTag(userID int64, request *model.UserTagCreationRequest) (*model.UserTag, error) {
+func (s *Storage) CreateUserTag(ctx context.Context, userID int64, request *model.UserTagCreationRequest) (*model.UserTag, error) {
 	var tag model.UserTag
 
 	query := `
@@ -113,7 +114,7 @@ func (s *Storage) CreateUserTag(userID int64, request *model.UserTagCreationRequ
 			user_id,
 			title
 	`
-	err := s.db.QueryRow(
+	err := s.db.QueryRowContext(ctx,
 		query,
 		userID,
 		request.Title,
@@ -131,9 +132,9 @@ func (s *Storage) CreateUserTag(userID int64, request *model.UserTagCreationRequ
 }
 
 // UpdateUserTag updates an existing user tag.
-func (s *Storage) UpdateUserTag(tag *model.UserTag) error {
+func (s *Storage) UpdateUserTag(ctx context.Context, tag *model.UserTag) error {
 	query := `UPDATE user_tags SET title=$1 WHERE id=$2 AND user_id=$3`
-	_, err := s.db.Exec(query, tag.Title, tag.ID, tag.UserID)
+	_, err := s.db.ExecContext(ctx, query, tag.Title, tag.ID, tag.UserID)
 
 	if err != nil {
 		return fmt.Errorf(`store: unable to update user tag: %v`, err)
@@ -143,9 +144,9 @@ func (s *Storage) UpdateUserTag(tag *model.UserTag) error {
 }
 
 // RemoveUserTag deletes a user tag and all its entry associations.
-func (s *Storage) RemoveUserTag(userID, tagID int64) error {
+func (s *Storage) RemoveUserTag(ctx context.Context, userID, tagID int64) error {
 	query := `DELETE FROM user_tags WHERE id = $1 AND user_id = $2`
-	result, err := s.db.Exec(query, tagID, userID)
+	result, err := s.db.ExecContext(ctx, query, tagID, userID)
 	if err != nil {
 		return fmt.Errorf(`store: unable to remove this user tag: %v`, err)
 	}
@@ -163,14 +164,14 @@ func (s *Storage) RemoveUserTag(userID, tagID int64) error {
 }
 
 // EntryUserTagIDs returns the IDs of user tags assigned to an entry.
-func (s *Storage) EntryUserTagIDs(userID, entryID int64) ([]int64, error) {
+func (s *Storage) EntryUserTagIDs(ctx context.Context, userID, entryID int64) ([]int64, error) {
 	query := `
 		SELECT eut.user_tag_id
 		FROM entry_user_tags eut
 		JOIN user_tags ut ON ut.id = eut.user_tag_id
 		WHERE ut.user_id = $1 AND eut.entry_id = $2
 	`
-	rows, err := s.db.Query(query, userID, entryID)
+	rows, err := s.db.QueryContext(ctx, query, userID, entryID)
 	if err != nil {
 		return nil, fmt.Errorf(`store: unable to fetch entry user tag IDs: %v`, err)
 	}
@@ -192,13 +193,13 @@ func (s *Storage) EntryUserTagIDs(userID, entryID int64) ([]int64, error) {
 }
 
 // SetEntryUserTags replaces all user tags for an entry.
-func (s *Storage) SetEntryUserTags(userID, entryID int64, tagIDs []int64) error {
-	tx, err := s.db.Begin()
+func (s *Storage) SetEntryUserTags(ctx context.Context, userID, entryID int64, tagIDs []int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf(`store: unable to begin transaction: %v`, err)
 	}
 
-	result, err := tx.Exec(`UPDATE entries SET changed_at=now() WHERE id=$1 AND user_id=$2`, entryID, userID)
+	result, err := tx.ExecContext(ctx, `UPDATE entries SET changed_at=now() WHERE id=$1 AND user_id=$2`, entryID, userID)
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf(`store: unable to update entry user tag timestamp: %v`, err)
@@ -214,7 +215,7 @@ func (s *Storage) SetEntryUserTags(userID, entryID int64, tagIDs []int64) error 
 	}
 
 	// Delete existing user tag associations for this entry (scoped to user's tags).
-	_, err = tx.Exec(`
+	_, err = tx.ExecContext(ctx, `
 		DELETE FROM entry_user_tags
 		WHERE entry_id = $1
 		AND user_tag_id IN (SELECT id FROM user_tags WHERE user_id = $2)
@@ -226,7 +227,7 @@ func (s *Storage) SetEntryUserTags(userID, entryID int64, tagIDs []int64) error 
 
 	// Insert new associations.
 	for _, tagID := range tagIDs {
-		_, err = tx.Exec(`
+		_, err = tx.ExecContext(ctx, `
 			INSERT INTO entry_user_tags (entry_id, user_tag_id)
 			VALUES ($1, $2)
 		`, entryID, tagID)

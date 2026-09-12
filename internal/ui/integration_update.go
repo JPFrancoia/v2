@@ -20,7 +20,7 @@ func (h *handler) updateIntegration(w http.ResponseWriter, r *http.Request) {
 	printer := locale.NewPrinter(sess.Language())
 	userID := request.UserID(r)
 
-	integration, err := h.store.Integration(userID)
+	integration, err := h.store.Integration(r.Context(), userID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -29,7 +29,7 @@ func (h *handler) updateIntegration(w http.ResponseWriter, r *http.Request) {
 	integrationForm := form.NewIntegrationForm(r)
 	integrationForm.Merge(integration)
 
-	if integration.FeverUsername != "" && h.store.HasDuplicateFeverUsername(userID, integration.FeverUsername) {
+	if integration.FeverUsername != "" && h.store.HasDuplicateFeverUsername(r.Context(), userID, integration.FeverUsername) {
 		sess.SetErrorMessage(printer.Print("error.duplicate_fever_username"))
 		response.HTMLRedirect(w, r, h.routePath("/integrations"))
 		return
@@ -43,7 +43,7 @@ func (h *handler) updateIntegration(w http.ResponseWriter, r *http.Request) {
 		integration.FeverToken = ""
 	}
 
-	if integration.GoogleReaderUsername != "" && h.store.HasDuplicateGoogleReaderUsername(userID, integration.GoogleReaderUsername) {
+	if integration.GoogleReaderUsername != "" && h.store.HasDuplicateGoogleReaderUsername(r.Context(), userID, integration.GoogleReaderUsername) {
 		sess.SetErrorMessage(printer.Print("error.duplicate_googlereader_username"))
 		response.HTMLRedirect(w, r, h.routePath("/integrations"))
 		return
@@ -84,7 +84,7 @@ func (h *handler) updateIntegration(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	err = h.store.UpdateIntegration(integration)
+	err = h.store.UpdateIntegration(r.Context(), integration)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return

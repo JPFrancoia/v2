@@ -14,13 +14,13 @@ func (h *handler) markFeedAsRead(w http.ResponseWriter, r *http.Request) {
 	feedID := request.RouteInt64Param(r, "feedID")
 	userID := request.UserID(r)
 
-	checkedAt, err := h.store.CheckedAt(userID, feedID)
+	checkedAt, err := h.store.CheckedAt(r.Context(), userID, feedID)
 	if err != nil {
 		response.HTMLNotFound(w, r)
 		return
 	}
 
-	if err = h.store.MarkFeedAsRead(userID, feedID, checkedAt); err != nil {
+	if err = h.store.MarkFeedAsRead(r.Context(), userID, feedID, checkedAt); err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}

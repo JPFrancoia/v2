@@ -16,7 +16,7 @@ import (
 )
 
 func (h *handler) saveUser(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -32,8 +32,8 @@ func (h *handler) saveUser(w http.ResponseWriter, r *http.Request) {
 	view := view.New(h.tpl, r)
 	view.Set("menu", "settings")
 	view.Set("user", user)
-	view.Set("countUnread", h.store.CountUnreadEntries(user.ID))
-	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
+	view.Set("countUnread", h.store.CountUnreadEntries(r.Context(), user.ID))
+	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), user.ID))
 	view.Set("form", userForm)
 
 	if validationErr := userForm.ValidateCreation(); validationErr != nil {
@@ -42,7 +42,7 @@ func (h *handler) saveUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.store.UserExists(userForm.Username) {
+	if h.store.UserExists(r.Context(), userForm.Username) {
 		view.Set("errorMessage", locale.NewLocalizedError("error.user_already_exists").Translate(user.Language))
 		response.HTML(w, r, view.Render("create_user"))
 		return
@@ -54,13 +54,13 @@ func (h *handler) saveUser(w http.ResponseWriter, r *http.Request) {
 		IsAdmin:  userForm.IsAdmin,
 	}
 
-	if validationErr := validator.ValidateUserCreationWithPassword(h.store, userCreationRequest); validationErr != nil {
+	if validationErr := validator.ValidateUserCreationWithPassword(r.Context(), h.store, userCreationRequest); validationErr != nil {
 		view.Set("errorMessage", validationErr.Translate(user.Language))
 		response.HTML(w, r, view.Render("create_user"))
 		return
 	}
 
-	if _, err := h.store.CreateUser(userCreationRequest); err != nil {
+	if _, err := h.store.CreateUser(r.Context(), userCreationRequest); err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}

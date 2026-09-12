@@ -14,7 +14,7 @@ import (
 )
 
 func (h *handler) showUnreadFeedEntryPage(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -23,7 +23,7 @@ func (h *handler) showUnreadFeedEntryPage(w http.ResponseWriter, r *http.Request
 	entryID := request.RouteInt64Param(r, "entryID")
 	feedID := request.RouteInt64Param(r, "feedID")
 
-	builder := h.store.NewEntryQueryBuilder(user.ID)
+	builder := h.store.NewEntryQueryBuilder(r.Context(), user.ID)
 	builder.WithFeedID(feedID)
 	builder.WithEntryID(entryID)
 
@@ -39,7 +39,7 @@ func (h *handler) showUnreadFeedEntryPage(w http.ResponseWriter, r *http.Request
 	}
 
 	if entry.ShouldMarkAsReadOnView(user) {
-		err = h.store.SetEntriesStatus(user.ID, []int64{entry.ID}, model.EntryStatusRead)
+		err = h.store.SetEntriesStatus(r.Context(), user.ID, []int64{entry.ID}, model.EntryStatusRead)
 		if err != nil {
 			response.HTMLServerError(w, r, err)
 			return
@@ -48,12 +48,12 @@ func (h *handler) showUnreadFeedEntryPage(w http.ResponseWriter, r *http.Request
 		entry.Status = model.EntryStatusRead
 	}
 
-	entryPaginationBuilder := storage.NewEntryPaginationBuilder(h.store, user.ID, entry.ID, user.EntryOrder, user.EntryDirection)
+	entryPaginationBuilder := storage.NewEntryPaginationBuilder(r.Context(), h.store, user.ID, entry.ID, user.EntryOrder, user.EntryDirection)
 	entryPaginationBuilder.WithFeedID(feedID)
 	entryPaginationBuilder.WithStatus(model.EntryStatusUnread)
 
 	if entry.Status == model.EntryStatusRead {
-		err = h.store.SetEntriesStatus(user.ID, []int64{entry.ID}, model.EntryStatusUnread)
+		err = h.store.SetEntriesStatus(r.Context(), user.ID, []int64{entry.ID}, model.EntryStatusUnread)
 		if err != nil {
 			response.HTMLServerError(w, r, err)
 			return
@@ -78,7 +78,7 @@ func (h *handler) showUnreadFeedEntryPage(w http.ResponseWriter, r *http.Request
 
 	// Restore entry read status if needed after fetching the pagination.
 	if entry.Status == model.EntryStatusRead {
-		err = h.store.SetEntriesStatus(user.ID, []int64{entry.ID}, model.EntryStatusRead)
+		err = h.store.SetEntriesStatus(r.Context(), user.ID, []int64{entry.ID}, model.EntryStatusRead)
 		if err != nil {
 			response.HTMLServerError(w, r, err)
 			return
@@ -90,13 +90,13 @@ func (h *handler) showUnreadFeedEntryPage(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	userTags, err := h.store.UserTags(user.ID)
+	userTags, err := h.store.UserTags(r.Context(), user.ID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
 
-	entryUserTagIDs, err := h.store.EntryUserTagIDs(user.ID, entry.ID)
+	entryUserTagIDs, err := h.store.EntryUserTagIDs(r.Context(), user.ID, entry.ID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -110,9 +110,9 @@ func (h *handler) showUnreadFeedEntryPage(w http.ResponseWriter, r *http.Request
 	view.Set("prevEntryRoute", prevEntryRoute)
 	view.Set("menu", "feeds")
 	view.Set("user", user)
-	view.Set("countUnread", h.store.CountUnreadEntries(user.ID))
-	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
-	view.Set("hasSaveEntry", h.store.HasSaveEntry(user.ID))
+	view.Set("countUnread", h.store.CountUnreadEntries(r.Context(), user.ID))
+	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), user.ID))
+	view.Set("hasSaveEntry", h.store.HasSaveEntry(r.Context(), user.ID))
 	view.Set("userTags", userTags)
 	view.Set("entryUserTagIDs", entryUserTagIDs)
 

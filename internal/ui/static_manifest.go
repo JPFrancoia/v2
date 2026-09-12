@@ -60,7 +60,7 @@ func (h *handler) showWebManifest(w http.ResponseWriter, r *http.Request) {
 	labelSearchMenu := "Search"
 	labelSettingsMenu := "Settings"
 	if request.IsAuthenticated(r) {
-		user, err := h.store.UserByID(request.UserID(r))
+		user, err := h.store.UserByID(r.Context(), request.UserID(r))
 		if err != nil {
 			response.JSONServerError(w, r, err)
 			return

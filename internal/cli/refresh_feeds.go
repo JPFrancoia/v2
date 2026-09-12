@@ -4,6 +4,7 @@
 package cli // import "miniflux.app/v2/internal/cli"
 
 import (
+	"context"
 	"log/slog"
 	"sync"
 	"time"
@@ -20,7 +21,7 @@ func refreshFeeds(store *storage.Storage) {
 	startTime := time.Now()
 
 	// Generate a batch of feeds for any user that has feeds to refresh.
-	batchBuilder := store.NewBatchBuilder()
+	batchBuilder := store.NewBatchBuilder(context.Background())
 	batchBuilder.WithBatchSize(config.Opts.BatchSize())
 	batchBuilder.WithErrorLimit(config.Opts.PollingParsingErrorLimit())
 	batchBuilder.WithoutDisabledFeeds()
@@ -53,7 +54,7 @@ func refreshFeeds(store *storage.Storage) {
 					slog.Int("worker_id", workerID),
 				)
 
-				if localizedError := feedHandler.RefreshFeed(store, job.UserID, job.FeedID, false); localizedError != nil {
+				if localizedError := feedHandler.RefreshFeed(context.Background(), store, job.UserID, job.FeedID, false); localizedError != nil {
 					slog.Warn("Unable to refresh feed",
 						slog.Int64("feed_id", job.FeedID),
 						slog.Int64("user_id", job.UserID),

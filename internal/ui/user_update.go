@@ -14,7 +14,7 @@ import (
 )
 
 func (h *handler) updateUser(w http.ResponseWriter, r *http.Request) {
-	loggedUser, err := h.store.UserByID(request.UserID(r))
+	loggedUser, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -26,7 +26,7 @@ func (h *handler) updateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := request.RouteInt64Param(r, "userID")
-	selectedUser, err := h.store.UserByID(userID)
+	selectedUser, err := h.store.UserByID(r.Context(), userID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -42,8 +42,8 @@ func (h *handler) updateUser(w http.ResponseWriter, r *http.Request) {
 	view := view.New(h.tpl, r)
 	view.Set("menu", "settings")
 	view.Set("user", loggedUser)
-	view.Set("countUnread", h.store.CountUnreadEntries(loggedUser.ID))
-	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(loggedUser.ID))
+	view.Set("countUnread", h.store.CountUnreadEntries(r.Context(), loggedUser.ID))
+	view.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), loggedUser.ID))
 	view.Set("selected_user", selectedUser)
 	view.Set("form", userForm)
 
@@ -53,14 +53,14 @@ func (h *handler) updateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.store.AnotherUserExists(selectedUser.ID, userForm.Username) {
+	if h.store.AnotherUserExists(r.Context(), selectedUser.ID, userForm.Username) {
 		view.Set("errorMessage", locale.NewLocalizedError("error.user_already_exists").Translate(loggedUser.Language))
 		response.HTML(w, r, view.Render("edit_user"))
 		return
 	}
 
 	userForm.Merge(selectedUser)
-	if err := h.store.UpdateUser(selectedUser); err != nil {
+	if err := h.store.UpdateUser(r.Context(), selectedUser); err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}

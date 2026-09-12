@@ -13,13 +13,13 @@ import (
 )
 
 func (h *handler) showEditUserTagPage(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
 
-	tag, err := h.store.UserTagByID(request.UserID(r), request.RouteInt64Param(r, "userTagID"))
+	tag, err := h.store.UserTagByID(r.Context(), request.UserID(r), request.RouteInt64Param(r, "userTagID"))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -39,8 +39,8 @@ func (h *handler) showEditUserTagPage(w http.ResponseWriter, r *http.Request) {
 	v.Set("tag", tag)
 	v.Set("menu", "settings")
 	v.Set("user", user)
-	v.Set("countUnread", h.store.CountUnreadEntries(user.ID))
-	v.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
+	v.Set("countUnread", h.store.CountUnreadEntries(r.Context(), user.ID))
+	v.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), user.ID))
 
 	response.HTML(w, r, v.Render("edit_user_tag"))
 }

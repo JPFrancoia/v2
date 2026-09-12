@@ -4,6 +4,7 @@
 package storage // import "miniflux.app/v2/internal/storage"
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 
 // feedQueryBuilder builds a SQL query to fetch feeds.
 type feedQueryBuilder struct {
+	ctx               context.Context
 	store             *Storage
 	args              []any
 	conditions        []string
@@ -28,8 +30,9 @@ type feedQueryBuilder struct {
 }
 
 // NewFeedQueryBuilder returns a new FeedQueryBuilder.
-func NewFeedQueryBuilder(store *Storage, userID int64) *feedQueryBuilder {
+func NewFeedQueryBuilder(ctx context.Context, store *Storage, userID int64) *feedQueryBuilder {
 	return &feedQueryBuilder{
+		ctx:               ctx,
 		store:             store,
 		args:              []any{userID},
 		conditions:        []string{"f.user_id = $1"},
@@ -199,7 +202,7 @@ func (f *feedQueryBuilder) GetFeeds() (model.Feeds, error) {
 		return nil, err
 	}
 
-	rows, err := f.store.db.Query(query, f.args...)
+	rows, err := f.store.db.QueryContext(f.ctx, query, f.args...)
 	if err != nil {
 		return nil, fmt.Errorf(`store: unable to fetch feeds: %w`, err)
 	}
@@ -316,7 +319,7 @@ func (f *feedQueryBuilder) fetchFeedCounter() (unreadCounters map[int64]int, rea
 	}
 	query = fmt.Sprintf(query, join, f.buildCounterCondition())
 
-	rows, err := f.store.db.Query(query, f.counterArgs...)
+	rows, err := f.store.db.QueryContext(f.ctx, query, f.counterArgs...)
 	if err != nil {
 		return nil, nil, fmt.Errorf(`store: unable to fetch feed counts: %w`, err)
 	}

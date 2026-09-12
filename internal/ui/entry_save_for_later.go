@@ -12,7 +12,7 @@ import (
 
 func (h *handler) saveEntryForLater(w http.ResponseWriter, r *http.Request) {
 	entryID := request.RouteInt64Param(r, "entryID")
-	unreadCountDelta, savedForLater, err := h.store.ToggleEntrySavedForLater(request.UserID(r), entryID)
+	unreadCountDelta, savedForLater, err := h.store.ToggleEntrySavedForLater(r.Context(), request.UserID(r), entryID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return

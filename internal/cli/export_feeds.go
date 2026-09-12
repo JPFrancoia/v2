@@ -4,6 +4,7 @@
 package cli // import "miniflux.app/v2/internal/cli"
 
 import (
+	"context"
 	"fmt"
 
 	"miniflux.app/v2/internal/reader/opml"
@@ -11,7 +12,7 @@ import (
 )
 
 func exportUserFeeds(store *storage.Storage, username string) {
-	user, err := store.UserByUsername(username)
+	user, err := store.UserByUsername(context.Background(), username)
 	if err != nil {
 		printErrorAndExit(fmt.Errorf("unable to find user: %w", err))
 	}
@@ -21,7 +22,7 @@ func exportUserFeeds(store *storage.Storage, username string) {
 	}
 
 	opmlHandler := opml.NewHandler(store)
-	opmlExport, err := opmlHandler.Export(user.ID)
+	opmlExport, err := opmlHandler.Export(context.Background(), user.ID)
 	if err != nil {
 		printErrorAndExit(fmt.Errorf("unable to export feeds: %w", err))
 	}

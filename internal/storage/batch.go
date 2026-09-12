@@ -4,6 +4,7 @@
 package storage // import "miniflux.app/v2/internal/storage"
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log/slog"
@@ -15,6 +16,7 @@ import (
 )
 
 type batchBuilder struct {
+	ctx          context.Context
 	db           *sql.DB
 	args         []any
 	conditions   []string
@@ -22,9 +24,10 @@ type batchBuilder struct {
 	limitPerHost int
 }
 
-func (s *Storage) NewBatchBuilder() *batchBuilder {
+func (s *Storage) NewBatchBuilder(ctx context.Context) *batchBuilder {
 	return &batchBuilder{
-		db: s.db,
+		ctx: ctx,
+		db:  s.db,
 	}
 }
 
@@ -85,7 +88,7 @@ func (b *batchBuilder) FetchJobs() (model.JobList, error) {
 		query += " LIMIT " + strconv.Itoa(b.batchSize)
 	}
 
-	rows, err := b.db.Query(query, b.args...)
+	rows, err := b.db.QueryContext(b.ctx, query, b.args...)
 	if err != nil {
 		return nil, fmt.Errorf(`store: unable to fetch batch of jobs: %v`, err)
 	}

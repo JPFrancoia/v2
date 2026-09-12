@@ -4,14 +4,17 @@
 package cli // import "miniflux.app/v2/internal/cli"
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
+	"time"
 
 	"miniflux.app/v2/internal/config"
 	"miniflux.app/v2/internal/database"
+	"miniflux.app/v2/internal/observability"
 	"miniflux.app/v2/internal/proxyrotator"
 	"miniflux.app/v2/internal/storage"
 	"miniflux.app/v2/internal/ui/static"
@@ -138,6 +141,21 @@ func Parse() {
 		return
 	}
 
+	if config.Opts.OtelEndpoint() != "" {
+		tracerProvider, err := observability.InitTracer(context.Background(), config.Opts.OtelEndpoint())
+		if err != nil {
+			printErrorAndExit(err)
+		}
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := tracerProvider.Shutdown(ctx); err != nil {
+				slog.Error("OpenTelemetry tracer shutdown error", slog.Any("error", err))
+			}
+		}()
+		slog.Info("OpenTelemetry tracing enabled")
+	}
+
 	if config.Opts.IsDefaultDatabaseURL() {
 		slog.Info("The default value for DATABASE_URL is used")
 	}
@@ -167,7 +185,7 @@ func Parse() {
 
 	store := storage.NewStorage(db)
 
-	if err := store.Ping(); err != nil {
+	if err := store.Ping(context.Background()); err != nil {
 		printErrorAndExit(err)
 	}
 
@@ -179,14 +197,14 @@ func Parse() {
 	}
 
 	if flagResetFeedErrors {
-		if err := store.ResetFeedErrors(); err != nil {
+		if err := store.ResetFeedErrors(context.Background()); err != nil {
 			printErrorAndExit(err)
 		}
 		return
 	}
 
 	if flagResetFeedNextCheckAt {
-		if err := store.ResetNextCheckAt(); err != nil {
+		if err := store.ResetNextCheckAt(context.Background()); err != nil {
 			printErrorAndExit(err)
 		}
 		return

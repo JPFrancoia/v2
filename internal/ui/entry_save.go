@@ -13,7 +13,7 @@ import (
 
 func (h *handler) saveEntry(w http.ResponseWriter, r *http.Request) {
 	entryID := request.RouteInt64Param(r, "entryID")
-	builder := h.store.NewEntryQueryBuilder(request.UserID(r))
+	builder := h.store.NewEntryQueryBuilder(r.Context(), request.UserID(r))
 	builder.WithEntryID(entryID)
 
 	entry, err := builder.GetEntry()
@@ -27,7 +27,7 @@ func (h *handler) saveEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userIntegrations, err := h.store.Integration(request.UserID(r))
+	userIntegrations, err := h.store.Integration(r.Context(), request.UserID(r))
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return

@@ -15,14 +15,14 @@ import (
 )
 
 func (h *handler) updateUserTag(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	tagID := request.RouteInt64Param(r, "userTagID")
-	tag, err := h.store.UserTagByID(request.UserID(r), tagID)
+	tag, err := h.store.UserTagByID(r.Context(), request.UserID(r), tagID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -40,21 +40,21 @@ func (h *handler) updateUserTag(w http.ResponseWriter, r *http.Request) {
 	v.Set("tag", tag)
 	v.Set("menu", "settings")
 	v.Set("user", user)
-	v.Set("countUnread", h.store.CountUnreadEntries(user.ID))
-	v.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
+	v.Set("countUnread", h.store.CountUnreadEntries(r.Context(), user.ID))
+	v.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), user.ID))
 
 	tagRequest := &model.UserTagModificationRequest{
 		Title: model.SetOptionalField(tagForm.Title),
 	}
 
-	if validationErr := validator.ValidateUserTagModification(h.store, user.ID, tag.ID, tagRequest); validationErr != nil {
+	if validationErr := validator.ValidateUserTagModification(r.Context(), h.store, user.ID, tag.ID, tagRequest); validationErr != nil {
 		v.Set("errorMessage", validationErr.Translate(user.Language))
 		response.HTML(w, r, v.Render("edit_user_tag"))
 		return
 	}
 
 	tagRequest.Patch(tag)
-	if err := h.store.UpdateUserTag(tag); err != nil {
+	if err := h.store.UpdateUserTag(r.Context(), tag); err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}

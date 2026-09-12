@@ -13,7 +13,7 @@ import (
 
 func (h *handler) exportFeedsHandler(w http.ResponseWriter, r *http.Request) {
 	opmlHandler := opml.NewHandler(h.store)
-	opmlExport, err := opmlHandler.Export(request.UserID(r))
+	opmlExport, err := opmlHandler.Export(r.Context(), request.UserID(r))
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -24,7 +24,7 @@ func (h *handler) exportFeedsHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *handler) importFeedsHandler(w http.ResponseWriter, r *http.Request) {
 	opmlHandler := opml.NewHandler(h.store)
-	err := opmlHandler.Import(request.UserID(r), r.Body)
+	err := opmlHandler.Import(r.Context(), request.UserID(r), r.Body)
 	defer r.Body.Close()
 	if err != nil {
 		response.JSONServerError(w, r, err)

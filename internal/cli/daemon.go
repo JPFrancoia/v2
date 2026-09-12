@@ -15,7 +15,6 @@ import (
 	"miniflux.app/v2/internal/config"
 	"miniflux.app/v2/internal/http/server"
 	"miniflux.app/v2/internal/metric"
-	"miniflux.app/v2/internal/observability"
 	"miniflux.app/v2/internal/storage"
 	"miniflux.app/v2/internal/systemd"
 	"miniflux.app/v2/internal/worker"
@@ -23,16 +22,6 @@ import (
 
 func startDaemon(store *storage.Storage) {
 	slog.Debug("Starting daemon...")
-
-	var shutdownTracer func(context.Context) error
-	if config.Opts.OtelEndpoint() != "" {
-		tracerProvider, err := observability.InitTracer(context.Background(), config.Opts.OtelEndpoint())
-		if err != nil {
-			printErrorAndExit(err)
-		}
-		shutdownTracer = tracerProvider.Shutdown
-		slog.Info("OpenTelemetry tracing enabled")
-	}
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
@@ -73,7 +62,7 @@ func startDaemon(store *storage.Storage) {
 				}
 
 				for {
-					if err := store.Ping(); err != nil {
+					if err := store.Ping(context.Background()); err != nil {
 						slog.Error("Unable to ping database", slog.Any("error", err))
 					} else {
 						systemd.SdNotify(systemd.SdNotifyWatchdog)
@@ -108,14 +97,6 @@ func startDaemon(store *storage.Storage) {
 	slog.Debug("Shutting down worker pool...")
 	pool.Shutdown()
 	slog.Debug("Worker pool shut down.")
-
-	if shutdownTracer != nil {
-		tracerCtx, cancelTracer := context.WithTimeout(context.Background(), 5*time.Second)
-		if err := shutdownTracer(tracerCtx); err != nil {
-			slog.Error("OpenTelemetry tracer shutdown error", slog.Any("error", err))
-		}
-		cancelTracer()
-	}
 
 	slog.Debug("Process gracefully stopped")
 }

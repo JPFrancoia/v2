@@ -24,7 +24,7 @@ func authenticateWebSession(w http.ResponseWriter, r *http.Request, store *stora
 	session.SetUser(user)
 
 	oldID, secret := session.Rotate()
-	if err := store.RotateWebSession(oldID, session); err != nil {
+	if err := store.RotateWebSession(r.Context(), oldID, session); err != nil {
 		return err
 	}
 

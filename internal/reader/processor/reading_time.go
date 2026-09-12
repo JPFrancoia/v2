@@ -4,6 +4,7 @@
 package processor // import "miniflux.app/v2/internal/reader/processor"
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -58,7 +59,7 @@ func fetchWatchTime(websiteURL, query string, isoDate bool) (int, error) {
 	return ret, nil
 }
 
-func updateEntryReadingTime(store *storage.Storage, feed *model.Feed, entry *model.Entry, entryIsNew bool, user *model.User) {
+func updateEntryReadingTime(ctx context.Context, store *storage.Storage, feed *model.Feed, entry *model.Entry, entryIsNew bool, user *model.User) {
 	if !user.ShowReadingTime {
 		slog.Debug("Skip reading time estimation for this user", slog.Int64("user_id", user.ID))
 		return
@@ -94,7 +95,7 @@ func updateEntryReadingTime(store *storage.Storage, feed *model.Feed, entry *mod
 					entry.ReadingTime = watchTime
 				}
 			} else {
-				entry.ReadingTime = store.GetReadTime(feed.ID, entry.Hash)
+				entry.ReadingTime = store.GetReadTime(ctx, feed.ID, entry.Hash)
 			}
 			break
 		}

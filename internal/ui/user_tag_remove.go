@@ -11,14 +11,14 @@ import (
 )
 
 func (h *handler) removeUserTag(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
 
 	tagID := request.RouteInt64Param(r, "userTagID")
-	tag, err := h.store.UserTagByID(request.UserID(r), tagID)
+	tag, err := h.store.UserTagByID(r.Context(), request.UserID(r), tagID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -29,7 +29,7 @@ func (h *handler) removeUserTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.RemoveUserTag(user.ID, tag.ID); err != nil {
+	if err := h.store.RemoveUserTag(r.Context(), user.ID, tag.ID); err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}

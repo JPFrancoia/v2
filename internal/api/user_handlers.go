@@ -16,7 +16,7 @@ import (
 )
 
 func (h *handler) currentUserHandler(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -37,12 +37,12 @@ func (h *handler) createUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if validationErr := validator.ValidateUserCreationWithPassword(h.store, &userCreationRequest); validationErr != nil {
+	if validationErr := validator.ValidateUserCreationWithPassword(r.Context(), h.store, &userCreationRequest); validationErr != nil {
 		response.JSONBadRequest(w, r, validationErr.Error())
 		return
 	}
 
-	user, err := h.store.CreateUser(&userCreationRequest)
+	user, err := h.store.CreateUser(r.Context(), &userCreationRequest)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -64,7 +64,7 @@ func (h *handler) updateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	originalUser, err := h.store.UserByID(userID)
+	originalUser, err := h.store.UserByID(r.Context(), userID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -87,13 +87,13 @@ func (h *handler) updateUserHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if validationErr := validator.ValidateUserModification(h.store, originalUser.ID, &userModificationRequest); validationErr != nil {
+	if validationErr := validator.ValidateUserModification(r.Context(), h.store, originalUser.ID, &userModificationRequest); validationErr != nil {
 		response.JSONBadRequest(w, r, validationErr.Error())
 		return
 	}
 
 	userModificationRequest.Patch(originalUser)
-	if err = h.store.UpdateUser(originalUser); err != nil {
+	if err = h.store.UpdateUser(r.Context(), originalUser); err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}
@@ -113,12 +113,12 @@ func (h *handler) markUserAsReadHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if _, err := h.store.UserByID(userID); err != nil {
+	if _, err := h.store.UserByID(r.Context(), userID); err != nil {
 		response.JSONNotFound(w, r)
 		return
 	}
 
-	if err := h.store.MarkAllAsRead(userID); err != nil {
+	if err := h.store.MarkAllAsRead(r.Context(), userID); err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}
@@ -128,12 +128,12 @@ func (h *handler) markUserAsReadHandler(w http.ResponseWriter, r *http.Request) 
 
 func (h *handler) getIntegrationsStatusHandler(w http.ResponseWriter, r *http.Request) {
 	userID := request.UserID(r)
-	if _, err := h.store.UserByID(userID); err != nil {
+	if _, err := h.store.UserByID(r.Context(), userID); err != nil {
 		response.JSONNotFound(w, r)
 		return
 	}
 
-	hasIntegrations := h.store.HasSaveEntry(userID)
+	hasIntegrations := h.store.HasSaveEntry(r.Context(), userID)
 
 	response.JSON(w, r, integrationsStatusResponse{HasIntegrations: hasIntegrations})
 }
@@ -144,7 +144,7 @@ func (h *handler) usersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	users, err := h.store.Users()
+	users, err := h.store.Users(r.Context())
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -179,7 +179,7 @@ func (h *handler) userByIDHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.store.UserByID(userID)
+	user, err := h.store.UserByID(r.Context(), userID)
 	if err != nil {
 		response.JSONBadRequest(w, r, errors.New("unable to fetch this user from the database"))
 		return
@@ -201,7 +201,7 @@ func (h *handler) userByUsernameHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	username := request.RouteStringParam(r, "username")
-	user, err := h.store.UserByUsername(username)
+	user, err := h.store.UserByUsername(r.Context(), username)
 	if err != nil {
 		response.JSONBadRequest(w, r, errors.New("unable to fetch this user from the database"))
 		return
@@ -227,7 +227,7 @@ func (h *handler) removeUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.store.UserByID(userID)
+	user, err := h.store.UserByID(r.Context(), userID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -244,7 +244,7 @@ func (h *handler) removeUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go func() {
-		if err := h.store.RemoveUser(user.ID); err != nil {
+		if err := h.store.RemoveUser(r.Context(), user.ID); err != nil {
 			slog.Error("Unable to delete user",
 				slog.Int64("user_id", user.ID),
 				slog.Any("error", err),

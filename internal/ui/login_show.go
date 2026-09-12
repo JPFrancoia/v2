@@ -13,7 +13,7 @@ import (
 
 func (h *handler) showLoginPage(w http.ResponseWriter, r *http.Request) {
 	if request.IsAuthenticated(r) {
-		user, err := h.store.UserByID(request.UserID(r))
+		user, err := h.store.UserByID(r.Context(), request.UserID(r))
 		if err != nil {
 			response.HTMLServerError(w, r, err)
 			return

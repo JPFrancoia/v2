@@ -15,18 +15,18 @@ func (h *handler) markCategoryFeedAsRead(w http.ResponseWriter, r *http.Request)
 	categoryID := request.RouteInt64Param(r, "categoryID")
 	userID := request.UserID(r)
 
-	if !h.store.CategoryFeedExists(userID, categoryID, feedID) {
+	if !h.store.CategoryFeedExists(r.Context(), userID, categoryID, feedID) {
 		response.HTMLNotFound(w, r)
 		return
 	}
 
-	checkedAt, err := h.store.CheckedAt(userID, feedID)
+	checkedAt, err := h.store.CheckedAt(r.Context(), userID, feedID)
 	if err != nil {
 		response.HTMLNotFound(w, r)
 		return
 	}
 
-	if err = h.store.MarkFeedAsRead(userID, feedID, checkedAt); err != nil {
+	if err = h.store.MarkFeedAsRead(r.Context(), userID, feedID, checkedAt); err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}

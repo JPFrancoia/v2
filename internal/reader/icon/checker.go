@@ -4,6 +4,7 @@
 package icon // import "miniflux.app/v2/internal/reader/icon"
 
 import (
+	"context"
 	"log/slog"
 
 	"miniflux.app/v2/internal/config"
@@ -14,12 +15,14 @@ import (
 )
 
 type iconChecker struct {
+	ctx   context.Context
 	store *storage.Storage
 	feed  *model.Feed
 }
 
-func NewIconChecker(store *storage.Storage, feed *model.Feed) *iconChecker {
+func NewIconChecker(ctx context.Context, store *storage.Storage, feed *model.Feed) *iconChecker {
 	return &iconChecker{
+		ctx:   ctx,
 		store: store,
 		feed:  feed,
 	}
@@ -52,7 +55,7 @@ func (c *iconChecker) UpdateOrCreateFeedIcon() {
 			slog.String("feed_icon_url", c.feed.IconURL),
 		)
 	} else {
-		if err := c.store.StoreFeedIcon(c.feed.ID, icon); err != nil {
+		if err := c.store.StoreFeedIcon(c.ctx, c.feed.ID, icon); err != nil {
 			slog.Error("Unable to store feed icon",
 				slog.Int64("feed_id", c.feed.ID),
 				slog.String("website_url", c.feed.SiteURL),
@@ -72,7 +75,7 @@ func (c *iconChecker) UpdateOrCreateFeedIcon() {
 }
 
 func (c *iconChecker) CreateFeedIconIfMissing() {
-	if c.store.HasFeedIcon(c.feed.ID) {
+	if c.store.HasFeedIcon(c.ctx, c.feed.ID) {
 		slog.Debug("Feed icon already exists",
 			slog.Int64("feed_id", c.feed.ID),
 		)

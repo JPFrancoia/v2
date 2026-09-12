@@ -26,12 +26,12 @@ func (h *handler) createCategoryHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if validationErr := validator.ValidateCategoryCreation(h.store, userID, &categoryCreationRequest); validationErr != nil {
+	if validationErr := validator.ValidateCategoryCreation(r.Context(), h.store, userID, &categoryCreationRequest); validationErr != nil {
 		response.JSONBadRequest(w, r, validationErr.Error())
 		return
 	}
 
-	category, err := h.store.CreateCategory(userID, &categoryCreationRequest)
+	category, err := h.store.CreateCategory(r.Context(), userID, &categoryCreationRequest)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -49,7 +49,7 @@ func (h *handler) updateCategoryHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	category, err := h.store.Category(userID, categoryID)
+	category, err := h.store.Category(r.Context(), userID, categoryID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -66,14 +66,14 @@ func (h *handler) updateCategoryHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if validationErr := validator.ValidateCategoryModification(h.store, userID, category.ID, &categoryModificationRequest); validationErr != nil {
+	if validationErr := validator.ValidateCategoryModification(r.Context(), h.store, userID, category.ID, &categoryModificationRequest); validationErr != nil {
 		response.JSONBadRequest(w, r, validationErr.Error())
 		return
 	}
 
 	categoryModificationRequest.Patch(category)
 
-	if err := h.store.UpdateCategory(category); err != nil {
+	if err := h.store.UpdateCategory(r.Context(), category); err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}
@@ -90,7 +90,7 @@ func (h *handler) markCategoryAsReadHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	category, err := h.store.Category(userID, categoryID)
+	category, err := h.store.Category(r.Context(), userID, categoryID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -101,7 +101,7 @@ func (h *handler) markCategoryAsReadHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if err = h.store.MarkCategoryAsRead(userID, categoryID, time.Now()); err != nil {
+	if err = h.store.MarkCategoryAsRead(r.Context(), userID, categoryID, time.Now()); err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}
@@ -115,14 +115,14 @@ func (h *handler) getCategoriesHandler(w http.ResponseWriter, r *http.Request) {
 	includeCounts := request.QueryStringParam(r, "counts", "false")
 
 	if includeCounts == "true" {
-		user, userErr := h.store.UserByID(request.UserID(r))
+		user, userErr := h.store.UserByID(r.Context(), request.UserID(r))
 		if userErr != nil {
 			response.JSONServerError(w, r, userErr)
 			return
 		}
-		categories, err = h.store.CategoriesWithFeedCount(user.ID, user.CategoriesSortingOrder)
+		categories, err = h.store.CategoriesWithFeedCount(r.Context(), user.ID, user.CategoriesSortingOrder)
 	} else {
-		categories, err = h.store.Categories(request.UserID(r))
+		categories, err = h.store.Categories(r.Context(), request.UserID(r))
 	}
 
 	if err != nil {
@@ -141,12 +141,12 @@ func (h *handler) removeCategoryHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if !h.store.CategoryIDExists(userID, categoryID) {
+	if !h.store.CategoryIDExists(r.Context(), userID, categoryID) {
 		response.JSONNotFound(w, r)
 		return
 	}
 
-	if err := h.store.RemoveCategory(userID, categoryID); err != nil {
+	if err := h.store.RemoveCategory(r.Context(), userID, categoryID); err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}
@@ -163,7 +163,7 @@ func (h *handler) refreshCategoryHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	batchBuilder := h.store.NewBatchBuilder()
+	batchBuilder := h.store.NewBatchBuilder(r.Context())
 	batchBuilder.WithErrorLimit(config.Opts.PollingParsingErrorLimit())
 	batchBuilder.WithoutDisabledFeeds()
 	batchBuilder.WithUserID(userID)

@@ -4,6 +4,7 @@
 package storage // import "miniflux.app/v2/internal/storage"
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -13,15 +14,15 @@ import (
 )
 
 // HasFeedIcon reports whether the specified feed already has an associated icon record.
-func (s *Storage) HasFeedIcon(feedID int64) bool {
+func (s *Storage) HasFeedIcon(ctx context.Context, feedID int64) bool {
 	var result bool
 	query := `SELECT true FROM feed_icons WHERE feed_id=$1 LIMIT 1`
-	s.db.QueryRow(query, feedID).Scan(&result)
+	s.db.QueryRowContext(ctx, query, feedID).Scan(&result)
 	return result
 }
 
 // IconByID fetches a single icon by its internal identifier, returning nil when it is not found.
-func (s *Storage) IconByID(iconID int64) (*model.Icon, error) {
+func (s *Storage) IconByID(ctx context.Context, iconID int64) (*model.Icon, error) {
 	var icon model.Icon
 	query := `
 		SELECT
@@ -32,7 +33,7 @@ func (s *Storage) IconByID(iconID int64) (*model.Icon, error) {
 			external_id
 		FROM icons
 		WHERE id=$1`
-	err := s.db.QueryRow(query, iconID).Scan(&icon.ID, &icon.Hash, &icon.MimeType, &icon.Content, &icon.ExternalID)
+	err := s.db.QueryRowContext(ctx, query, iconID).Scan(&icon.ID, &icon.Hash, &icon.MimeType, &icon.Content, &icon.ExternalID)
 	switch {
 	case err == sql.ErrNoRows:
 		return nil, nil
@@ -44,7 +45,7 @@ func (s *Storage) IconByID(iconID int64) (*model.Icon, error) {
 }
 
 // IconByExternalID fetches an icon using its external identifier, returning nil when no match exists.
-func (s *Storage) IconByExternalID(externalIconID string) (*model.Icon, error) {
+func (s *Storage) IconByExternalID(ctx context.Context, externalIconID string) (*model.Icon, error) {
 	var icon model.Icon
 	query := `
 		SELECT
@@ -56,7 +57,7 @@ func (s *Storage) IconByExternalID(externalIconID string) (*model.Icon, error) {
 		FROM icons
 		WHERE external_id=$1
 	`
-	err := s.db.QueryRow(query, externalIconID).Scan(&icon.ID, &icon.Hash, &icon.MimeType, &icon.Content, &icon.ExternalID)
+	err := s.db.QueryRowContext(ctx, query, externalIconID).Scan(&icon.ID, &icon.Hash, &icon.MimeType, &icon.Content, &icon.ExternalID)
 	switch {
 	case err == sql.ErrNoRows:
 		return nil, nil
@@ -68,7 +69,7 @@ func (s *Storage) IconByExternalID(externalIconID string) (*model.Icon, error) {
 }
 
 // IconByFeedID returns the icon linked to the given feed for the specified user, or nil if none is set.
-func (s *Storage) IconByFeedID(userID, feedID int64) (*model.Icon, error) {
+func (s *Storage) IconByFeedID(ctx context.Context, userID, feedID int64) (*model.Icon, error) {
 	query := `
 		SELECT
 			icons.id,
@@ -84,7 +85,7 @@ func (s *Storage) IconByFeedID(userID, feedID int64) (*model.Icon, error) {
 		LIMIT 1
 	`
 	var icon model.Icon
-	err := s.db.QueryRow(query, userID, feedID).Scan(&icon.ID, &icon.Hash, &icon.MimeType, &icon.Content, &icon.ExternalID)
+	err := s.db.QueryRowContext(ctx, query, userID, feedID).Scan(&icon.ID, &icon.Hash, &icon.MimeType, &icon.Content, &icon.ExternalID)
 	switch {
 	case err == sql.ErrNoRows:
 		return nil, nil
@@ -96,13 +97,13 @@ func (s *Storage) IconByFeedID(userID, feedID int64) (*model.Icon, error) {
 }
 
 // StoreFeedIcon creates or reuses an icon by hash and associates it with the given feed atomically.
-func (s *Storage) StoreFeedIcon(feedID int64, icon *model.Icon) error {
-	tx, err := s.db.Begin()
+func (s *Storage) StoreFeedIcon(ctx context.Context, feedID int64, icon *model.Icon) error {
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf(`store: unable to start transaction: %v`, err)
 	}
 
-	if err := tx.QueryRow(`SELECT id FROM icons WHERE hash=$1`, icon.Hash).Scan(&icon.ID); err == sql.ErrNoRows {
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM icons WHERE hash=$1`, icon.Hash).Scan(&icon.ID); err == sql.ErrNoRows {
 		query := `
 			INSERT INTO icons
 				(hash, mime_type, content, external_id)
@@ -111,7 +112,7 @@ func (s *Storage) StoreFeedIcon(feedID int64, icon *model.Icon) error {
 			RETURNING
 				id
 		`
-		err := tx.QueryRow(
+		err := tx.QueryRowContext(ctx,
 			query,
 			icon.Hash,
 			normalizeMimeType(icon.MimeType),
@@ -128,12 +129,12 @@ func (s *Storage) StoreFeedIcon(feedID int64, icon *model.Icon) error {
 		return fmt.Errorf(`store: unable to fetch icon by hash %q: %v`, icon.Hash, err)
 	}
 
-	if _, err := tx.Exec(`DELETE FROM feed_icons WHERE feed_id=$1`, feedID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM feed_icons WHERE feed_id=$1`, feedID); err != nil {
 		tx.Rollback()
 		return fmt.Errorf(`store: unable to delete feed icon: %v`, err)
 	}
 
-	if _, err := tx.Exec(`INSERT INTO feed_icons (feed_id, icon_id) VALUES ($1, $2)`, feedID, icon.ID); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO feed_icons (feed_id, icon_id) VALUES ($1, $2)`, feedID, icon.ID); err != nil {
 		tx.Rollback()
 		return fmt.Errorf(`store: unable to associate feed and icon: %v`, err)
 	}
@@ -146,7 +147,7 @@ func (s *Storage) StoreFeedIcon(feedID int64, icon *model.Icon) error {
 }
 
 // Icons lists all icons currently associated with any feed owned by the given user.
-func (s *Storage) Icons(userID int64) (model.Icons, error) {
+func (s *Storage) Icons(ctx context.Context, userID int64) (model.Icons, error) {
 	query := `
 		SELECT
 			icons.id,
@@ -160,7 +161,7 @@ func (s *Storage) Icons(userID int64) (model.Icons, error) {
 		WHERE
 			feeds.user_id=$1
 	`
-	rows, err := s.db.Query(query, userID)
+	rows, err := s.db.QueryContext(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf(`store: unable to fetch icons: %v`, err)
 	}

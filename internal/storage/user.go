@@ -4,6 +4,7 @@
 package storage // import "miniflux.app/v2/internal/storage"
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -16,9 +17,9 @@ import (
 )
 
 // CountUsers returns the total number of users.
-func (s *Storage) CountUsers() (int, error) {
+func (s *Storage) CountUsers(ctx context.Context) (int, error) {
 	var result int
-	err := s.db.QueryRow(`SELECT count(*) FROM users`).Scan(&result)
+	err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM users`).Scan(&result)
 	if err != nil {
 		return 0, fmt.Errorf("storage: unable to count users: %w", err)
 	}
@@ -27,9 +28,9 @@ func (s *Storage) CountUsers() (int, error) {
 }
 
 // SetLastLogin sets the user's last login timestamp to the current time.
-func (s *Storage) SetLastLogin(userID int64) error {
+func (s *Storage) SetLastLogin(ctx context.Context, userID int64) error {
 	query := `UPDATE users SET last_login_at=now() WHERE id=$1`
-	_, err := s.db.Exec(query, userID)
+	_, err := s.db.ExecContext(ctx, query, userID)
 	if err != nil {
 		return fmt.Errorf(`store: unable to update last login date: %v`, err)
 	}
@@ -38,21 +39,21 @@ func (s *Storage) SetLastLogin(userID int64) error {
 }
 
 // UserExists returns true if a user with the given username exists.
-func (s *Storage) UserExists(username string) bool {
+func (s *Storage) UserExists(ctx context.Context, username string) bool {
 	var result bool
-	s.db.QueryRow(`SELECT true FROM users WHERE username=LOWER($1) LIMIT 1`, username).Scan(&result)
+	s.db.QueryRowContext(ctx, `SELECT true FROM users WHERE username=LOWER($1) LIMIT 1`, username).Scan(&result)
 	return result
 }
 
 // AnotherUserExists returns true if a user other than userID has the given username.
-func (s *Storage) AnotherUserExists(userID int64, username string) bool {
+func (s *Storage) AnotherUserExists(ctx context.Context, userID int64, username string) bool {
 	var result bool
-	s.db.QueryRow(`SELECT true FROM users WHERE id != $1 AND username=LOWER($2) LIMIT 1`, userID, username).Scan(&result)
+	s.db.QueryRowContext(ctx, `SELECT true FROM users WHERE id != $1 AND username=LOWER($2) LIMIT 1`, userID, username).Scan(&result)
 	return result
 }
 
 // CreateUser creates a new user.
-func (s *Storage) CreateUser(userCreationRequest *model.UserCreationRequest) (*model.User, error) {
+func (s *Storage) CreateUser(ctx context.Context, userCreationRequest *model.UserCreationRequest) (*model.User, error) {
 	var hashedPassword string
 	if userCreationRequest.Password != "" {
 		var err error
@@ -102,13 +103,13 @@ func (s *Storage) CreateUser(userCreationRequest *model.UserCreationRequest) (*m
 			show_feed_tags
 	`
 
-	tx, err := s.db.Begin()
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf(`store: unable to start transaction: %v`, err)
 	}
 
 	var user model.User
-	err = tx.QueryRow(
+	err = tx.QueryRowContext(ctx,
 		query,
 		userCreationRequest.Username,
 		hashedPassword,
@@ -154,13 +155,13 @@ func (s *Storage) CreateUser(userCreationRequest *model.UserCreationRequest) (*m
 		return nil, fmt.Errorf(`store: unable to create user: %v`, err)
 	}
 
-	_, err = tx.Exec(`INSERT INTO categories (user_id, title) VALUES ($1, $2)`, user.ID, "All")
+	_, err = tx.ExecContext(ctx, `INSERT INTO categories (user_id, title) VALUES ($1, $2)`, user.ID, "All")
 	if err != nil {
 		tx.Rollback()
 		return nil, fmt.Errorf(`store: unable to create user default category: %v`, err)
 	}
 
-	_, err = tx.Exec(`INSERT INTO integrations (user_id) VALUES ($1)`, user.ID)
+	_, err = tx.ExecContext(ctx, `INSERT INTO integrations (user_id) VALUES ($1)`, user.ID)
 	if err != nil {
 		tx.Rollback()
 		return nil, fmt.Errorf(`store: unable to create integration row: %v`, err)
@@ -174,7 +175,7 @@ func (s *Storage) CreateUser(userCreationRequest *model.UserCreationRequest) (*m
 }
 
 // UpdateUser updates a user.
-func (s *Storage) UpdateUser(user *model.User) error {
+func (s *Storage) UpdateUser(ctx context.Context, user *model.User) error {
 	user.ExternalFontHosts = strings.TrimSpace(user.ExternalFontHosts)
 
 	if user.Password != "" {
@@ -222,7 +223,7 @@ func (s *Storage) UpdateUser(user *model.User) error {
 				id=$34
 		`
 
-		_, err = s.db.Exec(
+		_, err = s.db.ExecContext(ctx,
 			query,
 			user.Username,
 			hashedPassword,
@@ -301,7 +302,7 @@ func (s *Storage) UpdateUser(user *model.User) error {
 				id=$33
 		`
 
-		_, err := s.db.Exec(
+		_, err := s.db.ExecContext(ctx,
 			query,
 			user.Username,
 			user.IsAdmin,
@@ -347,8 +348,8 @@ func (s *Storage) UpdateUser(user *model.User) error {
 }
 
 // UserLanguage returns the language of the given user, or "en_US" if the lookup fails.
-func (s *Storage) UserLanguage(userID int64) (language string) {
-	err := s.db.QueryRow(`SELECT language FROM users WHERE id = $1`, userID).Scan(&language)
+func (s *Storage) UserLanguage(ctx context.Context, userID int64) (language string) {
+	err := s.db.QueryRowContext(ctx, `SELECT language FROM users WHERE id = $1`, userID).Scan(&language)
 	if err != nil {
 		return "en_US"
 	}
@@ -357,7 +358,7 @@ func (s *Storage) UserLanguage(userID int64) (language string) {
 }
 
 // UserByID finds a user by the ID.
-func (s *Storage) UserByID(userID int64) (*model.User, error) {
+func (s *Storage) UserByID(ctx context.Context, userID int64) (*model.User, error) {
 	query := `
 		SELECT
 			id,
@@ -399,11 +400,11 @@ func (s *Storage) UserByID(userID int64) (*model.User, error) {
 		WHERE
 			id = $1
 	`
-	return s.fetchUser(query, userID)
+	return s.fetchUser(ctx, query, userID)
 }
 
 // UserByUsername finds a user by the username.
-func (s *Storage) UserByUsername(username string) (*model.User, error) {
+func (s *Storage) UserByUsername(ctx context.Context, username string) (*model.User, error) {
 	query := `
 		SELECT
 			id,
@@ -445,11 +446,11 @@ func (s *Storage) UserByUsername(username string) (*model.User, error) {
 		WHERE
 			username=LOWER($1)
 	`
-	return s.fetchUser(query, username)
+	return s.fetchUser(ctx, query, username)
 }
 
 // UserByField returns the user matching the given column name and value.
-func (s *Storage) UserByField(field, value string) (*model.User, error) {
+func (s *Storage) UserByField(ctx context.Context, field, value string) (*model.User, error) {
 	query := `
 		SELECT
 			id,
@@ -491,19 +492,19 @@ func (s *Storage) UserByField(field, value string) (*model.User, error) {
 		WHERE
 			%s=$1
 	`
-	return s.fetchUser(fmt.Sprintf(query, pq.QuoteIdentifier(field)), value)
+	return s.fetchUser(ctx, fmt.Sprintf(query, pq.QuoteIdentifier(field)), value)
 }
 
 // AnotherUserWithFieldExists returns true if a user other than userID has the given value in the given column.
-func (s *Storage) AnotherUserWithFieldExists(userID int64, field, value string) bool {
+func (s *Storage) AnotherUserWithFieldExists(ctx context.Context, userID int64, field, value string) bool {
 	var result bool
 	query := `SELECT true FROM users WHERE id <> $1 AND ` + pq.QuoteIdentifier(field) + `=$2 LIMIT 1`
-	s.db.QueryRow(query, userID, value).Scan(&result)
+	s.db.QueryRowContext(ctx, query, userID, value).Scan(&result)
 	return result
 }
 
 // UserByAPIKey returns the user associated with the given API key.
-func (s *Storage) UserByAPIKey(token string) (*model.User, error) {
+func (s *Storage) UserByAPIKey(ctx context.Context, token string) (*model.User, error) {
 	query := `
 		SELECT
 			u.id,
@@ -547,12 +548,12 @@ func (s *Storage) UserByAPIKey(token string) (*model.User, error) {
 		WHERE
 			api_keys.token = $1
 	`
-	return s.fetchUser(query, token)
+	return s.fetchUser(ctx, query, token)
 }
 
-func (s *Storage) fetchUser(query string, args ...any) (*model.User, error) {
+func (s *Storage) fetchUser(ctx context.Context, query string, args ...any) (*model.User, error) {
 	var user model.User
-	err := s.db.QueryRow(query, args...).Scan(
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(
 		&user.ID,
 		&user.Username,
 		&user.IsAdmin,
@@ -599,15 +600,15 @@ func (s *Storage) fetchUser(query string, args ...any) (*model.User, error) {
 }
 
 // RemoveUser deletes a user and all related data.
-func (s *Storage) RemoveUser(userID int64) error {
-	if _, err := s.db.Exec(`DELETE FROM users WHERE id=$1`, userID); err != nil {
+func (s *Storage) RemoveUser(ctx context.Context, userID int64) error {
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, userID); err != nil {
 		return fmt.Errorf(`store: unable to remove user #%d: %v`, userID, err)
 	}
 	return nil
 }
 
 // Users returns all users.
-func (s *Storage) Users() (model.Users, error) {
+func (s *Storage) Users(ctx context.Context) (model.Users, error) {
 	query := `
 		SELECT
 			id,
@@ -646,7 +647,7 @@ func (s *Storage) Users() (model.Users, error) {
 			users
 		ORDER BY username ASC
 	`
-	rows, err := s.db.Query(query)
+	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf(`store: unable to fetch users: %v`, err)
 	}
@@ -701,11 +702,11 @@ func (s *Storage) Users() (model.Users, error) {
 }
 
 // CheckPassword returns nil if the given password matches the user's stored hash.
-func (s *Storage) CheckPassword(username, password string) error {
+func (s *Storage) CheckPassword(ctx context.Context, username, password string) error {
 	var hash string
 	username = strings.ToLower(username)
 
-	err := s.db.QueryRow("SELECT password FROM users WHERE username=$1", username).Scan(&hash)
+	err := s.db.QueryRowContext(ctx, "SELECT password FROM users WHERE username=$1", username).Scan(&hash)
 	if err == sql.ErrNoRows {
 		return fmt.Errorf(`store: unable to find this user: %s`, username)
 	} else if err != nil {
@@ -720,11 +721,11 @@ func (s *Storage) CheckPassword(username, password string) error {
 }
 
 // HasPassword returns true if the given user exists and has a non-empty password.
-func (s *Storage) HasPassword(userID int64) (bool, error) {
+func (s *Storage) HasPassword(ctx context.Context, userID int64) (bool, error) {
 	var result bool
 	query := `SELECT true FROM users WHERE id=$1 AND password <> '' LIMIT 1`
 
-	err := s.db.QueryRow(query, userID).Scan(&result)
+	err := s.db.QueryRowContext(ctx, query, userID).Scan(&result)
 	if err == sql.ErrNoRows {
 		return false, nil
 	} else if err != nil {

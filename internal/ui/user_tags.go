@@ -12,13 +12,13 @@ import (
 )
 
 func (h *handler) showUserTagsPage(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
 
-	tags, err := h.store.UserTags(user.ID)
+	tags, err := h.store.UserTags(r.Context(), user.ID)
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -29,8 +29,8 @@ func (h *handler) showUserTagsPage(w http.ResponseWriter, r *http.Request) {
 	v.Set("total", len(tags))
 	v.Set("menu", "tags")
 	v.Set("user", user)
-	v.Set("countUnread", h.store.CountUnreadEntries(user.ID))
-	v.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
+	v.Set("countUnread", h.store.CountUnreadEntries(r.Context(), user.ID))
+	v.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), user.ID))
 
 	response.HTML(w, r, v.Render("user_tags"))
 }

@@ -49,7 +49,7 @@ func (m *middleware) validateAPIKeyAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		user, err := m.store.UserByAPIKey(token)
+		user, err := m.store.UserByAPIKey(r.Context(), token)
 		if err != nil {
 			response.JSONServerError(w, r, err)
 			return
@@ -74,8 +74,8 @@ func (m *middleware) validateAPIKeyAuth(next http.Handler) http.Handler {
 			slog.String("request_uri", r.RequestURI),
 		)
 
-		m.store.SetLastLogin(user.ID)
-		m.store.SetAPIKeyUsedTimestamp(user.ID, token)
+		m.store.SetLastLogin(r.Context(), user.ID)
+		m.store.SetAPIKeyUsedTimestamp(r.Context(), user.ID, token)
 
 		ctx := r.Context()
 		ctx = context.WithValue(ctx, request.UserIDContextKey, user.ID)
@@ -120,7 +120,7 @@ func (m *middleware) validateBasicAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		if err := m.store.CheckPassword(username, password); err != nil {
+		if err := m.store.CheckPassword(r.Context(), username, password); err != nil {
 			slog.Warn("[API] Invalid username or password provided during Basic HTTP Authentication",
 				slog.Bool("authentication_failed", true),
 				slog.String("client_ip", clientIP),
@@ -132,7 +132,7 @@ func (m *middleware) validateBasicAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		user, err := m.store.UserByUsername(username)
+		user, err := m.store.UserByUsername(r.Context(), username)
 		if err != nil {
 			response.JSONServerError(w, r, err)
 			return
@@ -158,7 +158,7 @@ func (m *middleware) validateBasicAuth(next http.Handler) http.Handler {
 			slog.String("request_uri", r.RequestURI),
 		)
 
-		m.store.SetLastLogin(user.ID)
+		m.store.SetLastLogin(r.Context(), user.ID)
 
 		ctx := r.Context()
 		ctx = context.WithValue(ctx, request.UserIDContextKey, user.ID)

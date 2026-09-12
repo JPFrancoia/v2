@@ -24,12 +24,12 @@ func (h *handler) createAPIKeyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if validationErr := validator.ValidateAPIKeyCreation(h.store, userID, &apiKeyCreationRequest); validationErr != nil {
+	if validationErr := validator.ValidateAPIKeyCreation(r.Context(), h.store, userID, &apiKeyCreationRequest); validationErr != nil {
 		response.JSONBadRequest(w, r, validationErr.Error())
 		return
 	}
 
-	apiKey, err := h.store.CreateAPIKey(userID, apiKeyCreationRequest.Description)
+	apiKey, err := h.store.CreateAPIKey(r.Context(), userID, apiKeyCreationRequest.Description)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -40,7 +40,7 @@ func (h *handler) createAPIKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *handler) getAPIKeysHandler(w http.ResponseWriter, r *http.Request) {
 	userID := request.UserID(r)
-	apiKeys, err := h.store.APIKeys(userID)
+	apiKeys, err := h.store.APIKeys(r.Context(), userID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -56,7 +56,7 @@ func (h *handler) deleteAPIKeyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.DeleteAPIKey(userID, apiKeyID); err != nil {
+	if err := h.store.DeleteAPIKey(r.Context(), userID, apiKeyID); err != nil {
 		if errors.Is(err, storage.ErrAPIKeyNotFound) {
 			response.JSONNotFound(w, r)
 			return

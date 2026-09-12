@@ -12,7 +12,7 @@ import (
 )
 
 func (h *handler) showCreateUserTagPage(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -21,8 +21,8 @@ func (h *handler) showCreateUserTagPage(w http.ResponseWriter, r *http.Request) 
 	v := view.New(h.tpl, r)
 	v.Set("menu", "settings")
 	v.Set("user", user)
-	v.Set("countUnread", h.store.CountUnreadEntries(user.ID))
-	v.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
+	v.Set("countUnread", h.store.CountUnreadEntries(r.Context(), user.ID))
+	v.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), user.ID))
 
 	response.HTML(w, r, v.Render("create_user_tag"))
 }

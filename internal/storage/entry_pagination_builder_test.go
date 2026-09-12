@@ -5,6 +5,7 @@ package storage
 
 import "testing"
 
+// TestEntryPaginationBuilderSorting verifies standard pagination sorting expressions.
 func TestEntryPaginationBuilderSorting(t *testing.T) {
 	tests := []struct {
 		order     string
@@ -20,5 +21,18 @@ func TestEntryPaginationBuilderSorting(t *testing.T) {
 		if got := builder.buildSorting(); got != tc.want {
 			t.Errorf(`Got %q; want %q`, got, tc.want)
 		}
+	}
+}
+
+// TestEntryPaginationBuilderScoreDistanceSorting verifies that the target score remains a bound argument.
+func TestEntryPaginationBuilderScoreDistanceSorting(t *testing.T) {
+	builder := &entryPaginationBuilder{args: []any{int64(42)}}
+	builder.WithScoreDistanceSorting(123)
+
+	if result := builder.sortExpressions[0]; result != "ABS(e.score - $2) ASC" {
+		t.Fatalf(`Unexpected score sorting expression: %q`, result)
+	}
+	if result := builder.args[1]; result != int64(123) {
+		t.Fatalf(`Unexpected score sorting argument: %v`, result)
 	}
 }

@@ -4,6 +4,7 @@
 package cli // import "miniflux.app/v2/internal/cli"
 
 import (
+	"context"
 	"log/slog"
 
 	"miniflux.app/v2/internal/config"
@@ -28,18 +29,18 @@ func createAdminUser(store *storage.Storage, username, password string) {
 		IsAdmin:  true,
 	}
 
-	if store.UserExists(userCreationRequest.Username) {
+	if store.UserExists(context.Background(), userCreationRequest.Username) {
 		slog.Info("Skipping admin user creation because it already exists",
 			slog.String("username", userCreationRequest.Username),
 		)
 		return
 	}
 
-	if validationErr := validator.ValidateUserCreationWithPassword(store, userCreationRequest); validationErr != nil {
+	if validationErr := validator.ValidateUserCreationWithPassword(context.Background(), store, userCreationRequest); validationErr != nil {
 		printErrorAndExit(validationErr.Error())
 	}
 
-	if user, err := store.CreateUser(userCreationRequest); err != nil {
+	if user, err := store.CreateUser(context.Background(), userCreationRequest); err != nil {
 		printErrorAndExit(err)
 	} else {
 		slog.Info("Created new admin user",

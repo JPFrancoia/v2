@@ -29,7 +29,7 @@ func Middleware(store *storage.Storage) func(http.Handler) http.Handler {
 				return
 			}
 
-			user, err := store.UserByFeverToken(apiKey)
+			user, err := store.UserByFeverToken(r.Context(), apiKey)
 			if err != nil {
 				slog.Error("[Fever] Unable to fetch user by API key",
 					slog.Bool("authentication_failed", true),
@@ -59,7 +59,7 @@ func Middleware(store *storage.Storage) func(http.Handler) http.Handler {
 				slog.String("username", user.Username),
 			)
 
-			store.SetLastLogin(user.ID)
+			store.SetLastLogin(r.Context(), user.ID)
 
 			ctx := r.Context()
 			ctx = context.WithValue(ctx, request.UserIDContextKey, user.ID)

@@ -22,7 +22,7 @@ func (h *handler) getEnclosureByIDHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	enclosure, err := h.store.GetEnclosure(enclosureID)
+	enclosure, err := h.store.GetEnclosure(r.Context(), enclosureID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -62,7 +62,7 @@ func (h *handler) updateEnclosureByIDHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	enclosure, err := h.store.GetEnclosure(enclosureID)
+	enclosure, err := h.store.GetEnclosure(r.Context(), enclosureID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
@@ -80,7 +80,7 @@ func (h *handler) updateEnclosureByIDHandler(w http.ResponseWriter, r *http.Requ
 	}
 
 	enclosure.MediaProgression = enclosureUpdateRequest.MediaProgression
-	if err := h.store.UpdateEnclosure(enclosure); err != nil {
+	if err := h.store.UpdateEnclosure(r.Context(), enclosure); err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}

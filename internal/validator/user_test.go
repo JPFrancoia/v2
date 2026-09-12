@@ -4,6 +4,7 @@
 package validator // import "miniflux.app/v2/internal/validator"
 
 import (
+	"context"
 	"testing"
 
 	"miniflux.app/v2/internal/locale"
@@ -187,7 +188,7 @@ func TestValidateUserModificationAllowsClearingFilterRules(t *testing.T) {
 		KeepFilterEntryRules:  new(string),
 	}
 
-	if err := ValidateUserModification(nil, 0, req); err != nil {
+	if err := ValidateUserModification(context.Background(), nil, 0, req); err != nil {
 		t.Fatalf("expected empty filter rules to be accepted, got %v", err)
 	}
 }
@@ -197,7 +198,7 @@ func TestValidateUserModificationRejectsInvalidNonEmptyFilterRule(t *testing.T) 
 		BlockFilterEntryRules: new("EntryTitle=["),
 	}
 
-	if err := ValidateUserModification(nil, 0, req); err == nil {
+	if err := ValidateUserModification(context.Background(), nil, 0, req); err == nil {
 		t.Fatal("expected invalid non-empty filter rules to be rejected")
 	}
 }

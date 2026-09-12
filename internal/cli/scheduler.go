@@ -4,6 +4,7 @@
 package cli // import "miniflux.app/v2/internal/cli"
 
 import (
+	"context"
 	"log/slog"
 	"time"
 
@@ -33,7 +34,7 @@ func runScheduler(store *storage.Storage, pool *worker.Pool) {
 func feedScheduler(store *storage.Storage, pool *worker.Pool, frequency time.Duration, batchSize, errorLimit, limitPerHost int) {
 	for range time.Tick(frequency) {
 		// Generate a batch of feeds for any user that has feeds to refresh.
-		batchBuilder := store.NewBatchBuilder()
+		batchBuilder := store.NewBatchBuilder(context.Background())
 		batchBuilder.WithBatchSize(batchSize)
 		batchBuilder.WithErrorLimit(errorLimit)
 		batchBuilder.WithoutDisabledFeeds()

@@ -15,7 +15,7 @@ import (
 )
 
 func (h *handler) saveUserTag(w http.ResponseWriter, r *http.Request) {
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -27,18 +27,18 @@ func (h *handler) saveUserTag(w http.ResponseWriter, r *http.Request) {
 	v.Set("form", tagForm)
 	v.Set("menu", "settings")
 	v.Set("user", user)
-	v.Set("countUnread", h.store.CountUnreadEntries(user.ID))
-	v.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(user.ID))
+	v.Set("countUnread", h.store.CountUnreadEntries(r.Context(), user.ID))
+	v.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), user.ID))
 
 	tagCreationRequest := &model.UserTagCreationRequest{Title: tagForm.Title}
 
-	if validationErr := validator.ValidateUserTagCreation(h.store, user.ID, tagCreationRequest); validationErr != nil {
+	if validationErr := validator.ValidateUserTagCreation(r.Context(), h.store, user.ID, tagCreationRequest); validationErr != nil {
 		v.Set("errorMessage", validationErr.Translate(user.Language))
 		response.HTML(w, r, v.Render("create_user_tag"))
 		return
 	}
 
-	if _, err = h.store.CreateUserTag(user.ID, tagCreationRequest); err != nil {
+	if _, err = h.store.CreateUserTag(r.Context(), user.ID, tagCreationRequest); err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}

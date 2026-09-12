@@ -18,7 +18,7 @@ import (
 func (h *handler) refreshFeed(w http.ResponseWriter, r *http.Request) {
 	feedID := request.RouteInt64Param(r, "feedID")
 	forceRefresh := request.QueryBoolParam(r, "forceRefresh", false)
-	if localizedError := feedHandler.RefreshFeed(h.store, request.UserID(r), feedID, forceRefresh); localizedError != nil {
+	if localizedError := feedHandler.RefreshFeed(r.Context(), h.store, request.UserID(r), feedID, forceRefresh); localizedError != nil {
 		slog.Warn("Unable to refresh feed",
 			slog.Int64("user_id", request.UserID(r)),
 			slog.Int64("feed_id", feedID),
@@ -42,7 +42,7 @@ func (h *handler) refreshAllFeeds(w http.ResponseWriter, r *http.Request) {
 		userID := request.UserID(r)
 		// We allow the end-user to force refresh all its feeds
 		// without taking into consideration the number of errors.
-		batchBuilder := h.store.NewBatchBuilder()
+		batchBuilder := h.store.NewBatchBuilder(r.Context())
 		batchBuilder.WithoutDisabledFeeds()
 		batchBuilder.WithUserID(userID)
 		batchBuilder.WithLimitPerHost(config.Opts.PollingLimitPerHost())

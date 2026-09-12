@@ -18,7 +18,7 @@ func (h *handler) fetchContent(w http.ResponseWriter, r *http.Request) {
 	loggedUserID := request.UserID(r)
 	entryID := request.RouteInt64Param(r, "entryID")
 
-	entryBuilder := h.store.NewEntryQueryBuilder(loggedUserID)
+	entryBuilder := h.store.NewEntryQueryBuilder(r.Context(), loggedUserID)
 	entryBuilder.WithEntryID(entryID)
 
 	entry, err := entryBuilder.GetEntry()
@@ -32,13 +32,13 @@ func (h *handler) fetchContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.store.UserByID(loggedUserID)
+	user, err := h.store.UserByID(r.Context(), loggedUserID)
 	if err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}
 
-	feedBuilder := storage.NewFeedQueryBuilder(h.store, loggedUserID)
+	feedBuilder := storage.NewFeedQueryBuilder(r.Context(), h.store, loggedUserID)
 	feedBuilder.WithFeedID(entry.FeedID)
 	feed, err := feedBuilder.GetFeed()
 	if err != nil {
@@ -56,7 +56,7 @@ func (h *handler) fetchContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.UpdateEntryTitleAndContent(entry); err != nil {
+	if err := h.store.UpdateEntryTitleAndContent(r.Context(), entry); err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}

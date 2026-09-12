@@ -18,7 +18,7 @@ func (h *handler) updateEntryUserTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -36,7 +36,7 @@ func (h *handler) updateEntryUserTags(w http.ResponseWriter, r *http.Request) {
 		tagIDs = append(tagIDs, id)
 	}
 
-	if err := h.store.SetEntryUserTags(user.ID, entryID, tagIDs); err != nil {
+	if err := h.store.SetEntryUserTags(r.Context(), user.ID, entryID, tagIDs); err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}

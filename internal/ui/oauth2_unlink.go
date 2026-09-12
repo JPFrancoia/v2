@@ -39,13 +39,13 @@ func (h *handler) oauth2Unlink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.store.UserByID(request.UserID(r))
+	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}
 
-	hasPassword, err := h.store.HasPassword(request.UserID(r))
+	hasPassword, err := h.store.HasPassword(r.Context(), request.UserID(r))
 	if err != nil {
 		response.HTMLServerError(w, r, err)
 		return
@@ -60,7 +60,7 @@ func (h *handler) oauth2Unlink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	authProvider.UnsetUserProfileID(user)
-	if err := h.store.UpdateUser(user); err != nil {
+	if err := h.store.UpdateUser(r.Context(), user); err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}

@@ -12,7 +12,7 @@ import (
 
 func (h *handler) deleteAPIKey(w http.ResponseWriter, r *http.Request) {
 	keyID := request.RouteInt64Param(r, "keyID")
-	if err := h.store.DeleteAPIKey(request.UserID(r), keyID); err != nil {
+	if err := h.store.DeleteAPIKey(r.Context(), request.UserID(r), keyID); err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}

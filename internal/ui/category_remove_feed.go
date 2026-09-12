@@ -14,12 +14,12 @@ func (h *handler) removeCategoryFeed(w http.ResponseWriter, r *http.Request) {
 	feedID := request.RouteInt64Param(r, "feedID")
 	categoryID := request.RouteInt64Param(r, "categoryID")
 
-	if !h.store.CategoryFeedExists(request.UserID(r), categoryID, feedID) {
+	if !h.store.CategoryFeedExists(r.Context(), request.UserID(r), categoryID, feedID) {
 		response.HTMLNotFound(w, r)
 		return
 	}
 
-	if err := h.store.RemoveFeed(request.UserID(r), feedID); err != nil {
+	if err := h.store.RemoveFeed(r.Context(), request.UserID(r), feedID); err != nil {
 		response.HTMLServerError(w, r, err)
 		return
 	}

@@ -12,7 +12,7 @@ import (
 
 func (h *handler) toggleStarred(w http.ResponseWriter, r *http.Request) {
 	entryID := request.RouteInt64Param(r, "entryID")
-	if err := h.store.ToggleStarred(request.UserID(r), entryID); err != nil {
+	if err := h.store.ToggleStarred(r.Context(), request.UserID(r), entryID); err != nil {
 		response.JSONServerError(w, r, err)
 		return
 	}
