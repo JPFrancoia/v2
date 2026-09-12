@@ -484,6 +484,11 @@ func NewConfigOptions() *configOptions {
 				rawValue:          "",
 				valueType:         stringType,
 			},
+			"OTEL_EXPORTER_OTLP_ENDPOINT": {
+				parsedStringValue: "",
+				rawValue:          "",
+				valueType:         stringType,
+			},
 			"POLLING_FREQUENCY": {
 				parsedDuration: 60 * time.Minute,
 				rawValue:       "60",
@@ -932,6 +937,9 @@ func (c *configOptions) OAuth2UserCreation() bool {
 }
 
 func (c *configOptions) OtelEndpoint() string {
+	if endpoint := c.options["OTEL_EXPORTER_OTLP_ENDPOINT"].parsedStringValue; endpoint != "" {
+		return endpoint
+	}
 	return c.options["OTEL_ENDPOINT"].parsedStringValue
 }
 

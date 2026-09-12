@@ -1056,6 +1056,14 @@ func TestOtelEndpointOptionParsing(t *testing.T) {
 	if configParser.options.OtelEndpoint() != "http://collector:4318" {
 		t.Fatalf("Expected OTEL_ENDPOINT to be 'http://collector:4318'")
 	}
+
+	if err := configParser.parseLines([]string{"OTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example"}); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if configParser.options.OtelEndpoint() != "https://collector.example" {
+		t.Fatal("Expected OTEL_EXPORTER_OTLP_ENDPOINT to override OTEL_ENDPOINT")
+	}
 }
 
 func TestPollingLimitPerHostOptionParsing(t *testing.T) {

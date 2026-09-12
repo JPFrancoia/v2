@@ -545,17 +545,26 @@ a linked OAuth2 account to sign in\&.
 .br
 Disabled by default\&.
 .TP
-.B OTEL_ENDPOINT
+.B OTEL_EXPORTER_OTLP_ENDPOINT
 Base URL of the OpenTelemetry OTLP/HTTP collector
 destination, for example http://collector:4318\&.
 .br
 When set, Miniflux exports inbound HTTP and PostgreSQL traces
 to the /v1/traces path under this URL\&.
 .br
+OTEL_ENDPOINT provides the same setting as a fallback\&.
+.br
 OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES can override
 the default trace resource attributes\&.
 .br
 Default is empty, which disables tracing\&.
+.TP
+.B OTEL_EXPORTER_OTLP_TRACES_HEADERS
+Comma-separated HTTP headers for trace export\&.
+.br
+Use URL-encoded values, for example Authorization=Bearer%20token\&.
+.br
+Default is empty\&.
 .TP
 .B POLLING_FREQUENCY
 Interval for the background job scheduler.

@@ -24,6 +24,9 @@ func TestInitTracerRejectsInvalidEndpoint(t *testing.T) {
 func TestInitTracerExportsSpans(t *testing.T) {
 	t.Setenv("OTEL_RESOURCE_ATTRIBUTES", "")
 	t.Setenv("OTEL_SERVICE_NAME", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_TRACES_HEADERS", "Authorization=Bearer%20test-token")
 
 	requestReceived := make(chan struct{}, 1)
 	collector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -32,6 +35,9 @@ func TestInitTracerExportsSpans(t *testing.T) {
 		}
 		if r.URL.Path != "/otel/v1/traces" {
 			t.Errorf("Expected trace path /otel/v1/traces, got %s", r.URL.Path)
+		}
+		if authorization := r.Header.Get("Authorization"); authorization != "Bearer test-token" {
+			t.Errorf("Expected decoded authorization header, got %q", authorization)
 		}
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
