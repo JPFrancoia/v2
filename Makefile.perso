@@ -6,7 +6,7 @@ TAG=$(shell git log -1 --pretty=%h)
 pkg:
 	echo "Tag: " ${TAG}
 	echo ${NAME}:${TAG}
-	docker build -t ${NAME}:${TAG} -f packaging/docker/alpine/Dockerfile .
+	docker build --pull --no-cache -t ${NAME}:${TAG} -f packaging/docker/alpine/Dockerfile .
 	trivy image --scanners vuln --exit-code 1 --ignorefile .trivyignore.yaml --show-suppressed ${NAME}:${TAG}
 	-docker inspect "${NAME}:latest" > /dev/null 2>&1 || docker rmi ${NAME}:latest
 	docker tag ${NAME}:${TAG} ${NAME}:latest
