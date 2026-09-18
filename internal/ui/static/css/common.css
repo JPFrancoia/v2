@@ -1869,7 +1869,42 @@ audio, video {
 }
 
 .offline-mode-switch input {
+    appearance: none;
+    background: var(--table-border-color);
+    border: 1px solid var(--table-border-color);
+    border-radius: 1em;
+    cursor: pointer;
+    height: 1.2em;
     margin: 0;
+    position: relative;
+    transition: background-color 150ms ease;
+    width: 2.1em;
+}
+
+.offline-mode-switch input::after {
+    background: var(--button-primary-color);
+    border-radius: 50%;
+    content: "";
+    height: 0.8em;
+    left: 0.15em;
+    position: absolute;
+    top: 0.15em;
+    transition: transform 150ms ease;
+    width: 0.8em;
+}
+
+.offline-mode-switch input:checked {
+    background: var(--button-primary-background);
+    border-color: var(--button-primary-border-color);
+}
+
+.offline-mode-switch input:checked::after {
+    transform: translateX(0.9em);
+}
+
+.offline-mode-switch input:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
 }
 
 .offline-sync-status {
@@ -1976,6 +2011,11 @@ audio, video {
 @media (prefers-reduced-motion: reduce) {
     .offline-sync-spinner {
         animation: none;
+    }
+
+    .offline-mode-switch input,
+    .offline-mode-switch input::after {
+        transition: none;
     }
 }
 
