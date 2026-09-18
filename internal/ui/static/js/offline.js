@@ -2,7 +2,6 @@ const OFFLINE_DB_NAME = "miniflux-offline";
 const OFFLINE_DB_VERSION = 1;
 const OFFLINE_CACHE_VERSION = 2;
 const OFFLINE_MEDIA_LIMIT = 4000000;
-const OFFLINE_REFRESH_INTERVAL = 15 * 60 * 1000;
 const OFFLINE_ENTRY_REQUEST_BATCH_SIZE = 50;
 const OFFLINE_ENTRY_REQUEST_CONCURRENCY = 4;
 const OFFLINE_MEDIA_BATCH_SIZE = 4;
@@ -16,9 +15,6 @@ let offlineHTMLPolicy = null;
 let offlineRetryTimer = null;
 let offlineRetryDelay = 5000;
 let offlineFlushError = false;
-let offlineRefreshRetryTimer = null;
-let offlineRefreshRetryDelay = 5000;
-let offlineRefreshRetryPending = false;
 
 function trustedOfflineHTML(html) {
     if (!offlineHTMLPolicy) offlineHTMLPolicy = trustedTypes.createPolicy("html", {createHTML: (value) => value});
@@ -28,6 +24,21 @@ function trustedOfflineHTML(html) {
 function offlineUserID() {
     const value = parseInt(document.body.dataset.userId || "0", 10);
     return Number.isInteger(value) && value > 0 ? value : 0;
+}
+
+function updateOfflineModeControl(enabled) {
+    const controls = document.querySelector(".offline-sync-controls");
+    const toggle = document.querySelector("[data-offline-mode]");
+    if (controls) controls.hidden = false;
+    if (toggle) toggle.checked = enabled;
+}
+
+async function setOfflineModeEnabled(enabled) {
+    const userID = offlineUserID();
+    if (!userID) return null;
+    await putOfflineRecord("meta", {key: `offlineMode:${userID}`, value: enabled});
+    updateOfflineModeControl(enabled);
+    return enabled ? refreshOfflineContent() : null;
 }
 
 function offlinePatchKey(entryID) {
@@ -380,8 +391,6 @@ async function flushOfflineChanges() {
         if (offlineRetryTimer) clearTimeout(offlineRetryTimer);
         offlineRetryTimer = null;
         if (repairFailed) scheduleOfflineRetry();
-        // ponytail: refresh the full bounded cache; add targeted reconciliation if network cost becomes material.
-        refreshOfflineContent(true);
     })().catch((error) => {
         offlineFlushError = true;
         console.error("Offline synchronization failed:", error);
@@ -441,7 +450,6 @@ async function resolveOfflineConflict(entryID, field, useLocal) {
     }
     if (!useLocal && serverState) {
         document.querySelectorAll(`[data-id="${entryID}"]`).forEach((element) => applyOfflineServerStateToElement(element, serverState));
-        refreshOfflineContent(true);
     }
     await updateOfflineStatus();
     if (!blocked) flushOfflineChanges();
@@ -769,32 +777,13 @@ function offlineEntryNeedsRefresh(entryID, cachedEntryIDs, cachedVersions, curre
     return !currentVersion || !lastRefresh || Date.parse(currentVersion) > lastRefresh;
 }
 
-function scheduleOfflineRefreshRetry() {
-    offlineRefreshRetryPending = true;
-    if (offlineRefreshRetryTimer || navigator.onLine === false) return;
-    offlineRefreshRetryTimer = setTimeout(() => {
-        offlineRefreshRetryTimer = null;
-        refreshOfflineContent(true);
-    }, offlineRefreshRetryDelay);
-    offlineRefreshRetryDelay = Math.min(offlineRefreshRetryDelay * 2, 300000);
-}
-
-function clearOfflineRefreshRetry() {
-    if (offlineRefreshRetryTimer) clearTimeout(offlineRefreshRetryTimer);
-    offlineRefreshRetryTimer = null;
-    offlineRefreshRetryDelay = 5000;
-    offlineRefreshRetryPending = false;
-}
-
-async function refreshOfflineContent(force = false) {
+async function refreshOfflineContent() {
     if (offlineRefreshPromise) return offlineRefreshPromise;
     const userID = offlineUserID();
     const manifestURL = document.body.dataset.offlineManifestUrl;
     if (!userID || !manifestURL) return null;
 
     const lastRefresh = await getOfflineRecord("meta", `lastRefresh:${userID}`);
-    if (!force && lastRefresh && Date.now() - lastRefresh.value < OFFLINE_REFRESH_INTERVAL) return null;
-
     offlineRefreshPhase = "manifest";
     offlineRefreshPromise = (async () => {
         offlineSkippedMedia = 0;
@@ -912,15 +901,11 @@ async function refreshOfflineContent(force = false) {
         if (refreshFailures === 0) {
             await putOfflineRecord("meta", {key: `manifest:${userID}`, value: manifest});
             await putOfflineRecord("meta", {key: `lastRefresh:${userID}`, value: Date.now()});
-            clearOfflineRefreshRetry();
-        } else {
-            scheduleOfflineRefreshRetry();
         }
         await putOfflineRecord("meta", {key: `mediaSkipped:${userID}`, value: offlineSkippedMedia});
     })().catch((error) => {
         window.offlineSyncLastError = String(error?.stack || error);
         console.error("Offline content refresh failed:", error);
-        scheduleOfflineRefreshRetry();
     }).finally(async () => {
         offlineRefreshPromise = null;
         offlineRefreshProgress = null;
@@ -1236,6 +1221,8 @@ async function initializeOfflineSync() {
     const previousUser = await getOfflineRecord("meta", "activeUser");
     if (previousUser?.value && previousUser.value !== userID) await clearPreviousOfflineUser(previousUser.value);
     await putOfflineRecord("meta", {key: "activeUser", value: userID});
+    const offlineMode = await getOfflineRecord("meta", `offlineMode:${userID}`);
+    updateOfflineModeControl(offlineMode?.value === true);
     const notifyWorker = (worker) => worker?.postMessage({type: "active-user", userId: userID});
     if (navigator.serviceWorker) {
         notifyWorker(navigator.serviceWorker.controller);
@@ -1245,24 +1232,28 @@ async function initializeOfflineSync() {
     await markOfflineEntryAsReadOnView();
     await updateOfflineStatus();
     await flushOfflineChanges();
-    refreshOfflineContent();
 
     window.addEventListener("online", () => {
         updateOfflineStatus();
         flushOfflineChanges();
-        refreshOfflineContent(offlineRefreshRetryPending);
     });
     window.addEventListener("offline", updateOfflineStatus);
     document.addEventListener("visibilitychange", () => {
-        if (!document.hidden) {
-            flushOfflineChanges();
-            refreshOfflineContent();
-        }
+        if (!document.hidden) flushOfflineChanges();
     });
 
+    document.querySelector("[data-offline-mode]")?.addEventListener("change", async (event) => {
+        const enabled = event.currentTarget.checked;
+        try {
+            await setOfflineModeEnabled(enabled);
+        } catch (error) {
+            updateOfflineModeControl(!enabled);
+            console.error("Unable to update offline mode:", error);
+        }
+    });
     document.querySelector("[data-offline-refresh]")?.addEventListener("click", () => {
         flushOfflineChanges();
-        refreshOfflineContent(true);
+        setOfflineModeEnabled(true).catch((error) => console.error("Unable to prepare offline content:", error));
     });
     document.querySelector("[data-offline-review]")?.addEventListener("click", showOfflineConflictDialog);
     document.querySelector("[data-offline-conflict-close]")?.addEventListener("click", () => document.getElementById("offline-conflict-dialog")?.close());

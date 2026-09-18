@@ -20,8 +20,81 @@ test("service worker script parses", () => {
     assert.doesNotThrow(() => new vm.Script(fs.readFileSync("internal/ui/static/js/service_worker.js", "utf8")));
 });
 
-test("clear offline data reloads into a fresh sync", () => {
+test("clear offline data reloads the application", () => {
     assert.match(offlineSource, /await clearOfflineData\(\);\s*location\.reload\(\);/);
+});
+
+test("offline mode prepares content only when enabled", async () => {
+    const writes = [];
+    let refreshes = 0;
+    const originalDocument = context.document;
+    const originalPutOfflineRecord = context.putOfflineRecord;
+    const originalRefreshOfflineContent = context.refreshOfflineContent;
+    context.document = {
+        body: {dataset: {userId: "7"}},
+        querySelector: () => null,
+    };
+    context.putOfflineRecord = async (store, record) => writes.push({store, record});
+    context.refreshOfflineContent = async () => { refreshes += 1; };
+
+    try {
+        await context.setOfflineModeEnabled(true);
+        await context.setOfflineModeEnabled(false);
+    } finally {
+        context.document = originalDocument;
+        context.putOfflineRecord = originalPutOfflineRecord;
+        context.refreshOfflineContent = originalRefreshOfflineContent;
+    }
+
+    assert.deepEqual(writes.map(({store, record}) => ({store, record: {...record}})), [
+        {store: "meta", record: {key: "offlineMode:7", value: true}},
+        {store: "meta", record: {key: "offlineMode:7", value: false}},
+    ]);
+    assert.equal(refreshes, 1);
+});
+
+test("automatic lifecycle events replay changes without preparing content", async () => {
+    const listeners = {};
+    let flushes = 0;
+    let refreshes = 0;
+    const replacements = {
+        window: {
+            indexedDB: {},
+            caches: {},
+            addEventListener: (type, callback) => { listeners[`window:${type}`] = callback; },
+        },
+        navigator: {},
+        document: {
+            body: {dataset: {userId: "7"}},
+            hidden: false,
+            addEventListener: (type, callback) => { listeners[`document:${type}`] = callback; },
+            querySelector: () => null,
+            querySelectorAll: () => [],
+        },
+        getOfflineRecord: async () => null,
+        putOfflineRecord: async () => {},
+        applyOfflinePatchesToPage: async () => {},
+        markOfflineEntryAsReadOnView: async () => {},
+        updateOfflineStatus: async () => {},
+        flushOfflineChanges: async () => { flushes += 1; },
+        refreshOfflineContent: async () => { refreshes += 1; },
+    };
+    const originals = new Map(Object.keys(replacements).map((key) => [key, context[key]]));
+    Object.assign(context, replacements);
+
+    try {
+        await context.initializeOfflineSync();
+        listeners["window:online"]();
+        listeners["document:visibilitychange"]();
+    } finally {
+        for (const [key, value] of originals) {
+            if (value === undefined) delete context[key];
+            else context[key] = value;
+        }
+    }
+
+    assert.equal(flushes, 3);
+    assert.equal(refreshes, 0);
 });
 
 test("offline media accepts responses below four million bytes", async () => {

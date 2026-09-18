@@ -1847,9 +1847,32 @@ audio, video {
     margin-top: 15px;
 }
 
-.offline-sync-status {
+.offline-sync-controls {
+    align-items: center;
+    display: flex;
     flex: 0 0 auto;
+    gap: 8px;
     margin-left: auto;
+    position: relative;
+}
+
+.offline-sync-controls[hidden] {
+    display: none;
+}
+
+.offline-mode-switch {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.offline-mode-switch input {
+    margin: 0;
+}
+
+.offline-sync-status {
     position: relative;
 }
 
@@ -1939,14 +1962,10 @@ audio, video {
 }
 
 @media (max-width: 619px) {
-    .header nav {
-        position: relative;
-    }
-
-    .offline-sync-status {
-        position: absolute;
-        right: 0;
-        top: 0;
+    .offline-sync-controls {
+        align-self: flex-end;
+        margin-left: 0;
+        margin-top: 8px;
     }
 
     .offline-sync-status summary [data-offline-state] {
