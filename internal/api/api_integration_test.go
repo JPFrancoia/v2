@@ -5,10 +5,12 @@ package api // import "miniflux.app/v2/internal/api"
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math/rand/v2"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -59,6 +61,45 @@ func (c *integrationTestConfig) isConfigured() bool {
 
 func (c *integrationTestConfig) genRandomUsername() string {
 	return fmt.Sprintf("%s_%10d", c.testRegularUsername, rand.Int())
+}
+
+// sendOfflineAPIRequest calls a device route with optional API-key credentials.
+// It decodes successful responses so integration tests can check their contract.
+func sendOfflineAPIRequest(t *testing.T, baseURL, token, method, path string, payload, result any) int {
+	t.Helper()
+
+	var body io.Reader
+	if payload != nil {
+		data, err := json.Marshal(payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body = bytes.NewReader(data)
+	}
+
+	req, err := http.NewRequestWithContext(t.Context(), method, strings.TrimRight(baseURL, "/")+path, body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if token != "" {
+		req.Header.Set("X-Auth-Token", token)
+	}
+	if payload != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if result != nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return resp.StatusCode
 }
 
 func TestIncorrectEndpoint(t *testing.T) {
@@ -837,6 +878,124 @@ func TestAPIKeysEndpoint(t *testing.T) {
 	// Try to create an API key with an empty description.
 	if _, err := regularUserClient.CreateAPIKey(""); err == nil {
 		t.Fatal(`Creating an API key with an empty description should raise an error`)
+	}
+}
+
+// TestOfflineDeviceEndpoints verifies API-key access, user isolation, snapshot
+// content, and conflict-safe entry changes through the native client routes.
+func TestOfflineDeviceEndpoints(t *testing.T) {
+	testConfig := newIntegrationTestConfig()
+	if !testConfig.isConfigured() {
+		t.Skip(skipIntegrationTestsMessage)
+	}
+
+	adminClient := miniflux.NewClient(testConfig.testBaseURL, testConfig.testAdminUsername, testConfig.testAdminPassword)
+	regularUser, err := adminClient.CreateUser(testConfig.genRandomUsername(), testConfig.testRegularPassword, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := adminClient.DeleteUser(regularUser.ID); err != nil {
+			t.Errorf(`Unable to delete test user %d: %v`, regularUser.ID, err)
+		}
+	})
+
+	regularClient := miniflux.NewClient(testConfig.testBaseURL, regularUser.Username, testConfig.testRegularPassword)
+	feedID, err := regularClient.CreateFeed(&miniflux.FeedCreationRequest{FeedURL: testConfig.testFeedURL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, err := regularClient.FeedEntries(feedID, &miniflux.Filter{Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries.Entries) == 0 {
+		t.Fatal(`Expected at least one entry`)
+	}
+	entry := entries.Entries[0]
+	if !entry.Starred {
+		if err := regularClient.ToggleStarred(entry.ID); err != nil {
+			t.Fatal(err)
+		}
+		entry.Starred = true
+	}
+
+	otherUser, err := adminClient.CreateUser(testConfig.genRandomUsername(), testConfig.testRegularPassword, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := adminClient.DeleteUser(otherUser.ID); err != nil {
+			t.Errorf(`Unable to delete test user %d: %v`, otherUser.ID, err)
+		}
+	})
+	otherClient := miniflux.NewClient(testConfig.testBaseURL, otherUser.Username, testConfig.testRegularPassword)
+	otherFeedID, err := otherClient.CreateFeed(&miniflux.FeedCreationRequest{FeedURL: testConfig.testFeedURL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherEntries, err := otherClient.FeedEntries(otherFeedID, &miniflux.Filter{Limit: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(otherEntries.Entries) == 0 {
+		t.Fatal(`Expected at least one entry for the other user`)
+	}
+
+	apiKey, err := regularClient.CreateAPIKey("CrossPoint reader")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status := sendOfflineAPIRequest(t, testConfig.testBaseURL, "", http.MethodGet, "/v1/offline/manifest", nil, nil); status != http.StatusUnauthorized {
+		t.Fatalf(`Expected unauthorized status without credentials, got %d`, status)
+	}
+
+	var manifest model.OfflineManifest
+	if status := sendOfflineAPIRequest(t, testConfig.testBaseURL, apiKey.Token, http.MethodGet, "/v1/offline/manifest", nil, &manifest); status != http.StatusOK {
+		t.Fatalf(`Expected manifest status 200, got %d`, status)
+	}
+	if manifest.UserID != regularUser.ID {
+		t.Fatalf(`Expected manifest user ID %d, got %d`, regularUser.ID, manifest.UserID)
+	}
+	if manifest.SnapshotVersion != offlineDeviceSnapshotVersion {
+		t.Fatalf(`Expected snapshot version %q, got %q`, offlineDeviceSnapshotVersion, manifest.SnapshotVersion)
+	}
+	if _, ok := manifest.EntryVersions[entry.ID]; !ok {
+		t.Fatalf(`Expected entry %d in the manifest`, entry.ID)
+	}
+
+	var snapshots model.OfflineDeviceSnapshotResponse
+	snapshotRequest := model.OfflineSnapshotRequest{EntryIDs: []int64{entry.ID, otherEntries.Entries[0].ID}}
+	if status := sendOfflineAPIRequest(t, testConfig.testBaseURL, apiKey.Token, http.MethodPost, "/v1/offline/entries", snapshotRequest, &snapshots); status != http.StatusOK {
+		t.Fatalf(`Expected snapshot status 200, got %d`, status)
+	}
+	if len(snapshots.Entries) != 1 {
+		t.Fatalf(`Expected one user-scoped snapshot, got %d`, len(snapshots.Entries))
+	}
+	if snapshots.Entries[0].EntryID != entry.ID {
+		t.Fatalf(`Expected entry ID %d, got %d`, entry.ID, snapshots.Entries[0].EntryID)
+	}
+	if snapshots.Entries[0].Content == "" {
+		t.Fatal(`Expected snapshot content`)
+	}
+
+	baseStarred := entry.Starred
+	setStarred := !baseStarred
+	syncRequest := model.OfflineSyncRequest{Entries: []model.OfflineEntryPatch{{
+		EntryID: entry.ID,
+		Base:    model.OfflineEntryValues{Starred: &baseStarred},
+		Set:     model.OfflineEntryValues{Starred: &setStarred},
+	}}}
+	var syncResponse model.OfflineSyncResponse
+	if status := sendOfflineAPIRequest(t, testConfig.testBaseURL, apiKey.Token, http.MethodPost, "/v1/offline/sync", syncRequest, &syncResponse); status != http.StatusOK {
+		t.Fatalf(`Expected sync status 200, got %d`, status)
+	}
+	if len(syncResponse.Entries) != 1 || syncResponse.Entries[0].Result != model.OfflineSyncResultApplied {
+		t.Fatalf(`Expected one applied sync result, got %#v`, syncResponse.Entries)
+	}
+	if syncResponse.Entries[0].State == nil || syncResponse.Entries[0].State.Starred != setStarred {
+		t.Fatalf(`Expected starred state %v, got %#v`, setStarred, syncResponse.Entries[0].State)
 	}
 }
 

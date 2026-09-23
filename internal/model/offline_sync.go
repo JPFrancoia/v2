@@ -87,6 +87,31 @@ type OfflineSnapshotResponse struct {
 	Entries []OfflineSnapshot `json:"entries"`
 }
 
+// OfflineDeviceEntrySnapshot contains one compact entry for a native offline client.
+type OfflineDeviceEntrySnapshot struct {
+	EntryID       int64     `json:"entry_id"`
+	Version       time.Time `json:"version"`
+	FeedID        int64     `json:"feed_id"`
+	FeedTitle     string    `json:"feed_title"`
+	CategoryID    int64     `json:"category_id"`
+	CategoryTitle string    `json:"category_title"`
+	Title         string    `json:"title"`
+	Author        string    `json:"author"`
+	URL           string    `json:"url"`
+	PublishedAt   time.Time `json:"published_at"`
+	Content       string    `json:"content"`
+	Status        string    `json:"status"`
+	Starred       bool      `json:"starred"`
+	SavedForLater bool      `json:"saved_for_later"`
+	Vote          int       `json:"vote"`
+	UserTagIDs    []int64   `json:"user_tag_ids"`
+}
+
+// OfflineDeviceSnapshotResponse contains native client snapshots for one request.
+type OfflineDeviceSnapshotResponse struct {
+	Entries []OfflineDeviceEntrySnapshot `json:"entries"`
+}
+
 // OfflineManifest identifies the entries that belong in the offline cache.
 type OfflineManifest struct {
 	UserID                int64                    `json:"user_id"`
