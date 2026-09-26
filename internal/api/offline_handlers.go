@@ -14,7 +14,7 @@ import (
 	"miniflux.app/v2/internal/validator"
 )
 
-const offlineDeviceSnapshotVersion = "1"
+const offlineDeviceSnapshotVersion = "2"
 
 // getOfflineManifestHandler returns the authenticated user's offline entry set.
 // The device version is independent of browser themes and sessions.
@@ -75,6 +75,7 @@ func newOfflineDeviceEntrySnapshot(entry *model.Entry, userTagIDs []int64) model
 		Author:        entry.Author,
 		URL:           entry.URL,
 		PublishedAt:   entry.Date,
+		Score:         entry.Score,
 		Content:       entry.Content,
 		Status:        entry.Status,
 		Starred:       entry.Starred,

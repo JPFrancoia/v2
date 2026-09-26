@@ -99,6 +99,7 @@ type OfflineDeviceEntrySnapshot struct {
 	Author        string    `json:"author"`
 	URL           string    `json:"url"`
 	PublishedAt   time.Time `json:"published_at"`
+	Score         int64     `json:"score"`
 	Content       string    `json:"content"`
 	Status        string    `json:"status"`
 	Starred       bool      `json:"starred"`

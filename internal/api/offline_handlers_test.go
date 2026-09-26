@@ -11,6 +11,13 @@ import (
 	"miniflux.app/v2/internal/model"
 )
 
+// TestOfflineDeviceSnapshotVersion pins the device schema version after score is added.
+func TestOfflineDeviceSnapshotVersion(t *testing.T) {
+	if got := offlineDeviceSnapshotVersion; got != "2" {
+		t.Fatalf("Expected device snapshot version 2, got %q", got)
+	}
+}
+
 // TestNewOfflineDeviceEntrySnapshot verifies that device snapshots keep the
 // article identity, content, feed, category, state, and user tags.
 func TestNewOfflineDeviceEntrySnapshot(t *testing.T) {
@@ -27,6 +34,7 @@ func TestNewOfflineDeviceEntrySnapshot(t *testing.T) {
 	entry.Author = "Author"
 	entry.URL = "https://example.org/article"
 	entry.Date = publishedAt
+	entry.Score = 73
 	entry.ChangedAt = changedAt
 	entry.Content = "<p>Content</p>"
 	entry.Status = model.EntryStatusUnread
@@ -45,6 +53,7 @@ func TestNewOfflineDeviceEntrySnapshot(t *testing.T) {
 		Author:        "Author",
 		URL:           "https://example.org/article",
 		PublishedAt:   publishedAt,
+		Score:         73,
 		Content:       "<p>Content</p>",
 		Status:        model.EntryStatusUnread,
 		Starred:       true,
