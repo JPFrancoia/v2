@@ -1643,27 +1643,30 @@ func TestSchedulerRoundRobinMinIntervalOptionParsing(t *testing.T) {
 	}
 }
 
-// TestToReviewScoreTargetOptionParsing checks the default, valid range, and invalid values.
-func TestToReviewScoreTargetOptionParsing(t *testing.T) {
+// TestToReviewRawRelevanceTargetOptionParsing checks the raw target and ignores the obsolete setting.
+func TestToReviewRawRelevanceTargetOptionParsing(t *testing.T) {
 	configParser := NewConfigParser()
 
-	if configParser.options.ToReviewScoreTarget() != 21 {
-		t.Fatal("Expected TO_REVIEW_SCORE_TARGET to be 21 by default")
+	if err := configParser.parseLines([]string{"TO_REVIEW_SCORE_TARGET=21"}); err != nil {
+		t.Fatalf("Unexpected legacy setting error: %v", err)
+	}
+	if configParser.options.ToReviewRawRelevanceTarget() != 50 {
+		t.Fatal("Expected raw relevance target to remain 50 with the legacy setting")
 	}
 
 	for _, value := range []string{"0", "50", "100"} {
-		if err := configParser.parseLines([]string{"TO_REVIEW_SCORE_TARGET=" + value}); err != nil {
-			t.Fatalf("Unexpected error for TO_REVIEW_SCORE_TARGET=%s: %v", value, err)
+		if err := configParser.parseLines([]string{"TO_REVIEW_RAW_RELEVANCE_TARGET=" + value}); err != nil {
+			t.Fatalf("Unexpected error for TO_REVIEW_RAW_RELEVANCE_TARGET=%s: %v", value, err)
 		}
 	}
 
-	if configParser.options.ToReviewScoreTarget() != 100 {
-		t.Fatal("Expected TO_REVIEW_SCORE_TARGET to accept 100")
+	if configParser.options.ToReviewRawRelevanceTarget() != 100 {
+		t.Fatal("Expected raw relevance target to accept 100")
 	}
 
 	for _, value := range []string{"-1", "101"} {
-		if err := configParser.parseLines([]string{"TO_REVIEW_SCORE_TARGET=" + value}); err == nil {
-			t.Fatalf("Expected error for TO_REVIEW_SCORE_TARGET=%s", value)
+		if err := configParser.parseLines([]string{"TO_REVIEW_RAW_RELEVANCE_TARGET=" + value}); err == nil {
+			t.Fatalf("Expected error for TO_REVIEW_RAW_RELEVANCE_TARGET=%s", value)
 		}
 	}
 }

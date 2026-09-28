@@ -250,9 +250,16 @@ func (e *EntryQueryBuilder) WithSorting(column, direction string) *EntryQueryBui
 	return e
 }
 
-// WithScoreDistanceSorting sorts entries by absolute distance from a target score.
-func (e *EntryQueryBuilder) WithScoreDistanceSorting(score int64) *EntryQueryBuilder {
-	e.sortExpressions = append(e.sortExpressions, fmt.Sprintf("ABS(e.score - $%d) ASC", len(e.args)+1))
+// WithRawRelevanceScore selects entries with a stored raw relevance prediction.
+func (e *EntryQueryBuilder) WithRawRelevanceScore() *EntryQueryBuilder {
+	e.conditions = append(e.conditions, "e.raw_relevance_score is not null")
+	return e
+}
+
+// WithRawRelevanceDistanceSorting sorts predicted entries nearest a raw target first.
+func (e *EntryQueryBuilder) WithRawRelevanceDistanceSorting(score int64) *EntryQueryBuilder {
+	e.WithRawRelevanceScore()
+	e.sortExpressions = append(e.sortExpressions, fmt.Sprintf("abs(e.raw_relevance_score - $%d) asc", len(e.args)+1))
 	e.args = append(e.args, score)
 	return e
 }

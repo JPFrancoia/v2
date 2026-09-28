@@ -26,15 +26,18 @@ func TestEntryQueryBuilderContentColumn(t *testing.T) {
 	}
 }
 
-// TestEntryQueryBuilderScoreDistanceSorting verifies that the target score remains a bound argument.
-func TestEntryQueryBuilderScoreDistanceSorting(t *testing.T) {
+// TestEntryQueryBuilderRawRelevanceSorting verifies the raw target and null filter.
+func TestEntryQueryBuilderRawRelevanceSorting(t *testing.T) {
 	builder := NewEntryQueryBuilder(context.Background(), nil, 42)
-	builder.WithCategoryID(7).WithScoreDistanceSorting(123)
+	builder.WithCategoryID(7).WithRawRelevanceDistanceSorting(50)
 
-	if result := builder.sortExpressions[0]; result != "ABS(e.score - $3) ASC" {
+	if result := builder.sortExpressions[0]; result != "abs(e.raw_relevance_score - $3) asc" {
 		t.Fatalf(`Unexpected score sorting expression: %q`, result)
 	}
-	if result := builder.args[2]; result != int64(123) {
+	if result := builder.args[2]; result != int64(50) {
 		t.Fatalf(`Unexpected score sorting argument: %v`, result)
+	}
+	if result := builder.conditions[len(builder.conditions)-1]; result != "e.raw_relevance_score is not null" {
+		t.Fatalf(`Unexpected review filter: %q`, result)
 	}
 }

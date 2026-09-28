@@ -24,15 +24,18 @@ func TestEntryPaginationBuilderSorting(t *testing.T) {
 	}
 }
 
-// TestEntryPaginationBuilderScoreDistanceSorting verifies that the target score remains a bound argument.
-func TestEntryPaginationBuilderScoreDistanceSorting(t *testing.T) {
+// TestEntryPaginationBuilderRawRelevanceSorting verifies the raw target and null filter.
+func TestEntryPaginationBuilderRawRelevanceSorting(t *testing.T) {
 	builder := &entryPaginationBuilder{args: []any{int64(42)}}
-	builder.WithScoreDistanceSorting(123)
+	builder.WithRawRelevanceDistanceSorting(50)
 
-	if result := builder.sortExpressions[0]; result != "ABS(e.score - $2) ASC" {
+	if result := builder.sortExpressions[0]; result != "abs(e.raw_relevance_score - $2) asc" {
 		t.Fatalf(`Unexpected score sorting expression: %q`, result)
 	}
-	if result := builder.args[1]; result != int64(123) {
+	if result := builder.args[1]; result != int64(50) {
 		t.Fatalf(`Unexpected score sorting argument: %v`, result)
+	}
+	if result := builder.conditions[0]; result != "e.raw_relevance_score is not null" {
+		t.Fatalf(`Unexpected review filter: %q`, result)
 	}
 }

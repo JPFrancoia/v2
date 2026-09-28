@@ -571,9 +571,9 @@ func NewConfigOptions() *configOptions {
 					return validateGreaterOrEqualThan(rawValue, 1)
 				},
 			},
-			"TO_REVIEW_SCORE_TARGET": {
-				parsedInt64Value: 21,
-				rawValue:         "21",
+			"TO_REVIEW_RAW_RELEVANCE_TARGET": {
+				parsedInt64Value: 50,
+				rawValue:         "50",
 				valueType:        int64Type,
 				validator: func(rawValue string) error {
 					return validateRange(rawValue, 0, 100)
@@ -1001,8 +1001,9 @@ func (c *configOptions) SchedulerRoundRobinMinInterval() time.Duration {
 	return c.options["SCHEDULER_ROUND_ROBIN_MIN_INTERVAL"].parsedDuration
 }
 
-func (c *configOptions) ToReviewScoreTarget() int64 {
-	return c.options["TO_REVIEW_SCORE_TARGET"].parsedInt64Value
+// ToReviewRawRelevanceTarget returns the untransformed score target for the review queue.
+func (c *configOptions) ToReviewRawRelevanceTarget() int64 {
+	return c.options["TO_REVIEW_RAW_RELEVANCE_TARGET"].parsedInt64Value
 }
 
 func (c *configOptions) TrustedReverseProxyNetworks() []string {
