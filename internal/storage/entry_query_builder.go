@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -250,21 +251,28 @@ func (e *EntryQueryBuilder) WithSorting(column, direction string) *EntryQueryBui
 	return e
 }
 
-// WithScoreDistanceSorting sorts entries by absolute distance from a target score.
-func (e *EntryQueryBuilder) WithScoreDistanceSorting(score int64) *EntryQueryBuilder {
-	e.sortExpressions = append(e.sortExpressions, fmt.Sprintf("ABS(e.score - $%d) ASC", len(e.args)+1))
+// WithRawRelevanceScore selects entries with a stored raw relevance prediction.
+func (e *EntryQueryBuilder) WithRawRelevanceScore() *EntryQueryBuilder {
+	e.conditions = append(e.conditions, "e.raw_relevance_score is not null")
+	return e
+}
+
+// WithRawRelevanceDistanceSorting sorts predicted entries nearest a raw target first.
+func (e *EntryQueryBuilder) WithRawRelevanceDistanceSorting(score int64) *EntryQueryBuilder {
+	e.WithRawRelevanceScore()
+	e.sortExpressions = append(e.sortExpressions, fmt.Sprintf("abs(e.raw_relevance_score - $%d) asc", len(e.args)+1))
 	e.args = append(e.args, score)
 	return e
 }
 
 // AfterOfflineSectionCursor keeps a device page after the last row in the current sort order.
-// All cursor values are parsed as integers before they reach this query.
+// Review distance uses the float's bits to preserve fractional scores in URL-safe cursors.
 func (e *EntryQueryBuilder) AfterOfflineSectionCursor(section, sort string, first, second, id, target int64) *EntryQueryBuilder {
 	n := len(e.args) + 1
 	switch {
 	case section == "review" && sort == "score":
-		e.conditions = append(e.conditions, fmt.Sprintf(`(abs(e.score-$%d) > $%d or (abs(e.score-$%d) = $%d and (e.published_at, e.id) < ($%d, $%d)))`, n, n+1, n, n+1, n+2, n+3))
-		e.args = append(e.args, target, first, time.UnixMicro(second), id)
+		e.conditions = append(e.conditions, fmt.Sprintf(`(abs(e.raw_relevance_score-$%d) > $%d or (abs(e.raw_relevance_score-$%d) = $%d and (e.published_at, e.id) < ($%d, $%d)))`, n, n+1, n, n+1, n+2, n+3))
+		e.args = append(e.args, target, math.Float64frombits(uint64(first)), time.UnixMicro(second), id)
 	case section == "history" && sort == "newest":
 		e.conditions = append(e.conditions, fmt.Sprintf(`(e.changed_at, e.published_at, e.id) < ($%d, $%d, $%d)`, n, n+1, n+2))
 		e.args = append(e.args, time.UnixMicro(first), time.UnixMicro(second), id)
@@ -382,6 +390,7 @@ func (e *EntryQueryBuilder) fetchEntries(withCount bool) (model.Entries, int, er
 			e.changed_at,
 			e.tags,
 			e.score,
+			e.raw_relevance_score,
 			e.vote,
 			f.title as feed_title,
 			f.feed_url,
@@ -455,6 +464,7 @@ func (e *EntryQueryBuilder) fetchEntries(withCount bool) (model.Entries, int, er
 			&entry.ChangedAt,
 			pq.Array(&entry.Tags),
 			&entry.Score,
+			&entry.RawRelevanceScore,
 			&entry.Vote,
 			&entry.Feed.Title,
 			&entry.Feed.FeedURL,

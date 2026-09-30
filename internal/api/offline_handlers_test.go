@@ -5,6 +5,7 @@ package api // import "miniflux.app/v2/internal/api"
 
 import (
 	"context"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -57,7 +58,7 @@ func TestOfflineSectionQuery(t *testing.T) {
 
 // TestOfflineSectionCursorRoundTrip checks marker fields and stale Review targets.
 func TestOfflineSectionCursorRoundTrip(t *testing.T) {
-	t.Setenv("TO_REVIEW_SCORE_TARGET", "21")
+	t.Setenv("TO_REVIEW_RAW_RELEVANCE_TARGET", "50")
 	options, err := config.NewConfigParser().ParseEnvironmentVariables()
 	if err != nil {
 		t.Fatal(err)
@@ -68,14 +69,19 @@ func TestOfflineSectionCursorRoundTrip(t *testing.T) {
 	entry := model.NewEntry()
 	entry.ID = 55
 	entry.Score = 25
+	raw := 49.875
+	entry.RawRelevanceScore = &raw
 	entry.Date = time.Date(2026, 9, 29, 8, 0, 0, 0, time.UTC)
 	entry.ChangedAt = entry.Date.Add(time.Hour)
 	for _, section := range []string{"unread", "saved", "review", "history"} {
 		for _, sort := range []string{"score", "newest"} {
-			marker := offlineSectionCursor(entry, section, sort, config.Opts.ToReviewScoreTarget())
-			_, _, id, err := parseOfflineSectionCursor(marker, section, sort)
+			marker := offlineSectionCursor(entry, section, sort, config.Opts.ToReviewRawRelevanceTarget())
+			first, _, id, err := parseOfflineSectionCursor(marker, section, sort)
 			if err != nil || id != entry.ID {
 				t.Fatalf("invalid %s %s cursor: %q: %v", section, sort, marker, err)
+			}
+			if section == "review" && sort == "score" && math.Float64frombits(uint64(first)) != 0.125 {
+				t.Fatal("cursor lost fractional raw distance")
 			}
 		}
 	}

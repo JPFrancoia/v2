@@ -120,10 +120,11 @@ func (e *entryPaginationBuilder) WithGloballyVisible() {
 	e.conditions = append(e.conditions, "not f.hide_globally")
 }
 
-// WithScoreDistanceSorting sorts entries by absolute distance from a target score.
-func (e *entryPaginationBuilder) WithScoreDistanceSorting(score int64) {
+// WithRawRelevanceDistanceSorting orders predicted entries nearest a raw target first.
+func (e *entryPaginationBuilder) WithRawRelevanceDistanceSorting(score int64) {
+	e.conditions = append(e.conditions, "e.raw_relevance_score is not null")
 	e.sortExpressions = []string{
-		fmt.Sprintf("ABS(e.score - $%d) ASC", len(e.args)+1),
+		fmt.Sprintf("abs(e.raw_relevance_score - $%d) asc", len(e.args)+1),
 		"e.published_at DESC",
 		"e.id DESC",
 	}

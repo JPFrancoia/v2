@@ -6,6 +6,7 @@ package api // import "miniflux.app/v2/internal/api"
 import (
 	json_parser "encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -33,7 +34,7 @@ func offlineSectionQuery(builder *storage.EntryQueryBuilder, section, sort strin
 	case "saved":
 		builder.WithStatus(model.EntryStatusUnread).WithSavedForLater(true)
 	case "review":
-		builder.WithStatus(model.EntryStatusUnread).WithVote(0).AfterPublishedDate(now.Add(-5 * 24 * time.Hour))
+		builder.WithStatus(model.EntryStatusUnread).WithVote(0).WithRawRelevanceScore().AfterPublishedDate(now.Add(-5 * 24 * time.Hour))
 	case "history":
 		builder.WithStatus(model.EntryStatusRead)
 	default:
@@ -44,7 +45,7 @@ func offlineSectionQuery(builder *storage.EntryQueryBuilder, section, sort strin
 	}
 	builder.WithoutContent()
 	if section == "review" && sort == "score" {
-		builder.WithScoreDistanceSorting(config.Opts.ToReviewScoreTarget())
+		builder.WithRawRelevanceDistanceSorting(config.Opts.ToReviewRawRelevanceTarget())
 	} else if section == "history" && sort == "newest" {
 		builder.WithSorting("e.changed_at", "DESC")
 		builder.WithSorting("e.published_at", "DESC")
@@ -79,12 +80,13 @@ func parseOfflineSectionCursor(raw, section, sort string) (first, second, id int
 		return 0, 0, 0, fmt.Errorf(`api: invalid section cursor`)
 	}
 	encodedTarget, targetErr := strconv.ParseInt(parts[5], 10, 64)
-	if targetErr != nil || (section == "review" && sort == "score" && encodedTarget != config.Opts.ToReviewScoreTarget()) ||
+	if targetErr != nil || (section == "review" && sort == "score" && encodedTarget != config.Opts.ToReviewRawRelevanceTarget()) ||
 		(section != "review" || sort != "score") && encodedTarget != 0 {
 		return 0, 0, 0, fmt.Errorf(`api: invalid section cursor`)
 	}
 	if section == "review" && sort == "score" {
-		if first < 0 || second <= 0 {
+		distance := math.Float64frombits(uint64(first))
+		if first < 0 || math.IsNaN(distance) || math.IsInf(distance, 0) || distance < 0 || distance > 100 || second <= 0 {
 			return 0, 0, 0, fmt.Errorf(`api: invalid section cursor`)
 		}
 	} else if sort == "newest" && first <= 0 {
@@ -98,10 +100,7 @@ func offlineSectionCursor(entry *model.Entry, section, sort string, target int64
 	first, second := entry.Score, int64(0)
 	switch {
 	case section == "review" && sort == "score":
-		first = entry.Score - target
-		if first < 0 {
-			first = -first
-		}
+		first = int64(math.Float64bits(math.Abs(*entry.RawRelevanceScore - float64(target))))
 		second = entry.Date.UnixMicro()
 	case section == "history" && sort == "newest":
 		first, second = entry.ChangedAt.UnixMicro(), entry.Date.UnixMicro()
@@ -133,7 +132,7 @@ func (h *handler) getOfflineSectionHandler(w http.ResponseWriter, r *http.Reques
 			response.JSONBadRequest(w, r, err)
 			return
 		}
-		builder.AfterOfflineSectionCursor(section, sort, first, second, id, config.Opts.ToReviewScoreTarget())
+		builder.AfterOfflineSectionCursor(section, sort, first, second, id, config.Opts.ToReviewRawRelevanceTarget())
 	}
 	builder.WithLimit(offlineSectionPageSize + 1)
 	entries, err := builder.GetEntries()
@@ -155,7 +154,7 @@ func (h *handler) getOfflineSectionHandler(w http.ResponseWriter, r *http.Reques
 	}
 	nextCursor := ""
 	if more {
-		nextCursor = offlineSectionCursor(entries[len(entries)-1], section, sort, config.Opts.ToReviewScoreTarget())
+		nextCursor = offlineSectionCursor(entries[len(entries)-1], section, sort, config.Opts.ToReviewRawRelevanceTarget())
 	}
 	response.JSON(w, r, &model.OfflineSectionPage{
 		UserID: request.UserID(r), Entries: rows, HasMore: more, NextCursor: nextCursor,
