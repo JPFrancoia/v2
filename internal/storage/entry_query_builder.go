@@ -257,6 +257,27 @@ func (e *EntryQueryBuilder) WithScoreDistanceSorting(score int64) *EntryQueryBui
 	return e
 }
 
+// AfterOfflineSectionCursor keeps a device page after the last row in the current sort order.
+// All cursor values are parsed as integers before they reach this query.
+func (e *EntryQueryBuilder) AfterOfflineSectionCursor(section, sort string, first, second, id, target int64) *EntryQueryBuilder {
+	n := len(e.args) + 1
+	switch {
+	case section == "review" && sort == "score":
+		e.conditions = append(e.conditions, fmt.Sprintf(`(abs(e.score-$%d) > $%d or (abs(e.score-$%d) = $%d and (e.published_at, e.id) < ($%d, $%d)))`, n, n+1, n, n+1, n+2, n+3))
+		e.args = append(e.args, target, first, time.UnixMicro(second), id)
+	case section == "history" && sort == "newest":
+		e.conditions = append(e.conditions, fmt.Sprintf(`(e.changed_at, e.published_at, e.id) < ($%d, $%d, $%d)`, n, n+1, n+2))
+		e.args = append(e.args, time.UnixMicro(first), time.UnixMicro(second), id)
+	case sort == "newest":
+		e.conditions = append(e.conditions, fmt.Sprintf(`(e.published_at, e.id) < ($%d, $%d)`, n, n+1))
+		e.args = append(e.args, time.UnixMicro(first), id)
+	default:
+		e.conditions = append(e.conditions, fmt.Sprintf(`(e.score, e.id) < ($%d, $%d)`, n, n+1))
+		e.args = append(e.args, first, id)
+	}
+	return e
+}
+
 // WithLimit set the limit.
 func (e *EntryQueryBuilder) WithLimit(limit int) *EntryQueryBuilder {
 	if limit > 0 {

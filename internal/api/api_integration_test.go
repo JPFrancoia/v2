@@ -882,7 +882,7 @@ func TestAPIKeysEndpoint(t *testing.T) {
 }
 
 // TestOfflineDeviceEndpoints verifies API-key access, user isolation, snapshot
-// content, and conflict-safe entry changes through the native client routes.
+// content, conflict-safe changes, and paged sections through the native routes.
 func TestOfflineDeviceEndpoints(t *testing.T) {
 	testConfig := newIntegrationTestConfig()
 	if !testConfig.isConfigured() {
@@ -963,6 +963,44 @@ func TestOfflineDeviceEndpoints(t *testing.T) {
 	}
 	if _, ok := manifest.EntryVersions[entry.ID]; !ok {
 		t.Fatalf(`Expected entry %d in the manifest`, entry.ID)
+	}
+
+	if status := sendOfflineAPIRequest(t, testConfig.testBaseURL, "", http.MethodGet, "/v1/offline/sections/unread", nil, nil); status != http.StatusUnauthorized {
+		t.Fatalf(`Expected unauthorized section status, got %d`, status)
+	}
+	seen := make(map[int64]bool)
+	cursor := ""
+	for pageNumber := 0; pageNumber < 100; pageNumber++ {
+		path := "/v1/offline/sections/unread?sort=newest"
+		if cursor != "" {
+			path += "&cursor=" + cursor
+		}
+		var page model.OfflineSectionPage
+		if status := sendOfflineAPIRequest(t, testConfig.testBaseURL, apiKey.Token, http.MethodGet, path, nil, &page); status != http.StatusOK {
+			t.Fatalf(`Expected section status 200, got %d`, status)
+		}
+		if page.UserID != regularUser.ID || len(page.Entries) > offlineSectionPageSize {
+			t.Fatalf(`Invalid section ownership or page size: %#v`, page)
+		}
+		for _, row := range page.Entries {
+			if seen[row.EntryID] || row.EntryID == otherEntries.Entries[0].ID || row.Status != model.EntryStatusUnread {
+				t.Fatalf(`Invalid or duplicate user-scoped section row: %#v`, row)
+			}
+			seen[row.EntryID] = true
+		}
+		if !page.HasMore {
+			if page.NextCursor != "" || !seen[entry.ID] {
+				t.Fatalf(`Incomplete section: %#v`, page)
+			}
+			break
+		}
+		if page.NextCursor == "" {
+			t.Fatal(`Missing cursor for next page`)
+		}
+		cursor = page.NextCursor
+		if pageNumber == 99 {
+			t.Fatal(`Section did not terminate`)
+		}
 	}
 
 	var snapshots model.OfflineDeviceSnapshotResponse
