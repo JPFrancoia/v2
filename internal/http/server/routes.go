@@ -17,6 +17,7 @@ import (
 	"miniflux.app/v2/internal/worker"
 )
 
+// newRouter constructs the HTTP router and instruments all endpoints for tracing.
 func newRouter(store *storage.Storage, pool *worker.Pool) http.Handler {
 	readinessProbe := newReadinessProbe(store)
 
@@ -72,16 +73,5 @@ func newRouter(store *storage.Storage, pool *worker.Pool) http.Handler {
 		rootMux.Handle("/", appHandler)
 	}
 
-	return otelhttp.NewHandler(rootMux, "miniflux.http", otelhttp.WithFilter(func(r *http.Request) bool {
-		return isTraceablePath(r.URL.Path, basePath+"/healthcheck")
-	}))
-}
-
-func isTraceablePath(requestPath, healthcheckPath string) bool {
-	switch requestPath {
-	case "/liveness", "/healthz", "/readiness", "/readyz":
-		return false
-	default:
-		return requestPath != healthcheckPath
-	}
+	return otelhttp.NewHandler(rootMux, "miniflux.http")
 }
