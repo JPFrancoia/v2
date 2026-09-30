@@ -128,6 +128,8 @@ type OfflineSectionEntry struct {
 
 // OfflineSectionPage is one complete bounded page in the server's sort order.
 type OfflineSectionPage struct {
+	AsOf       int64                 `json:"as_of,omitempty"`
+	Selection  string                `json:"selection,omitempty"`
 	UserID     int64                 `json:"user_id"`
 	Entries    []OfflineSectionEntry `json:"entries"`
 	HasMore    bool                  `json:"has_more"`

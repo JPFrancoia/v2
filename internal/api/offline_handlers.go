@@ -4,10 +4,13 @@
 package api // import "miniflux.app/v2/internal/api"
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	json_parser "encoding/json"
 	"fmt"
 	"math"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -22,9 +25,134 @@ import (
 
 const offlineDeviceSnapshotVersion = "2"
 const offlineSectionPageSize = 10
+const offlineSectionMaxPageSize = 20
+
+// offlineSectionParameters keeps native paging and offline preparation separate.
+type offlineSectionParameters struct {
+	limit     int
+	asOf      int64
+	selection string
+}
+
+// parseOfflineSectionParameters validates bounded pages before database access.
+func parseOfflineSectionParameters(r *http.Request, now time.Time) (offlineSectionParameters, error) {
+	params := offlineSectionParameters{limit: offlineSectionPageSize}
+	query := r.URL.Query()
+	if query.Has("limit") {
+		limit, err := strconv.Atoi(query.Get("limit"))
+		if err != nil || limit < 1 || limit > offlineSectionMaxPageSize {
+			return params, fmt.Errorf(`api: invalid section limit`)
+		}
+		params.limit = limit
+	}
+	switch query.Get("scope") {
+	case "":
+		if query.Has("as_of") || query.Has("selection") {
+			return params, fmt.Errorf(`api: preparation parameters require offline scope`)
+		}
+	case "offline":
+		if r.PathValue("section") == "history" {
+			return params, fmt.Errorf(`api: History has no offline preparation scope`)
+		}
+		params.asOf = now.Unix()
+		if query.Has("as_of") {
+			asOf, err := strconv.ParseInt(query.Get("as_of"), 10, 64)
+			if err != nil || asOf <= 0 || asOf > now.Unix() {
+				return params, fmt.Errorf(`api: invalid preparation time`)
+			}
+			params.asOf = asOf
+		} else if query.Get("cursor") != "" {
+			return params, fmt.Errorf(`api: offline continuation requires preparation time`)
+		}
+		if r.PathValue("section") == "review" && query.Get("cursor") != "" && !query.Has("selection") {
+			return params, fmt.Errorf(`api: Review continuation requires selection`)
+		}
+		if query.Has("selection") {
+			params.selection = query.Get("selection")
+			decoded, err := hex.DecodeString(params.selection)
+			if r.PathValue("section") != "review" || err != nil || len(decoded) != sha256.Size || strings.ToLower(params.selection) != params.selection {
+				return params, fmt.Errorf(`api: invalid Review selection`)
+			}
+		}
+	default:
+		return params, fmt.Errorf(`api: invalid section scope`)
+	}
+	return params, nil
+}
+
+// offlineCursorSection binds offline markers to the preparation window.
+func offlineCursorSection(section string, asOf int64) string {
+	if asOf > 0 {
+		return fmt.Sprintf(`%s-offline-%d`, section, asOf)
+	}
+	return section
+}
+
+// offlineSectionPreparationQuery applies the bounded library profile, not browser rules.
+func offlineSectionPreparationQuery(builder *storage.EntryQueryBuilder, section, sort string, asOf int64) error {
+	if section == "history" {
+		return fmt.Errorf(`api: History has no offline preparation scope`)
+	}
+	now := time.Unix(asOf, 0)
+	if err := offlineSectionQueryWithScope(builder, section, sort, now, true); err != nil {
+		return fmt.Errorf(`api: unable to build preparation query: %w`, err)
+	}
+	builder.BeforeCreatedDate(now)
+	if section == "unread" {
+		builder.AfterPublishedDate(now.Add(-7 * 24 * time.Hour))
+	}
+	return nil
+}
+
+// offlineReviewSelection identifies canonical membership and ordering without a long database transaction.
+func offlineReviewSelection(entries model.Entries) string {
+	hash := sha256.New()
+	for _, entry := range entries {
+		fmt.Fprintf(hash, "%d:%016x:%d;", entry.ID, math.Float64bits(*entry.RawRelevanceScore), entry.Date.UnixMicro())
+	}
+	return fmt.Sprintf(`%x`, hash.Sum(nil))
+}
+
+// offlineReviewPage derives a page from one canonical query, keeping its token and rows consistent.
+func offlineReviewPage(entries model.Entries, order string, first, second, id, target int64) model.Entries {
+	if order == "newest" {
+		sort.Slice(entries, func(i, j int) bool {
+			if entries[i].Date.Equal(entries[j].Date) {
+				return entries[i].ID > entries[j].ID
+			}
+			return entries[i].Date.After(entries[j].Date)
+		})
+	}
+	if id == 0 {
+		return entries
+	}
+	remaining := entries[:0]
+	for _, entry := range entries {
+		published := entry.Date.UnixMicro()
+		after := published < first || published == first && entry.ID < id
+		if order == "score" {
+			distance := math.Abs(*entry.RawRelevanceScore - float64(target))
+			cursorDistance := math.Float64frombits(uint64(first))
+			after = distance > cursorDistance || distance == cursorDistance &&
+				(published < second || published == second && entry.ID < id)
+		}
+		if after {
+			remaining = append(remaining, entry)
+		}
+	}
+	return remaining
+}
 
 // offlineSectionQuery applies the same filters as the web sections to a scoped device query.
 func offlineSectionQuery(builder *storage.EntryQueryBuilder, section, sort string, now time.Time) error {
+	if err := offlineSectionQueryWithScope(builder, section, sort, now, false); err != nil {
+		return fmt.Errorf(`api: unable to build online section query: %w`, err)
+	}
+	return nil
+}
+
+// offlineSectionQueryWithScope preserves online Saved while preparing every saved article.
+func offlineSectionQueryWithScope(builder *storage.EntryQueryBuilder, section, sort string, now time.Time, offline bool) error {
 	if sort != "score" && sort != "newest" {
 		return fmt.Errorf(`api: invalid section sort`)
 	}
@@ -32,7 +160,10 @@ func offlineSectionQuery(builder *storage.EntryQueryBuilder, section, sort strin
 	case "unread":
 		builder.WithStatus(model.EntryStatusUnread)
 	case "saved":
-		builder.WithStatus(model.EntryStatusUnread).WithSavedForLater(true)
+		builder.WithSavedForLater(true)
+		if !offline {
+			builder.WithStatus(model.EntryStatusUnread)
+		}
 	case "review":
 		builder.WithStatus(model.EntryStatusUnread).WithVote(0).WithRawRelevanceScore().AfterPublishedDate(now.Add(-5 * 24 * time.Hour))
 	case "history":
@@ -40,7 +171,7 @@ func offlineSectionQuery(builder *storage.EntryQueryBuilder, section, sort strin
 	default:
 		return fmt.Errorf(`api: invalid section`)
 	}
-	if section != "history" {
+	if section != "history" && (!offline || section == "review") {
 		builder.WithGloballyVisible()
 	}
 	builder.WithoutContent()
@@ -62,9 +193,9 @@ func offlineSectionQuery(builder *storage.EntryQueryBuilder, section, sort strin
 }
 
 // parseOfflineSectionCursor rejects malformed or cross-section page markers.
-func parseOfflineSectionCursor(raw, section, sort string) (first, second, id int64, err error) {
+func parseOfflineSectionCursor(raw, section, sort string, asOf int64) (first, second, id int64, err error) {
 	parts := strings.Split(raw, ".")
-	if len(raw) > 128 || len(parts) != 6 || parts[0] != section || parts[1] != sort {
+	if len(raw) > 128 || len(parts) != 6 || parts[0] != offlineCursorSection(section, asOf) || parts[1] != sort {
 		return 0, 0, 0, fmt.Errorf(`api: invalid section cursor`)
 	}
 	first, err = strconv.ParseInt(parts[2], 10, 64)
@@ -96,7 +227,7 @@ func parseOfflineSectionCursor(raw, section, sort string) (first, second, id int
 }
 
 // offlineSectionCursor encodes the last visible sort tuple as a URL-safe page marker.
-func offlineSectionCursor(entry *model.Entry, section, sort string, target int64) string {
+func offlineSectionCursor(entry *model.Entry, section, sort string, target, asOf int64) string {
 	first, second := entry.Score, int64(0)
 	switch {
 	case section == "review" && sort == "score":
@@ -110,7 +241,7 @@ func offlineSectionCursor(entry *model.Entry, section, sort string, target int64
 	if section != "review" || sort != "score" {
 		target = 0
 	}
-	return fmt.Sprintf(`%s.%s.%d.%d.%d.%d`, section, sort, first, second, entry.ID, target)
+	return fmt.Sprintf(`%s.%s.%d.%d.%d.%d`, offlineCursorSection(section, asOf), sort, first, second, entry.ID, target)
 }
 
 // getOfflineSectionHandler returns one bounded page without downloading article bodies.
@@ -120,29 +251,63 @@ func (h *handler) getOfflineSectionHandler(w http.ResponseWriter, r *http.Reques
 	if sort == "" {
 		sort = "score"
 	}
+	now := time.Now()
+	params, err := parseOfflineSectionParameters(r, now)
+	if err != nil {
+		response.JSONBadRequest(w, r, err)
+		return
+	}
 	builder := h.store.NewEntryQueryBuilder(r.Context(), request.UserID(r))
-	if err := offlineSectionQuery(builder, section, sort, time.Now()); err != nil {
+	if params.asOf > 0 {
+		err = offlineSectionPreparationQuery(builder, section, sort, params.asOf)
+	} else {
+		err = offlineSectionQuery(builder, section, sort, now)
+	}
+	if err != nil {
 		response.JSONBadRequest(w, r, err)
 		return
 	}
 	cursor := r.URL.Query().Get("cursor")
+	var first, second, id int64
 	if cursor != "" {
-		first, second, id, err := parseOfflineSectionCursor(cursor, section, sort)
+		first, second, id, err = parseOfflineSectionCursor(cursor, section, sort, params.asOf)
 		if err != nil {
 			response.JSONBadRequest(w, r, err)
 			return
 		}
 		builder.AfterOfflineSectionCursor(section, sort, first, second, id, config.Opts.ToReviewRawRelevanceTarget())
 	}
-	builder.WithLimit(offlineSectionPageSize + 1)
-	entries, err := builder.GetEntries()
-	if err != nil {
-		response.JSONServerError(w, r, err)
-		return
+	selection := ""
+	var entries model.Entries
+	if params.asOf > 0 && section == "review" {
+		canonical := h.store.NewEntryQueryBuilder(r.Context(), request.UserID(r))
+		if err := offlineSectionPreparationQuery(canonical, section, "score", params.asOf); err != nil {
+			response.JSONBadRequest(w, r, err)
+			return
+		}
+		candidates, err := canonical.WithLimit(100).GetEntries()
+		if err != nil {
+			response.JSONServerError(w, r, err)
+			return
+		}
+		selection = offlineReviewSelection(candidates)
+		if params.selection != "" && selection != params.selection {
+			response.NewBuilder(w, r).WithStatus(http.StatusConflict).
+				WithHeader("Content-Type", "application/json").
+				WithBodyAsBytes([]byte(`{"error_message":"api: Review selection changed; retry Sync"}`)).Write()
+			return
+		}
+		entries = offlineReviewPage(candidates, sort, first, second, id, config.Opts.ToReviewRawRelevanceTarget())
+	} else {
+		entries, err = builder.WithLimit(params.limit + 1).GetEntries()
+		if err != nil {
+			response.JSONServerError(w, r, err)
+			return
+		}
 	}
-	more := len(entries) > offlineSectionPageSize
+	more := len(entries) > params.limit
 	if more {
-		entries = entries[:offlineSectionPageSize]
+		entries = entries[:params.limit]
 	}
 	rows := make([]model.OfflineSectionEntry, 0, len(entries))
 	for _, entry := range entries {
@@ -154,10 +319,11 @@ func (h *handler) getOfflineSectionHandler(w http.ResponseWriter, r *http.Reques
 	}
 	nextCursor := ""
 	if more {
-		nextCursor = offlineSectionCursor(entries[len(entries)-1], section, sort, config.Opts.ToReviewRawRelevanceTarget())
+		nextCursor = offlineSectionCursor(entries[len(entries)-1], section, sort, config.Opts.ToReviewRawRelevanceTarget(), params.asOf)
 	}
 	response.JSON(w, r, &model.OfflineSectionPage{
 		UserID: request.UserID(r), Entries: rows, HasMore: more, NextCursor: nextCursor,
+		AsOf: params.asOf, Selection: selection,
 	})
 }
 

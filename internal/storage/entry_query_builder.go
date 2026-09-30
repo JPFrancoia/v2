@@ -97,6 +97,13 @@ func (e *EntryQueryBuilder) WithVote(vote int) *EntryQueryBuilder {
 	return e
 }
 
+// BeforeCreatedDate excludes entries added after preparation starts.
+func (e *EntryQueryBuilder) BeforeCreatedDate(date time.Time) *EntryQueryBuilder {
+	e.conditions = append(e.conditions, "e.created_at <= $"+strconv.Itoa(len(e.args)+1))
+	e.args = append(e.args, date)
+	return e
+}
+
 // BeforeChangedDate adds a condition < changed_at
 func (e *EntryQueryBuilder) BeforeChangedDate(date time.Time) *EntryQueryBuilder {
 	e.conditions = append(e.conditions, "e.changed_at < $"+strconv.Itoa(len(e.args)+1))

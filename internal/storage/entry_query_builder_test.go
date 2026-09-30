@@ -78,3 +78,16 @@ func TestOfflineSectionCursorPredicates(t *testing.T) {
 		})
 	}
 }
+
+// TestEntryQueryBuilderPreparationCutoff excludes new arrivals with a bound timestamp.
+func TestEntryQueryBuilderPreparationCutoff(t *testing.T) {
+	asOf := time.Unix(1790762400, 0)
+	builder := NewEntryQueryBuilder(context.Background(), nil, 42)
+	builder.BeforeCreatedDate(asOf).AfterPublishedDate(asOf.Add(-7 * 24 * time.Hour))
+	if got := builder.conditions[1]; got != "e.created_at <= $2" {
+		t.Fatalf("unexpected creation cutoff: %q", got)
+	}
+	if got := builder.args[1]; got != asOf {
+		t.Fatalf("unexpected bound cutoff: %v", got)
+	}
+}

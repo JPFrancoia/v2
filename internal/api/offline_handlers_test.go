@@ -75,8 +75,8 @@ func TestOfflineSectionCursorRoundTrip(t *testing.T) {
 	entry.ChangedAt = entry.Date.Add(time.Hour)
 	for _, section := range []string{"unread", "saved", "review", "history"} {
 		for _, sort := range []string{"score", "newest"} {
-			marker := offlineSectionCursor(entry, section, sort, config.Opts.ToReviewRawRelevanceTarget())
-			first, _, id, err := parseOfflineSectionCursor(marker, section, sort)
+			marker := offlineSectionCursor(entry, section, sort, config.Opts.ToReviewRawRelevanceTarget(), 0)
+			first, _, id, err := parseOfflineSectionCursor(marker, section, sort, 0)
 			if err != nil || id != entry.ID {
 				t.Fatalf("invalid %s %s cursor: %q: %v", section, sort, marker, err)
 			}
@@ -85,7 +85,7 @@ func TestOfflineSectionCursorRoundTrip(t *testing.T) {
 			}
 		}
 	}
-	if _, _, _, err := parseOfflineSectionCursor("review.score.4.1790668800000000.55.100", "review", "score"); err == nil {
+	if _, _, _, err := parseOfflineSectionCursor("review.score.4.1790668800000000.55.100", "review", "score", 0); err == nil {
 		t.Fatal("accepted a cursor with a stale Review target")
 	}
 }
@@ -143,5 +143,153 @@ func TestNewOfflineDeviceEntrySnapshot(t *testing.T) {
 
 	if got := newOfflineDeviceEntrySnapshot(entry, []int64{5, 9}); !reflect.DeepEqual(got, expected) {
 		t.Fatalf("Unexpected device snapshot: %#v", got)
+	}
+}
+
+// TestOfflineSectionParameters pins limits, scope isolation, and preparation time validation.
+func TestOfflineSectionParameters(t *testing.T) {
+	now := time.Unix(1790762400, 0)
+	for _, tc := range []struct {
+		query string
+		limit int
+		asOf  int64
+	}{
+		{"", 10, 0},
+		{"limit=1", 1, 0},
+		{"limit=20", 20, 0},
+		{"scope=offline&limit=20", 20, now.Unix()},
+		{"scope=offline&as_of=1790762300", 10, 1790762300},
+	} {
+		r := httptest.NewRequest(http.MethodGet, "/?"+tc.query, nil)
+		r.SetPathValue("section", "unread")
+		params, err := parseOfflineSectionParameters(r, now)
+		if err != nil || params.limit != tc.limit || params.asOf != tc.asOf {
+			t.Fatalf("%q: params=%+v, error=%v", tc.query, params, err)
+		}
+	}
+	for _, query := range []string{
+		"limit=0", "limit=21", "limit=-1", "limit=", "limit=no", "limit=9999999999999999999999999",
+		"scope=other", "as_of=1790762400", "selection=abc",
+		"scope=offline&as_of=", "scope=offline&as_of=0", "scope=offline&as_of=-1",
+		"scope=offline&as_of=no", "scope=offline&as_of=1790762401",
+		"scope=offline&cursor=anything", "scope=offline&selection=abc",
+	} {
+		r := httptest.NewRequest(http.MethodGet, "/?"+query, nil)
+		r.SetPathValue("section", "unread")
+		if _, err := parseOfflineSectionParameters(r, now); err == nil {
+			t.Fatalf("accepted invalid parameters %q", query)
+		}
+	}
+	r := httptest.NewRequest(http.MethodGet, "/?scope=offline", nil)
+	r.SetPathValue("section", "history")
+	if _, err := parseOfflineSectionParameters(r, now); err == nil {
+		t.Fatal("accepted bulk History")
+	}
+}
+
+// TestOfflineCursorScope prevents a library cursor from traversing another scope or time window.
+func TestOfflineCursorScope(t *testing.T) {
+	entry := model.NewEntry()
+	entry.ID, entry.Score = 55, 80
+	entry.Date = time.Unix(1790762200, 123000)
+	asOf := int64(1790762400)
+	cursor := offlineSectionCursor(entry, "unread", "newest", 50, asOf)
+	if _, _, id, err := parseOfflineSectionCursor(cursor, "unread", "newest", asOf); err != nil || id != entry.ID {
+		t.Fatalf("failed scoped cursor round trip: %v", err)
+	}
+	for _, wrongTime := range []int64{0, asOf - 1, asOf + 1} {
+		if _, _, _, err := parseOfflineSectionCursor(cursor, "unread", "newest", wrongTime); err == nil {
+			t.Fatalf("accepted cursor from wrong time %d", wrongTime)
+		}
+	}
+	online := offlineSectionCursor(entry, "unread", "newest", 50, 0)
+	if _, _, _, err := parseOfflineSectionCursor(online, "unread", "newest", asOf); err == nil {
+		t.Fatal("accepted online cursor in offline scope")
+	}
+}
+
+// TestOfflineReviewSelection detects membership and rank changes, including an empty queue.
+func TestOfflineReviewSelection(t *testing.T) {
+	raw := 49.875
+	makeEntries := func(ids ...int64) model.Entries {
+		entries := make(model.Entries, 0, len(ids))
+		for _, id := range ids {
+			entries = append(entries, &model.Entry{ID: id, RawRelevanceScore: &raw, Date: time.Unix(1790762200, 0)})
+		}
+		return entries
+	}
+	selection := offlineReviewSelection(makeEntries(1, 2, 3))
+	for _, ids := range [][]int64{{2, 1, 3}, {1, 2}, {1, 2, 4}, nil} {
+		if selection == offlineReviewSelection(makeEntries(ids...)) {
+			t.Fatalf("selection did not change for %v", ids)
+		}
+	}
+	raw = 50.125
+	if selection == offlineReviewSelection(makeEntries(1, 2, 3)) {
+		t.Fatal("selection did not change when raw rank values changed")
+	}
+	now := time.Unix(1790762400, 0)
+	for _, section := range []string{"review", "unread"} {
+		r := httptest.NewRequest(http.MethodGet, "/?scope=offline&selection="+selection, nil)
+		r.SetPathValue("section", section)
+		params, err := parseOfflineSectionParameters(r, now)
+		if (err == nil) != (section == "review") || section == "review" && params.selection != selection {
+			t.Fatalf("invalid selection scope behavior: %s, %+v, %v", section, params, err)
+		}
+	}
+}
+
+// TestOfflineReviewContinuationRequiresSelection rejects continuation without the consistency token.
+func TestOfflineReviewContinuationRequiresSelection(t *testing.T) {
+	path := "/?scope=offline&as_of=1790762400&cursor=marker"
+	r := httptest.NewRequest(http.MethodGet, path, nil)
+	r.SetPathValue("section", "review")
+	if _, err := parseOfflineSectionParameters(r, time.Unix(1790762400, 0)); err == nil {
+		t.Fatal("accepted Review continuation without selection")
+	}
+	r = httptest.NewRequest(http.MethodGet, path+"&selection="+offlineReviewSelection(nil), nil)
+	r.SetPathValue("section", "review")
+	if _, err := parseOfflineSectionParameters(r, time.Unix(1790762400, 0)); err != nil {
+		t.Fatalf("rejected complete continuation parameters: %v", err)
+	}
+}
+
+// TestOfflineReviewPage verifies canonical membership, fractional cursor ties, and both page orders.
+func TestOfflineReviewPage(t *testing.T) {
+	raw := []float64{49.875, 50.125, 50.25, 51}
+	published := []int64{100, 100, 300, 200}
+	entries := make(model.Entries, 4)
+	for i := range entries {
+		entries[i] = &model.Entry{ID: int64(4 - i), RawRelevanceScore: &raw[i], Date: time.Unix(published[i], 0)}
+	}
+	ids := func(rows model.Entries) []int64 {
+		result := make([]int64, len(rows))
+		for i, row := range rows {
+			result[i] = row.ID
+		}
+		return result
+	}
+	copyEntries := func() model.Entries { return append(model.Entries(nil), entries...) }
+	for _, tc := range []struct {
+		order  string
+		first  int64
+		second int64
+		id     int64
+		want   []int64
+	}{
+		{"score", 0, 0, 0, []int64{4, 3, 2, 1}},
+		{"newest", 0, 0, 0, []int64{2, 1, 4, 3}},
+		{"score", int64(math.Float64bits(0.125)), 100000000, 4, []int64{3, 2, 1}},
+		{"score", int64(math.Float64bits(0.125)), 100000000, 3, []int64{2, 1}},
+		{"newest", 100000000, 0, 4, []int64{3}},
+		{"newest", 100000000, 0, 3, []int64{}},
+	} {
+		got := ids(offlineReviewPage(copyEntries(), tc.order, tc.first, tc.second, tc.id, 50))
+		if !reflect.DeepEqual(got, tc.want) {
+			t.Fatalf("%s after %d: got %v, want %v", tc.order, tc.id, got, tc.want)
+		}
+	}
+	if got := offlineReviewPage(nil, "newest", 0, 0, 0, 50); len(got) != 0 {
+		t.Fatal("empty canonical queue gained members")
 	}
 }
