@@ -113,6 +113,29 @@ type OfflineDeviceSnapshotResponse struct {
 	Entries []OfflineDeviceEntrySnapshot `json:"entries"`
 }
 
+// OfflineSectionEntry contains the display fields for one device list row.
+type OfflineSectionEntry struct {
+	EntryID       int64     `json:"entry_id"`
+	Title         string    `json:"title"`
+	PublishedAt   time.Time `json:"published_at"`
+	ChangedAt     time.Time `json:"changed_at"`
+	Score         int64     `json:"score"`
+	Status        string    `json:"status"`
+	Starred       bool      `json:"starred"`
+	SavedForLater bool      `json:"saved_for_later"`
+	Vote          int       `json:"vote"`
+}
+
+// OfflineSectionPage is one complete bounded page in the server's sort order.
+type OfflineSectionPage struct {
+	AsOf       int64                 `json:"as_of,omitempty"`
+	Selection  string                `json:"selection,omitempty"`
+	UserID     int64                 `json:"user_id"`
+	Entries    []OfflineSectionEntry `json:"entries"`
+	HasMore    bool                  `json:"has_more"`
+	NextCursor string                `json:"next_cursor"`
+}
+
 // OfflineManifest identifies the entries that belong in the offline cache.
 type OfflineManifest struct {
 	UserID                int64                    `json:"user_id"`

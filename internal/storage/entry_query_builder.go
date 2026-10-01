@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -93,6 +94,13 @@ func (e *EntryQueryBuilder) WithSavedForLater(savedForLater bool) *EntryQueryBui
 func (e *EntryQueryBuilder) WithVote(vote int) *EntryQueryBuilder {
 	e.conditions = append(e.conditions, "e.vote = $"+strconv.Itoa(len(e.args)+1))
 	e.args = append(e.args, vote)
+	return e
+}
+
+// BeforeCreatedDate excludes entries added after preparation starts.
+func (e *EntryQueryBuilder) BeforeCreatedDate(date time.Time) *EntryQueryBuilder {
+	e.conditions = append(e.conditions, "e.created_at <= $"+strconv.Itoa(len(e.args)+1))
+	e.args = append(e.args, date)
 	return e
 }
 
@@ -264,6 +272,27 @@ func (e *EntryQueryBuilder) WithRawRelevanceDistanceSorting(score int64) *EntryQ
 	return e
 }
 
+// AfterOfflineSectionCursor keeps a device page after the last row in the current sort order.
+// Review distance uses the float's bits to preserve fractional scores in URL-safe cursors.
+func (e *EntryQueryBuilder) AfterOfflineSectionCursor(section, sort string, first, second, id, target int64) *EntryQueryBuilder {
+	n := len(e.args) + 1
+	switch {
+	case section == "review" && sort == "score":
+		e.conditions = append(e.conditions, fmt.Sprintf(`(abs(e.raw_relevance_score-$%d) > $%d or (abs(e.raw_relevance_score-$%d) = $%d and (e.published_at, e.id) < ($%d, $%d)))`, n, n+1, n, n+1, n+2, n+3))
+		e.args = append(e.args, target, math.Float64frombits(uint64(first)), time.UnixMicro(second), id)
+	case section == "history" && sort == "newest":
+		e.conditions = append(e.conditions, fmt.Sprintf(`(e.changed_at, e.published_at, e.id) < ($%d, $%d, $%d)`, n, n+1, n+2))
+		e.args = append(e.args, time.UnixMicro(first), time.UnixMicro(second), id)
+	case sort == "newest":
+		e.conditions = append(e.conditions, fmt.Sprintf(`(e.published_at, e.id) < ($%d, $%d)`, n, n+1))
+		e.args = append(e.args, time.UnixMicro(first), id)
+	default:
+		e.conditions = append(e.conditions, fmt.Sprintf(`(e.score, e.id) < ($%d, $%d)`, n, n+1))
+		e.args = append(e.args, first, id)
+	}
+	return e
+}
+
 // WithLimit set the limit.
 func (e *EntryQueryBuilder) WithLimit(limit int) *EntryQueryBuilder {
 	if limit > 0 {
@@ -368,6 +397,7 @@ func (e *EntryQueryBuilder) fetchEntries(withCount bool) (model.Entries, int, er
 			e.changed_at,
 			e.tags,
 			e.score,
+			e.raw_relevance_score,
 			e.vote,
 			f.title as feed_title,
 			f.feed_url,
@@ -441,6 +471,7 @@ func (e *EntryQueryBuilder) fetchEntries(withCount bool) (model.Entries, int, er
 			&entry.ChangedAt,
 			pq.Array(&entry.Tags),
 			&entry.Score,
+			&entry.RawRelevanceScore,
 			&entry.Vote,
 			&entry.Feed.Title,
 			&entry.Feed.FeedURL,

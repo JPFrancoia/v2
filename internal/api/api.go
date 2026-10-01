@@ -69,6 +69,7 @@ func NewHandler(store *storage.Storage, pool *worker.Pool) http.Handler {
 	mux.HandleFunc("GET /v1/integrations/status", handler.getIntegrationsStatusHandler)
 	mux.HandleFunc("GET /v1/version", handler.versionHandler)
 	mux.HandleFunc("GET /v1/offline/manifest", handler.getOfflineManifestHandler)
+	mux.HandleFunc("GET /v1/offline/sections/{section}", handler.getOfflineSectionHandler)
 	mux.HandleFunc("POST /v1/offline/entries", handler.getOfflineEntriesHandler)
 	mux.HandleFunc("POST /v1/offline/sync", handler.syncOfflineEntriesHandler)
 	mux.HandleFunc("POST /v1/api-keys", handler.createAPIKeyHandler)
