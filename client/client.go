@@ -645,7 +645,7 @@ func (c *Client) UpdateUserTag(tagID int64, title string) (*UserTag, error) {
 // UpdateUserTagContext updates a user tag.
 func (c *Client) UpdateUserTagContext(ctx context.Context, tagID int64, title string) (*UserTag, error) {
 	body, err := c.request.Put(ctx, fmt.Sprintf("/v1/user-tags/%d", tagID), &UserTagModificationRequest{
-		Title: SetOptionalField(title),
+		Title: new(title),
 	})
 	if err != nil {
 		return nil, err

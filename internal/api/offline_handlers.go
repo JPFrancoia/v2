@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	json_parser "encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -41,41 +42,41 @@ func parseOfflineSectionParameters(r *http.Request, now time.Time) (offlineSecti
 	if query.Has("limit") {
 		limit, err := strconv.Atoi(query.Get("limit"))
 		if err != nil || limit < 1 || limit > offlineSectionMaxPageSize {
-			return params, fmt.Errorf(`api: invalid section limit`)
+			return params, errors.New(`api: invalid section limit`)
 		}
 		params.limit = limit
 	}
 	switch query.Get("scope") {
 	case "":
 		if query.Has("as_of") || query.Has("selection") {
-			return params, fmt.Errorf(`api: preparation parameters require offline scope`)
+			return params, errors.New(`api: preparation parameters require offline scope`)
 		}
 	case "offline":
 		if r.PathValue("section") == "history" {
-			return params, fmt.Errorf(`api: History has no offline preparation scope`)
+			return params, errors.New(`api: History has no offline preparation scope`)
 		}
 		params.asOf = now.Unix()
 		if query.Has("as_of") {
 			asOf, err := strconv.ParseInt(query.Get("as_of"), 10, 64)
 			if err != nil || asOf <= 0 || asOf > now.Unix() {
-				return params, fmt.Errorf(`api: invalid preparation time`)
+				return params, errors.New(`api: invalid preparation time`)
 			}
 			params.asOf = asOf
 		} else if query.Get("cursor") != "" {
-			return params, fmt.Errorf(`api: offline continuation requires preparation time`)
+			return params, errors.New(`api: offline continuation requires preparation time`)
 		}
 		if r.PathValue("section") == "review" && query.Get("cursor") != "" && !query.Has("selection") {
-			return params, fmt.Errorf(`api: Review continuation requires selection`)
+			return params, errors.New(`api: Review continuation requires selection`)
 		}
 		if query.Has("selection") {
 			params.selection = query.Get("selection")
 			decoded, err := hex.DecodeString(params.selection)
 			if r.PathValue("section") != "review" || err != nil || len(decoded) != sha256.Size || strings.ToLower(params.selection) != params.selection {
-				return params, fmt.Errorf(`api: invalid Review selection`)
+				return params, errors.New(`api: invalid Review selection`)
 			}
 		}
 	default:
-		return params, fmt.Errorf(`api: invalid section scope`)
+		return params, errors.New(`api: invalid section scope`)
 	}
 	return params, nil
 }
@@ -91,7 +92,7 @@ func offlineCursorSection(section string, asOf int64) string {
 // offlineSectionPreparationQuery applies the bounded library profile, not browser rules.
 func offlineSectionPreparationQuery(builder *storage.EntryQueryBuilder, section, sort string, asOf int64) error {
 	if section == "history" {
-		return fmt.Errorf(`api: History has no offline preparation scope`)
+		return errors.New(`api: History has no offline preparation scope`)
 	}
 	now := time.Unix(asOf, 0)
 	if err := offlineSectionQueryWithScope(builder, section, sort, now, true); err != nil {
@@ -110,7 +111,7 @@ func offlineReviewSelection(entries model.Entries) string {
 	for _, entry := range entries {
 		fmt.Fprintf(hash, "%d:%016x:%d;", entry.ID, math.Float64bits(*entry.RawRelevanceScore), entry.Date.UnixMicro())
 	}
-	return fmt.Sprintf(`%x`, hash.Sum(nil))
+	return hex.EncodeToString(hash.Sum(nil))
 }
 
 // offlineReviewPage derives a page from one canonical query, keeping its token and rows consistent.
@@ -154,7 +155,7 @@ func offlineSectionQuery(builder *storage.EntryQueryBuilder, section, sort strin
 // offlineSectionQueryWithScope preserves online Saved while preparing every saved article.
 func offlineSectionQueryWithScope(builder *storage.EntryQueryBuilder, section, sort string, now time.Time, offline bool) error {
 	if sort != "score" && sort != "newest" {
-		return fmt.Errorf(`api: invalid section sort`)
+		return errors.New(`api: invalid section sort`)
 	}
 	switch section {
 	case "unread":
@@ -169,20 +170,21 @@ func offlineSectionQueryWithScope(builder *storage.EntryQueryBuilder, section, s
 	case "history":
 		builder.WithStatus(model.EntryStatusRead)
 	default:
-		return fmt.Errorf(`api: invalid section`)
+		return errors.New(`api: invalid section`)
 	}
 	if section != "history" && (!offline || section == "review") {
 		builder.WithGloballyVisible()
 	}
 	builder.WithoutContent()
-	if section == "review" && sort == "score" {
+	switch {
+	case section == "review" && sort == "score":
 		builder.WithRawRelevanceDistanceSorting(config.Opts.ToReviewRawRelevanceTarget())
-	} else if section == "history" && sort == "newest" {
+	case section == "history" && sort == "newest":
 		builder.WithSorting("e.changed_at", "DESC")
 		builder.WithSorting("e.published_at", "DESC")
-	} else if sort == "score" {
+	case sort == "score":
 		builder.WithSorting("e.score", "DESC")
-	} else {
+	default:
 		builder.WithSorting("e.published_at", "DESC")
 	}
 	if section == "review" && sort == "score" {
@@ -196,7 +198,7 @@ func offlineSectionQueryWithScope(builder *storage.EntryQueryBuilder, section, s
 func parseOfflineSectionCursor(raw, section, sort string, asOf int64) (first, second, id int64, err error) {
 	parts := strings.Split(raw, ".")
 	if len(raw) > 128 || len(parts) != 6 || parts[0] != offlineCursorSection(section, asOf) || parts[1] != sort {
-		return 0, 0, 0, fmt.Errorf(`api: invalid section cursor`)
+		return 0, 0, 0, errors.New(`api: invalid section cursor`)
 	}
 	first, err = strconv.ParseInt(parts[2], 10, 64)
 	if err != nil {
@@ -208,20 +210,20 @@ func parseOfflineSectionCursor(raw, section, sort string, asOf int64) (first, se
 	}
 	id, err = strconv.ParseInt(parts[4], 10, 64)
 	if err != nil || id <= 0 {
-		return 0, 0, 0, fmt.Errorf(`api: invalid section cursor`)
+		return 0, 0, 0, errors.New(`api: invalid section cursor`)
 	}
 	encodedTarget, targetErr := strconv.ParseInt(parts[5], 10, 64)
 	if targetErr != nil || (section == "review" && sort == "score" && encodedTarget != config.Opts.ToReviewRawRelevanceTarget()) ||
 		(section != "review" || sort != "score") && encodedTarget != 0 {
-		return 0, 0, 0, fmt.Errorf(`api: invalid section cursor`)
+		return 0, 0, 0, errors.New(`api: invalid section cursor`)
 	}
 	if section == "review" && sort == "score" {
 		distance := math.Float64frombits(uint64(first))
 		if first < 0 || math.IsNaN(distance) || math.IsInf(distance, 0) || distance < 0 || distance > 100 || second <= 0 {
-			return 0, 0, 0, fmt.Errorf(`api: invalid section cursor`)
+			return 0, 0, 0, errors.New(`api: invalid section cursor`)
 		}
 	} else if sort == "newest" && first <= 0 {
-		return 0, 0, 0, fmt.Errorf(`api: invalid section cursor`)
+		return 0, 0, 0, errors.New(`api: invalid section cursor`)
 	}
 	return first, second, id, nil
 }

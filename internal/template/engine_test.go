@@ -4,9 +4,12 @@
 package template // import "miniflux.app/v2/internal/template"
 
 import (
+	"bytes"
 	"testing"
+	"time"
 
 	"miniflux.app/v2/internal/config"
+	"miniflux.app/v2/internal/model"
 )
 
 // TestParseTemplates verifies that all embedded templates can be parsed
@@ -23,4 +26,53 @@ func TestParseTemplates(t *testing.T) {
 	}()
 
 	NewEngine("").ParseTemplates()
+}
+
+// TestRenderWithoutArticleSummaries checks that views omit stored summaries and keep article text.
+func TestRenderWithoutArticleSummaries(t *testing.T) {
+	config.Opts = config.NewConfigOptions()
+	engine := NewEngine("")
+	engine.ParseTemplates()
+	entry := &model.Entry{
+		ID:             1,
+		Title:          "Article title",
+		URL:            "https://example.com/article",
+		Content:        "<p>Article body preview.</p>",
+		OneLineSummary: "Stored generated summary.",
+		Date:           time.Now(),
+		Status:         "unread",
+		Feed: &model.Feed{
+			ID:       1,
+			Title:    "Example feed",
+			Icon:     &model.FeedIcon{},
+			Category: &model.Category{ID: 1, Title: "Example category"},
+		},
+	}
+	user := &model.User{Timezone: "UTC"}
+	cases := []struct {
+		name     string
+		view     string
+		fragment string
+		data     map[string]any
+		preview  bool
+	}{
+		{"list", "unread_entries.html", "item_meta", map[string]any{"entry": entry, "user": user}, true},
+		{"shared list", "shared_entries.html", "content", map[string]any{"entries": model.Entries{entry}, "user": user, "pagination": map[string]any{}}, true},
+		{"article", "entry.html", "page_header", map[string]any{"entry": entry, "user": user}, false},
+		{"public article", "entry.html", "page_header", map[string]any{"entry": entry}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var output bytes.Buffer
+			if err := engine.templates[tc.view].ExecuteTemplate(&output, tc.fragment, tc.data); err != nil {
+				t.Fatal(err)
+			}
+			if bytes.Contains(output.Bytes(), []byte(entry.OneLineSummary)) {
+				t.Error("view contains a stored generated summary")
+			}
+			if tc.preview && !bytes.Contains(output.Bytes(), []byte("Article body preview.")) {
+				t.Error("list view does not contain the article preview")
+			}
+		})
+	}
 }

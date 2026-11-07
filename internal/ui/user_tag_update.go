@@ -14,6 +14,7 @@ import (
 	"miniflux.app/v2/internal/validator"
 )
 
+// updateUserTag validates and saves a user-owned tag title from the edit form.
 func (h *handler) updateUserTag(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
@@ -44,7 +45,7 @@ func (h *handler) updateUserTag(w http.ResponseWriter, r *http.Request) {
 	v.Set("countErrorFeeds", h.store.CountUserFeedsWithErrors(r.Context(), user.ID))
 
 	tagRequest := &model.UserTagModificationRequest{
-		Title: model.SetOptionalField(tagForm.Title),
+		Title: new(tagForm.Title),
 	}
 
 	if validationErr := validator.ValidateUserTagModification(r.Context(), h.store, user.ID, tag.ID, tagRequest); validationErr != nil {
