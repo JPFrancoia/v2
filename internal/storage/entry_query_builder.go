@@ -29,6 +29,19 @@ type EntryQueryBuilder struct {
 	offset          int
 	fetchEnclosures bool
 	excludeContent  bool
+	fetchImportance bool
+}
+
+// WithImportance loads prediction flags for authenticated web lists only.
+func (e *EntryQueryBuilder) WithImportance() *EntryQueryBuilder {
+	e.fetchImportance = true
+	return e
+}
+
+// WithImportant restricts results to articles with a true current prediction.
+func (e *EntryQueryBuilder) WithImportant() *EntryQueryBuilder {
+	e.conditions = append(e.conditions, "exists (select 1 from entries_importance ei where ei.entry_id = e.id and ei.is_important)")
+	return e
 }
 
 // WithEnclosures fetches enclosures for each entry.
@@ -386,6 +399,13 @@ func (e *EntryQueryBuilder) entryQuery(withCount bool) string {
 		}
 	}
 
+	importanceColumn := "false"
+	importanceJoin := ""
+	if e.fetchImportance {
+		importanceColumn = "coalesce(ei.is_important, false)"
+		importanceJoin = " left join entries_importance ei on ei.entry_id = e.id "
+	}
+
 	return prefix + `
 		SELECT
 			` + countColumn + `
@@ -410,6 +430,7 @@ func (e *EntryQueryBuilder) entryQuery(withCount bool) string {
 			e.score,
 			e.raw_relevance_score,
 			e.vote,
+            ` + importanceColumn + `,
 			f.title as feed_title,
 			f.feed_url,
 			f.site_url,
@@ -430,7 +451,7 @@ func (e *EntryQueryBuilder) entryQuery(withCount bool) string {
 			i.external_id AS icon_external_id,
 			u.timezone
 		FROM
-			entries e ` + pageJoin + `
+			entries e ` + pageJoin + importanceJoin + `
 		LEFT JOIN
 			feeds f ON f.id=e.feed_id
 		LEFT JOIN
@@ -490,6 +511,7 @@ func (e *EntryQueryBuilder) fetchEntries(withCount bool) (model.Entries, int, er
 			&entry.Score,
 			&entry.RawRelevanceScore,
 			&entry.Vote,
+			&entry.IsImportant,
 			&entry.Feed.Title,
 			&entry.Feed.FeedURL,
 			&entry.Feed.SiteURL,

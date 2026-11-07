@@ -70,6 +70,7 @@
     --category-link-color: #000;
     --category-link-hover-color: #000;
 
+    --item-important-background: #fff4e6;
     --item-border-color: #ddd;
     --item-padding: 5px;
     --item-title-link-font-weight: 600;
@@ -198,6 +199,7 @@ html {
         --category-link-color: #999;
         --category-link-hover-color: #aaa;
 
+        --item-important-background: #382b20;
         --item-border-color: #666;
         --item-padding: 4px;
         --item-title-link-font-weight: 400;

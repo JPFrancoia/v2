@@ -10,7 +10,11 @@
         {{ end }}
     </div>
 
+    {{ if .importantReturnURL }}
+    <a href="{{ .importantReturnURL }}{{ queryString (dict "order" .sortOrder "direction" .sortDirection) }}">{{ t "menu.important" }}</a>
+    {{ else }}
     <a href="#" class="elevator">{{ icon "up" }}{{ t "page.footer.elevator" }}</a>
+    {{ end }}
 
     <div class="pagination-next {{ if not .nextEntry }}disabled{{end}}">
         {{ if .nextEntry }}

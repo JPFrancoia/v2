@@ -34,6 +34,11 @@ func (e *entryPaginationBuilder) WithSearchQuery(query string) {
 	}
 }
 
+// WithImportant keeps article navigation inside the predicted-important selection.
+func (e *entryPaginationBuilder) WithImportant() {
+	e.conditions = append(e.conditions, "exists (select 1 from entries_importance ei where ei.entry_id = e.id and ei.is_important)")
+}
+
 // WithStarred adds starred to the condition.
 func (e *entryPaginationBuilder) WithStarred() {
 	e.conditions = append(e.conditions, "e.starred is true")

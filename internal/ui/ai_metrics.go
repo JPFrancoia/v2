@@ -37,11 +37,18 @@ type importantDiscoveryView struct {
 }
 
 type importantDiscoveryWeekView struct {
-	WeekStart      string
-	ImportantCount int
-	ReadCount      int
-	RatePercent    float64
-	HasRate        bool
+	WeekStart                   string
+	ImportantCount              int
+	ReadCount                   int
+	RatePercent                 float64
+	HasRate                     bool
+	ClassifierReadCount         int
+	ClassifierUpvoteCount       int
+	ClassifierUpvoteRatePercent float64
+	HasClassifierUpvoteRate     bool
+	ClassifierUpvoteTotal       int
+	RecallPercent               float64
+	HasRecall                   bool
 }
 
 type aiMetricRowView struct {
@@ -99,17 +106,29 @@ func (h *handler) showAIMetricsPage(w http.ResponseWriter, r *http.Request) {
 	response.HTML(w, r, view.Render("ai_metrics"))
 }
 
+// buildImportantDiscoveryView prepares weekly counts and percentages for display.
 func buildImportantDiscoveryView(weeks model.ImportantDiscoveryWeeks) importantDiscoveryView {
 	result := importantDiscoveryView{Rows: make([]importantDiscoveryWeekView, 0, len(weeks))}
 	for _, week := range weeks {
 		row := importantDiscoveryWeekView{
-			WeekStart:      week.WeekStart.Format("2006-01-02"),
-			ImportantCount: week.ImportantCount,
-			ReadCount:      week.ReadCount,
-			HasRate:        week.ReadCount > 0,
+			WeekStart:               week.WeekStart.Format("2006-01-02"),
+			ImportantCount:          week.ImportantCount,
+			ReadCount:               week.ReadCount,
+			HasRate:                 week.ReadCount > 0,
+			ClassifierReadCount:     week.ClassifierReadCount,
+			ClassifierUpvoteCount:   week.ClassifierUpvoteCount,
+			HasClassifierUpvoteRate: week.ClassifierReadCount > 0,
+			ClassifierUpvoteTotal:   week.ClassifierUpvoteCount + week.ClassifierMissedCount,
 		}
 		if row.HasRate {
 			row.RatePercent = float64(week.ImportantCount) / float64(week.ReadCount) * 100
+		}
+		if row.HasClassifierUpvoteRate {
+			row.ClassifierUpvoteRatePercent = float64(week.ClassifierUpvoteCount) / float64(week.ClassifierReadCount) * 100
+		}
+		row.HasRecall = row.ClassifierUpvoteTotal > 0
+		if row.HasRecall {
+			row.RecallPercent = float64(week.ClassifierUpvoteCount) / float64(row.ClassifierUpvoteTotal) * 100
 		}
 		result.Rows = append(result.Rows, row)
 	}
@@ -120,12 +139,19 @@ func buildImportantDiscoveryView(weeks model.ImportantDiscoveryWeeks) importantD
 	return result
 }
 
+// buildImportantDiscoveryChartData orders normalized rates by date and leaves gaps for empty groups.
 func buildImportantDiscoveryChartData(rows []importantDiscoveryWeekView) string {
 	points := make([]map[string]any, 0, len(rows))
 	for i := len(rows) - 1; i >= 0; i-- {
-		point := map[string]any{"date": rows[i].WeekStart, "rate": nil}
+		point := map[string]any{"date": rows[i].WeekStart, "rate": nil, "classifier_upvote_rate": nil, "recall": nil}
 		if rows[i].HasRate {
 			point["rate"] = rows[i].RatePercent / 100
+		}
+		if rows[i].HasClassifierUpvoteRate {
+			point["classifier_upvote_rate"] = rows[i].ClassifierUpvoteRatePercent / 100
+		}
+		if rows[i].HasRecall {
+			point["recall"] = rows[i].RecallPercent / 100
 		}
 		points = append(points, point)
 	}

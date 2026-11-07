@@ -1530,6 +1530,8 @@ function aiMetricsChartSeries(chartElement) {
     if (chartElement.dataset.isDiscovery === "true") {
         return [
             { key: "rate", label: chartElement.dataset.labelRate || "Important discovery rate", color: "#16a34a", visible: true },
+            { key: "classifier_upvote_rate", label: chartElement.dataset.labelClassifierUpvoteRate || "Classifier upvote rate", color: "#ea580c", visible: true },
+            { key: "recall", label: chartElement.dataset.labelRecall || "Recall", color: "#2563eb", visible: true },
         ];
     }
     if (chartElement.dataset.isRelevance === "true") {

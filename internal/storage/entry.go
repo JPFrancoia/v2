@@ -6,6 +6,7 @@ package storage // import "miniflux.app/v2/internal/storage"
 import (
 	"context"
 	"database/sql"
+	_ "embed"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -760,47 +761,27 @@ func (s *Storage) MarkCategoryAsRead(ctx context.Context, userID, categoryID int
 	return nil
 }
 
-// ImportantDiscoveryWeeks returns read and important article counts for the last 12 calendar weeks.
+//go:embed sql/important_discovery_weeks.sql
+var importantDiscoveryWeeksQuery string
+
+// ImportantDiscoveryWeeks returns discovery and classifier feedback counts for the last 12 calendar weeks.
 func (s *Storage) ImportantDiscoveryWeeks(ctx context.Context, userID int64, userTimezone string) (model.ImportantDiscoveryWeeks, error) {
-	query := `
-		WITH weeks AS (
-			SELECT generate_series(
-				date_trunc('week', CURRENT_TIMESTAMP AT TIME ZONE $2) - INTERVAL '11 weeks',
-				date_trunc('week', CURRENT_TIMESTAMP AT TIME ZONE $2),
-				INTERVAL '1 week'
-			)::date AS week_start
-		)
-		SELECT
-			weeks.week_start,
-			COUNT(entries.id) FILTER (
-				WHERE entries.vote >= 0 AND (entries.starred OR entries.vote = 1)
-			),
-			COUNT(entries.id)
-		FROM weeks
-		LEFT JOIN entries ON
-			entries.user_id = $1
-			AND entries.status = 'read'
-			AND entries.changed_at >= weeks.week_start::timestamp AT TIME ZONE $2
-			AND entries.changed_at < (weeks.week_start::timestamp + INTERVAL '1 week') AT TIME ZONE $2
-		GROUP BY weeks.week_start
-		ORDER BY weeks.week_start DESC
-	`
-	rows, err := s.db.QueryContext(ctx, query, userID, userTimezone)
+	rows, err := s.db.QueryContext(ctx, importantDiscoveryWeeksQuery, userID, userTimezone)
 	if err != nil {
-		return nil, fmt.Errorf(`store: unable to fetch important discovery weeks: %v`, err)
+		return nil, fmt.Errorf(`store: unable to fetch important discovery weeks: %w`, err)
 	}
 	defer rows.Close()
 
 	weeks := make(model.ImportantDiscoveryWeeks, 0, 12)
 	for rows.Next() {
 		week := &model.ImportantDiscoveryWeek{}
-		if err := rows.Scan(&week.WeekStart, &week.ImportantCount, &week.ReadCount); err != nil {
-			return nil, fmt.Errorf(`store: unable to fetch important discovery week: %v`, err)
+		if err := rows.Scan(&week.WeekStart, &week.ImportantCount, &week.ReadCount, &week.ClassifierReadCount, &week.ClassifierUpvoteCount, &week.ClassifierMissedCount); err != nil {
+			return nil, fmt.Errorf(`store: unable to fetch important discovery week: %w`, err)
 		}
 		weeks = append(weeks, week)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf(`store: unable to fetch important discovery weeks: %v`, err)
+		return nil, fmt.Errorf(`store: unable to fetch important discovery weeks: %w`, err)
 	}
 
 	return weeks, nil

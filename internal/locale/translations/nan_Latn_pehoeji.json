@@ -505,6 +505,10 @@
     "page.ai_metrics.discovery.important": "Important",
     "page.ai_metrics.discovery.read": "Read",
     "page.ai_metrics.discovery.rate": "Rate",
+    "page.ai_metrics.discovery.classifier_upvote_rate": "Classifier upvote rate",
+    "page.ai_metrics.discovery.recall": "Recall",
+    "page.ai_metrics.discovery.recall_description": "Recall is the share of your important articles that Jev found. Only read, upvoted articles with a stored Jev prediction count.",
+    "page.ai_metrics.discovery.classifier_upvote_description": "Share of read articles with a current important prediction that you upvoted. Counts show upvoted/read articles. Weeks use the time of the latest article state change in your timezone. Current predictions and feedback can change earlier weeks.",
     "page.ai_metrics.metric.accuracy": "Accuracy",
     "page.ai_metrics.metric.average_precision": "Average precision",
     "page.ai_metrics.metric.preference_ap": "Preference AP",
@@ -720,5 +724,9 @@
     ],
     "time_elapsed.yesterday": "cha-hng",
     "tooltip.keyboard_shortcuts": "Khoài-sok khí：%s",
-    "tooltip.logged_user": "Chit-má teng-lo̍k--ê:  %s"
+    "tooltip.logged_user": "Chit-má teng-lo̍k--ê:  %s",
+    "menu.important": "Important",
+    "page.important.title": "Important",
+    "page.important_entry_count": ["%d important unread articles"],
+    "alert.no_important_entry": "No important unread articles."
 }

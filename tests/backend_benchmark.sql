@@ -35,6 +35,15 @@ select 1000 + n, u.id, 100, md5(n::text), now() - (n % 86400) * interval '1 seco
     to_tsvector('simple', 'benchmark article content')
 from generate_series(0, :entries - 1) n cross join users u;
 
+-- The web-only prediction reads use this synthetic Feedoscope-owned table.
+create table entries_importance (
+    entry_id bigint primary key references entries(id) on delete cascade,
+    is_important boolean not null
+);
+insert into entries_importance (entry_id, is_important)
+select id, id % 4 = 0 from entries;
+analyze entries_importance;
+
 insert into user_tags (id, user_id, title)
 select n, u.id, 'Benchmark tag ' || n from generate_series(1, 10) n cross join users u;
 

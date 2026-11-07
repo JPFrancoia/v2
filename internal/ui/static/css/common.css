@@ -1140,6 +1140,10 @@ dialog {
     padding: 12px 14px;
 }
 
+.item-important {
+    background-color: var(--item-important-background);
+}
+
 .item.current-item {
     border: var(--current-item-border-width) solid var(--current-item-border-color);
     padding: 3px;

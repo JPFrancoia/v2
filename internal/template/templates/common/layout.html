@@ -98,6 +98,9 @@
                         {{ end }}
                     </a>
                 </li>
+                <li {{ if eq .menu "important" }}class="active"{{ end }}>
+                    <a href="{{ routePath "/important" }}" data-page="important">{{ icon "entries" }}{{ t "menu.important" }}</a>
+                </li>
                 <li {{ if eq .menu "to_review" }}class="active"{{ end }}>
                     <a href="{{ routePath "/to-review" }}" data-page="to-review">{{ icon "entries" }}{{ t "menu.to_review" }}</a>
                 </li>

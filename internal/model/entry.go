@@ -40,6 +40,7 @@ type Entry struct {
 	Score             int64         `json:"score"`
 	Vote              int           `json:"vote"`
 	RawRelevanceScore *float64      `json:"-"`
+	IsImportant       bool          `json:"-"`
 }
 
 func NewEntry() *Entry {
@@ -74,9 +75,12 @@ type Entries []*Entry
 
 // ImportantDiscoveryWeek stores weekly read and important article counts.
 type ImportantDiscoveryWeek struct {
-	WeekStart      time.Time
-	ImportantCount int
-	ReadCount      int
+	WeekStart             time.Time
+	ImportantCount        int
+	ReadCount             int
+	ClassifierReadCount   int
+	ClassifierUpvoteCount int
+	ClassifierMissedCount int
 }
 
 // ImportantDiscoveryWeeks represents weekly important discovery counts.

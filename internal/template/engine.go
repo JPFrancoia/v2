@@ -69,6 +69,7 @@ func (e *Engine) ParseTemplates() {
 		"user_tag_entries.html":        {"item_meta.html", "layout.html", "pagination.html"},
 		"create_user_tag.html":         {"layout.html", "settings_menu.html"},
 		"edit_user_tag.html":           {"layout.html", "settings_menu.html"},
+		"important_entries.html":       {"item_meta.html", "layout.html", "pagination.html"},
 		"unread_entries.html":          {"item_meta.html", "layout.html", "pagination.html"},
 		"users.html":                   {"layout.html", "settings_menu.html"},
 		"webauthn_rename.html":         {"layout.html"},
