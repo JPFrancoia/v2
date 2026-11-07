@@ -12,9 +12,9 @@ insert into feeds (id, user_id, category_id, title, feed_url, site_url,
 values (9, 42, 7, 'Fixture feed', 'https://example.test/feed', 'https://example.test/',
     '', '', '', '', '', '', now());
 insert into entries (id, user_id, feed_id, hash, published_at, title, url,
-    changed_at, content, one_line_summary, author, comments_url, status, score,
+    changed_at, content, author, comments_url, status, score,
     tags, document_vectors)
 select 100+n, 42, 9, md5(n::text), now(), 'Fixture article',
     'https://example.test/article/' || n, now(), repeat('Original article body. ', 400),
-    'Stored generated summary.', '', '', 'unread', 55, '{}', to_tsvector('needle article')
+    '', '', 'unread', 55, '{}', to_tsvector('needle article')
 from generate_series(1, 3) n;

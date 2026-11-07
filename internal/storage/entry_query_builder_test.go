@@ -62,12 +62,9 @@ func TestEntryQueryBuilderContentColumn(t *testing.T) {
 			name      string
 			configure func(*EntryQueryBuilder)
 			content   string
-			summary   string
 		}{
-			{"full", func(*EntryQueryBuilder) {}, strings.Repeat("Original article body. ", 400), "Stored generated summary."},
-			{"without_content", func(b *EntryQueryBuilder) { b.WithoutContent() }, "", "Stored generated summary."},
-			{"without_summary", func(b *EntryQueryBuilder) { b.WithoutSummary() }, strings.Repeat("Original article body. ", 400), ""},
-			{"list", func(b *EntryQueryBuilder) { b.WithoutContent().WithoutSummary() }, "", ""},
+			{"full", func(*EntryQueryBuilder) {}, strings.Repeat("Original article body. ", 400)},
+			{"without_content", func(b *EntryQueryBuilder) { b.WithoutContent() }, ""},
 		} {
 			for _, counted := range []bool{false, true} {
 				name := tc.name + "/plain"
@@ -98,18 +95,18 @@ func TestEntryQueryBuilderContentColumn(t *testing.T) {
 						if entry.ID != int64(102+i) || entry.Title != "Fixture article" || entry.Score != 55 {
 							t.Fatalf("Changed list metadata: id=%d title=%q score=%d", entry.ID, entry.Title, entry.Score)
 						}
-						if entry.Content != tc.content || entry.OneLineSummary != tc.summary {
-							t.Errorf("Unexpected text: content length=%d, summary=%q", len(entry.Content), entry.OneLineSummary)
+						if entry.Content != tc.content {
+							t.Errorf("Unexpected content length: %d", len(entry.Content))
 						}
 					}
 				})
 			}
 		}
-		var content, summary string
-		if err := db.QueryRowContext(t.Context(), entryQueryStoredText, 101).Scan(&content, &summary); err != nil {
+		var content string
+		if err := db.QueryRowContext(t.Context(), entryQueryStoredText, 101).Scan(&content); err != nil {
 			t.Fatal(err)
 		}
-		if content != strings.Repeat("Original article body. ", 400) || summary != "Stored generated summary." {
+		if content != strings.Repeat("Original article body. ", 400) {
 			t.Fatal("Stored article text changed")
 		}
 	})

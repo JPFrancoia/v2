@@ -34,13 +34,12 @@ func TestRenderWithoutArticleSummaries(t *testing.T) {
 	engine := NewEngine("")
 	engine.ParseTemplates()
 	entry := &model.Entry{
-		ID:             1,
-		Title:          "Article title",
-		URL:            "https://example.com/article",
-		Content:        "<p>Article body preview.</p>",
-		OneLineSummary: "Stored generated summary.",
-		Date:           time.Now(),
-		Status:         "unread",
+		ID:      1,
+		Title:   "Article title",
+		URL:     "https://example.com/article",
+		Content: "<p>Article body preview.</p>",
+		Date:    time.Now(),
+		Status:  "unread",
 		Feed: &model.Feed{
 			ID:       1,
 			Title:    "Example feed",
@@ -68,9 +67,6 @@ func TestRenderWithoutArticleSummaries(t *testing.T) {
 			var output bytes.Buffer
 			if err := engine.templates[tc.view].ExecuteTemplate(&output, tc.fragment, tc.data); err != nil {
 				t.Fatal(err)
-			}
-			if bytes.Contains(output.Bytes(), []byte(entry.OneLineSummary)) {
-				t.Error("view contains a stored generated summary")
 			}
 			if bytes.Contains(output.Bytes(), []byte(`class="item-preview"`)) {
 				t.Error("view contains an article preview paragraph")
