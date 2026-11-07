@@ -26,6 +26,7 @@ export PGPASSWORD := postgres
 	clean \
 	add-string \
 	test \
+	benchmark-backend \
 	lint \
 	integration-test \
 	clean-integration-test \
@@ -103,6 +104,9 @@ test:
 
 test-js:
 	node --test tests/*.js
+
+benchmark-backend:
+	sh tests/run_backend_benchmark.sh
 
 lint:
 	go vet ./...
