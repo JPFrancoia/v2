@@ -12,6 +12,7 @@ import (
 	"miniflux.app/v2/internal/ui/view"
 )
 
+// showCategoryEntriesPage displays matching entries without body or summary reads.
 func (h *handler) showCategoryEntriesPage(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
@@ -37,7 +38,7 @@ func (h *handler) showCategoryEntriesPage(w http.ResponseWriter, r *http.Request
 	builder.WithSorting(user.EntryOrder, user.EntryDirection)
 	builder.WithSorting("id", user.EntryDirection)
 	builder.WithStatus(model.EntryStatusUnread)
-	builder.WithContentPreview()
+	builder.WithoutContent().WithoutSummary()
 	builder.WithOffset(offset)
 	builder.WithLimit(user.EntriesPerPage)
 

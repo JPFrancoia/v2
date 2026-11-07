@@ -12,6 +12,7 @@ import (
 	"miniflux.app/v2/internal/ui/view"
 )
 
+// showHistoryPage displays matching entries without body or summary reads.
 func (h *handler) showHistoryPage(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
@@ -24,7 +25,7 @@ func (h *handler) showHistoryPage(w http.ResponseWriter, r *http.Request) {
 	builder.WithStatus(model.EntryStatusRead)
 	builder.WithSorting("changed_at", "DESC")
 	builder.WithSorting("published_at", "DESC")
-	builder.WithContentPreview()
+	builder.WithoutContent().WithoutSummary()
 	builder.WithOffset(offset)
 	builder.WithLimit(user.EntriesPerPage)
 

@@ -12,6 +12,7 @@ import (
 	"miniflux.app/v2/internal/ui/view"
 )
 
+// showSearchPage displays matching entries without body or summary reads.
 func (h *handler) showSearchPage(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
@@ -32,7 +33,7 @@ func (h *handler) showSearchPage(w http.ResponseWriter, r *http.Request) {
 		if unreadOnly {
 			builder.WithStatus(model.EntryStatusUnread)
 		}
-		builder.WithContentPreview()
+		builder.WithoutContent().WithoutSummary()
 		builder.WithOffset(offset)
 		builder.WithLimit(user.EntriesPerPage)
 

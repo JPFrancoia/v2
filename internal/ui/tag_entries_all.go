@@ -12,6 +12,7 @@ import (
 	"miniflux.app/v2/internal/ui/view"
 )
 
+// showTagEntriesAllPage displays matching entries without body or summary reads.
 func (h *handler) showTagEntriesAllPage(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
@@ -31,7 +32,7 @@ func (h *handler) showTagEntriesAllPage(w http.ResponseWriter, r *http.Request) 
 	builder.WithSorting("status", "asc")
 	builder.WithSorting(user.EntryOrder, user.EntryDirection)
 	builder.WithSorting("id", user.EntryDirection)
-	builder.WithContentPreview()
+	builder.WithoutContent().WithoutSummary()
 	builder.WithOffset(offset)
 	builder.WithLimit(user.EntriesPerPage)
 

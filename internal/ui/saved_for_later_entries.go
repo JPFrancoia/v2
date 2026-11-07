@@ -12,6 +12,7 @@ import (
 	"miniflux.app/v2/internal/ui/view"
 )
 
+// showSavedForLaterPage displays matching entries without body or summary reads.
 func (h *handler) showSavedForLaterPage(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
@@ -29,7 +30,7 @@ func (h *handler) showSavedForLaterPage(w http.ResponseWriter, r *http.Request) 
 	builder.WithOffset(offset)
 	builder.WithLimit(user.EntriesPerPage)
 	builder.WithGloballyVisible()
-	builder.WithContentPreview()
+	builder.WithoutContent().WithoutSummary()
 
 	entries, count, err := builder.GetEntriesWithCount()
 	if err != nil {
@@ -46,7 +47,7 @@ func (h *handler) showSavedForLaterPage(w http.ResponseWriter, r *http.Request) 
 		builder.WithSorting("id", direction)
 		builder.WithLimit(user.EntriesPerPage)
 		builder.WithGloballyVisible()
-		builder.WithContentPreview()
+		builder.WithoutContent().WithoutSummary()
 
 		entries, count, err = builder.GetEntriesWithCount()
 		if err != nil {

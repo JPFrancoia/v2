@@ -29,7 +29,7 @@ type EntryQueryBuilder struct {
 	offset          int
 	fetchEnclosures bool
 	excludeContent  bool
-	previewContent  bool
+	excludeSummary  bool
 }
 
 // WithEnclosures fetches enclosures for each entry.
@@ -43,14 +43,12 @@ func (e *EntryQueryBuilder) WithEnclosures() *EntryQueryBuilder {
 // transfer from PostgreSQL on list pages where content is not displayed.
 func (e *EntryQueryBuilder) WithoutContent() *EntryQueryBuilder {
 	e.excludeContent = true
-	e.previewContent = false
 	return e
 }
 
-// WithContentPreview fetches a bounded content prefix for list previews.
-func (e *EntryQueryBuilder) WithContentPreview() *EntryQueryBuilder {
-	e.excludeContent = false
-	e.previewContent = true
+// WithoutSummary excludes generated summary text that HTML lists do not display.
+func (e *EntryQueryBuilder) WithoutSummary() *EntryQueryBuilder {
+	e.excludeSummary = true
 	return e
 }
 
@@ -374,6 +372,11 @@ func (e *EntryQueryBuilder) fetchEntries(withCount bool) (model.Entries, int, er
 		countColumn = "count(*) OVER(),"
 	}
 
+	summaryColumn := "e.one_line_summary"
+	if e.excludeSummary {
+		summaryColumn = "'' AS one_line_summary"
+	}
+
 	query := `
 		SELECT
 			` + countColumn + `
@@ -388,7 +391,7 @@ func (e *EntryQueryBuilder) fetchEntries(withCount bool) (model.Entries, int, er
 			e.author,
 			e.share_code,
 			` + e.contentColumn() + `,
-			e.one_line_summary,
+			` + summaryColumn + `,
 			e.status,
 			e.starred,
 			e.saved_for_later,
@@ -578,12 +581,10 @@ func (e *EntryQueryBuilder) GetEntryIDs() ([]int64, error) {
 	return entryIDs, nil
 }
 
+// contentColumn selects full article content or an empty value for metadata queries.
 func (e *EntryQueryBuilder) contentColumn() string {
 	if e.excludeContent {
 		return "'' AS content"
-	}
-	if e.previewContent {
-		return "(select left(preview.content, 4096) from entries preview where preview.id = e.id) as content"
 	}
 	return "e.content"
 }

@@ -11,6 +11,7 @@ import (
 	"miniflux.app/v2/internal/ui/view"
 )
 
+// showStarredPage displays matching entries without body or summary reads.
 func (h *handler) showStarredPage(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
@@ -25,7 +26,7 @@ func (h *handler) showStarredPage(w http.ResponseWriter, r *http.Request) {
 	builder.WithSorting("id", user.EntryDirection)
 	builder.WithOffset(offset)
 	builder.WithLimit(user.EntriesPerPage)
-	builder.WithContentPreview()
+	builder.WithoutContent().WithoutSummary()
 
 	entries, count, err := builder.GetEntriesWithCount()
 	if err != nil {

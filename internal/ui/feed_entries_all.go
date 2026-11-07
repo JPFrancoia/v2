@@ -11,6 +11,7 @@ import (
 	"miniflux.app/v2/internal/ui/view"
 )
 
+// showFeedEntriesAllPage displays matching entries without body or summary reads.
 func (h *handler) showFeedEntriesAllPage(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.UserByID(r.Context(), request.UserID(r))
 	if err != nil {
@@ -35,7 +36,7 @@ func (h *handler) showFeedEntriesAllPage(w http.ResponseWriter, r *http.Request)
 	builder.WithFeedID(feed.ID)
 	builder.WithSorting(user.EntryOrder, user.EntryDirection)
 	builder.WithSorting("id", user.EntryDirection)
-	builder.WithContentPreview()
+	builder.WithoutContent().WithoutSummary()
 	builder.WithOffset(offset)
 	builder.WithLimit(user.EntriesPerPage)
 
