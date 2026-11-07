@@ -28,7 +28,7 @@ func TestParseTemplates(t *testing.T) {
 	NewEngine("").ParseTemplates()
 }
 
-// TestRenderWithoutArticleSummaries checks that views omit stored summaries and keep article text.
+// TestRenderWithoutArticleSummaries checks that lists omit previews and summaries while full articles retain content.
 func TestRenderWithoutArticleSummaries(t *testing.T) {
 	config.Opts = config.NewConfigOptions()
 	engine := NewEngine("")
@@ -54,12 +54,14 @@ func TestRenderWithoutArticleSummaries(t *testing.T) {
 		view     string
 		fragment string
 		data     map[string]any
-		preview  bool
+		body     bool
 	}{
-		{"list", "unread_entries.html", "item_meta", map[string]any{"entry": entry, "user": user}, true},
-		{"shared list", "shared_entries.html", "content", map[string]any{"entries": model.Entries{entry}, "user": user, "pagination": map[string]any{}}, true},
+		{"list", "unread_entries.html", "item_meta", map[string]any{"entry": entry, "user": user}, false},
+		{"shared list", "shared_entries.html", "content", map[string]any{"entries": model.Entries{entry}, "user": user, "pagination": map[string]any{}}, false},
 		{"article", "entry.html", "page_header", map[string]any{"entry": entry, "user": user}, false},
 		{"public article", "entry.html", "page_header", map[string]any{"entry": entry}, false},
+		{"article body", "entry.html", "content", map[string]any{"entry": entry, "user": user}, true},
+		{"public article body", "entry.html", "content", map[string]any{"entry": entry}, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -70,8 +72,11 @@ func TestRenderWithoutArticleSummaries(t *testing.T) {
 			if bytes.Contains(output.Bytes(), []byte(entry.OneLineSummary)) {
 				t.Error("view contains a stored generated summary")
 			}
-			if tc.preview && !bytes.Contains(output.Bytes(), []byte("Article body preview.")) {
-				t.Error("list view does not contain the article preview")
+			if bytes.Contains(output.Bytes(), []byte(`class="item-preview"`)) {
+				t.Error("view contains an article preview paragraph")
+			}
+			if bytes.Contains(output.Bytes(), []byte("Article body preview.")) != tc.body {
+				t.Errorf("article content presence does not match full-article view: %v", tc.body)
 			}
 		})
 	}

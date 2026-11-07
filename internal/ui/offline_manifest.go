@@ -14,7 +14,7 @@ import (
 )
 
 // Increment this version when cached page rendering or client behavior changes.
-const offlineSnapshotSchemaVersion = "4"
+const offlineSnapshotSchemaVersion = "5"
 
 func (h *handler) showOfflineManifest(w http.ResponseWriter, r *http.Request) {
 	manifest, err := h.store.OfflineManifest(r.Context(), request.UserID(r), time.Now())
