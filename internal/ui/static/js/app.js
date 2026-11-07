@@ -1597,7 +1597,7 @@ function renderAIMetricsChart(chartElement) {
         return Number.isFinite(value) ? value : null;
     };
 
-    const draw = () => {
+    function draw() {
         const width = Math.max(320, Math.floor(chartElement.clientWidth || chartElement.getBoundingClientRect().width || 320));
         const height = 220;
         const dpr = window.devicePixelRatio || 1;
@@ -1714,7 +1714,7 @@ function renderAIMetricsChart(chartElement) {
                 ctx.fill();
             });
         });
-    };
+    }
 
     chartElement.addEventListener("mousemove", (event) => {
         if (!tooltip || hitTargets.length === 0) return;

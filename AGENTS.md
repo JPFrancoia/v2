@@ -36,6 +36,7 @@ make clean             # Remove build artifacts
 
 ```bash
 make test                    # Unit tests: go test -cover -race -count=1 ./...
+make test-js                 # JavaScript tests: node --test tests/*.js
 go test -v -run TestName ./internal/pkg/...   # Run a single test by name
 go test -v -run TestName -count=1 ./internal/reader/sanitizer/  # Single test, specific package
 make integration-test        # Full API integration tests (needs PostgreSQL)
@@ -44,9 +45,15 @@ make clean-integration-test  # Cleanup after integration tests
 
 ## Lint Commands
 
+Lint checks inspect source code for errors and style rules. Always run local tests and all lint checks before pushing code or reporting completion. Tests do not replace lint checks. Use the checker versions in `.github/workflows/linters.yml`.
+
 ```bash
 make lint              # Runs: go vet ./..., gofmt check, golangci-lint run
+jshint internal/ui/static/js/*.js
+eslint internal/ui/static/js/*.js
 ```
+
+Report every failed or unavailable check. Remote checks supplement local checks. They do not replace them.
 
 Linter config in `.golangci.yml`: standard set with `errcheck` disabled. Enforces SPDX license header.
 Enables: errname, gocritic, goheader, loggercheck, misspell, perfsprint, sqlclosecheck, staticcheck, whitespace.

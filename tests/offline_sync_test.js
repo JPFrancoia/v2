@@ -24,6 +24,43 @@ test("clear offline data reloads the application", () => {
     assert.match(offlineSource, /await clearOfflineData\(\);\s*location\.reload\(\);/);
 });
 
+test("offline list caching keeps only allowed articles", async () => {
+    const entries = [1, 99, 2].map((id) => ({
+        dataset: {id: String(id)},
+        removed: false,
+        remove() { this.removed = true; },
+    }));
+    const parsed = {
+        body: {dataset: {}},
+        documentElement: {
+            get outerHTML() { return entries.filter((entry) => !entry.removed).map((entry) => `<article data-id="${entry.dataset.id}"></article>`).join(""); },
+        },
+        querySelectorAll: (selector) => selector === "article[data-id]" ? entries : [],
+        querySelector: () => null,
+    };
+    const local = vm.createContext({
+        URL, Response, Headers,
+        location: {origin: "https://miniflux.test"},
+        fetch: async () => new Response("<body></body>"),
+        DOMParser: class { parseFromString() { return parsed; } },
+        trustedTypes: {createPolicy: (_name, rules) => rules},
+    });
+    vm.runInContext(offlineSource, local);
+    const cached = [];
+    const pageCache = {
+        keys: async () => [],
+        put: async (url, response) => cached.push({url, html: await response.text()}),
+    };
+    const url = "https://miniflux.test/unread";
+    assert.equal(await local.cacheOfflineListPages(url, new Set([1, 2]), pageCache), true);
+    assert.equal(cached.length, 1);
+    assert.equal(cached[0].url, url);
+    assert.match(cached[0].html, /data-id="1"/);
+    assert.match(cached[0].html, /data-id="2"/);
+    assert.doesNotMatch(cached[0].html, /data-id="99"/);
+    assert.equal(parsed.body.dataset.offlineSnapshot, "true");
+});
+
 test("offline mode prepares content only when enabled", async () => {
     const writes = [];
     let refreshes = 0;
