@@ -250,8 +250,14 @@ func (e *EntryQueryBuilder) WithShareCodeNotEmpty() *EntryQueryBuilder {
 	return e
 }
 
-// WithSorting add a sort expression.
+// WithSorting qualifies ambiguous names and adds a sort expression.
 func (e *EntryQueryBuilder) WithSorting(column, direction string) *EntryQueryBuilder {
+	switch column {
+	case "title":
+		column = "e.title"
+	case "category_title":
+		column = "c.title"
+	}
 	e.sortExpressions = append(e.sortExpressions, column+" "+direction)
 	return e
 }
@@ -363,13 +369,28 @@ func (e *EntryQueryBuilder) GetEntriesWithCount() (model.Entries, int, error) {
 	return e.fetchEntries(true)
 }
 
-// fetchEntries is the shared implementation for GetEntries and GetEntriesWithCount.
-// When withCount is true, count(*) OVER() is included in the SELECT and the total
-// count of matching rows is returned; otherwise the returned count is 0.
-func (e *EntryQueryBuilder) fetchEntries(withCount bool) (model.Entries, int, error) {
+// entryQuery builds the row query separately so execution-plan checks can inspect real database work.
+func (e *EntryQueryBuilder) entryQuery(withCount bool) string {
 	countColumn := ""
+	prefix := ""
+	condition := e.buildCondition()
+	sorting := e.buildSorting()
+	pageJoin := ""
 	if withCount {
-		countColumn = "count(*) OVER(),"
+		countColumn = "page_entries.total_count,"
+		prefix = `with page_entries as materialized (
+            select e.id, count(*) over () as total_count
+            from entries e
+            left join feeds f on f.id = e.feed_id
+            left join categories c on c.id = f.category_id
+            where ` + condition + " " + sorting + `
+        ) `
+		pageJoin = " join page_entries on page_entries.id = e.id "
+		condition = "true"
+		sorting = ""
+		if len(e.sortExpressions) > 0 {
+			sorting = " order by " + strings.Join(e.sortExpressions, ", ")
+		}
 	}
 
 	summaryColumn := "e.one_line_summary"
@@ -377,7 +398,7 @@ func (e *EntryQueryBuilder) fetchEntries(withCount bool) (model.Entries, int, er
 		summaryColumn = "'' AS one_line_summary"
 	}
 
-	query := `
+	return prefix + `
 		SELECT
 			` + countColumn + `
 			e.id,
@@ -422,7 +443,7 @@ func (e *EntryQueryBuilder) fetchEntries(withCount bool) (model.Entries, int, er
 			i.external_id AS icon_external_id,
 			u.timezone
 		FROM
-			entries e
+			entries e ` + pageJoin + `
 		LEFT JOIN
 			feeds f ON f.id=e.feed_id
 		LEFT JOIN
@@ -433,7 +454,14 @@ func (e *EntryQueryBuilder) fetchEntries(withCount bool) (model.Entries, int, er
 			icons i ON i.id=fi.icon_id
 		LEFT JOIN
 			users u ON u.id=e.user_id
-		WHERE ` + e.buildCondition() + " " + e.buildSorting()
+		WHERE ` + condition + " " + sorting
+}
+
+// fetchEntries is the shared implementation for GetEntries and GetEntriesWithCount.
+// When withCount is true, count(*) OVER() is included in the SELECT and the total
+// count of matching rows is returned; otherwise the returned count is 0.
+func (e *EntryQueryBuilder) fetchEntries(withCount bool) (model.Entries, int, error) {
+	query := e.entryQuery(withCount)
 
 	rows, err := e.store.db.QueryContext(e.ctx, query, e.args...)
 	if err != nil {

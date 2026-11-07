@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
+	"encoding/json"
 	"math"
 	"net/url"
 	"os"
@@ -24,6 +25,9 @@ var entryQueryTextFixture string
 //go:embed testdata/entry_query_stored_text.sql
 var entryQueryStoredText string
 
+//go:embed testdata/entry_query_counted.sql
+var entryQueryCountedFixture string
+
 // TestEntryQueryBuilderContentColumn checks text selection without changing stored data.
 func TestEntryQueryBuilderContentColumn(t *testing.T) {
 	builder := &EntryQueryBuilder{}
@@ -37,27 +41,8 @@ func TestEntryQueryBuilderContentColumn(t *testing.T) {
 	}
 
 	t.Run("PostgreSQL", func(t *testing.T) {
-		databaseURL := os.Getenv("TEST_STORAGE_DATABASE_URL")
-		if databaseURL == "" {
-			t.Skip("Set TEST_STORAGE_DATABASE_URL to an isolated local PostgreSQL database")
-		}
-		u, err := url.Parse(databaseURL)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if u.Hostname() != "localhost" && u.Hostname() != "127.0.0.1" && u.Hostname() != "::1" {
-			t.Fatal("Storage text checks require a loopback database")
-		}
-		db, err := sql.Open("postgres", databaseURL)
-		if err != nil {
-			t.Fatal(err)
-		}
-		db.SetMaxOpenConns(1)
-		t.Cleanup(func() { db.Close() })
-		if _, err := db.ExecContext(t.Context(), entryQueryTextFixture); err != nil {
-			t.Fatal(err)
-		}
-		store := NewStorage(db)
+		store := newEntryQueryFixture(t)
+		db := store.db
 		for _, tc := range []struct {
 			name      string
 			configure func(*EntryQueryBuilder)
@@ -79,6 +64,7 @@ func TestEntryQueryBuilderContentColumn(t *testing.T) {
 					b.WithSearchQuery("needle").WithSorting("e.id", "asc").WithLimit(2).WithOffset(1)
 					tc.configure(b)
 					var entries model.Entries
+					var err error
 					if counted {
 						var count int
 						entries, count, err = b.GetEntriesWithCount()
@@ -105,6 +91,39 @@ func TestEntryQueryBuilderContentColumn(t *testing.T) {
 				})
 			}
 		}
+
+		t.Run("narrow_count_stage", func(t *testing.T) {
+			builder := NewEntryQueryBuilder(t.Context(), store, 42)
+			builder.WithoutContent().WithoutSummary().WithSorting("e.score", "desc").WithSorting("e.id", "desc").WithLimit(2)
+			var raw []byte
+			if err := db.QueryRowContext(t.Context(), "explain (format json) "+builder.entryQuery(true), builder.args...).Scan(&raw); err != nil {
+				t.Fatal(err)
+			}
+			var plans []struct{ Plan map[string]any }
+			if err := json.Unmarshal(raw, &plans); err != nil {
+				t.Fatal(err)
+			}
+			var visit func(map[string]any)
+			windows := 0
+			visit = func(node map[string]any) {
+				if node["Node Type"] == "WindowAgg" {
+					windows++
+					// The count stage needs IDs, a count, and sort keys, not feed metadata.
+					if width := node["Plan Width"].(float64); width > 64 {
+						t.Errorf("Count stage carries %.0f bytes per row, want at most 64", width)
+					}
+				}
+				if children, ok := node["Plans"].([]any); ok {
+					for _, child := range children {
+						visit(child.(map[string]any))
+					}
+				}
+			}
+			visit(plans[0].Plan)
+			if windows != 1 {
+				t.Fatalf("Unexpected count stages: %d", windows)
+			}
+		})
 		var content, summary string
 		if err := db.QueryRowContext(t.Context(), entryQueryStoredText, 101).Scan(&content, &summary); err != nil {
 			t.Fatal(err)
@@ -175,5 +194,120 @@ func TestEntryQueryBuilderPreparationCutoff(t *testing.T) {
 	}
 	if got := builder.args[1]; got != asOf {
 		t.Fatalf("unexpected bound cutoff: %v", got)
+	}
+}
+
+// newEntryQueryFixture creates connection-local tables without changing stored rows.
+func newEntryQueryFixture(t *testing.T) *Storage {
+	t.Helper()
+	databaseURL := os.Getenv("TEST_STORAGE_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("Set TEST_STORAGE_DATABASE_URL to an isolated local PostgreSQL database")
+	}
+	u, err := url.Parse(databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Hostname() != "localhost" && u.Hostname() != "127.0.0.1" && u.Hostname() != "::1" {
+		t.Fatal("Storage text checks require a loopback database")
+	}
+	db, err := sql.Open("postgres", databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.SetMaxOpenConns(1)
+	t.Cleanup(func() { db.Close() })
+	if _, err := db.ExecContext(t.Context(), entryQueryTextFixture); err != nil {
+		t.Fatal(err)
+	}
+	return NewStorage(db)
+}
+
+// TestCountedEntryPages preserves complete results while counting before metadata joins.
+func TestCountedEntryPages(t *testing.T) {
+	store := newEntryQueryFixture(t)
+	if _, err := store.db.ExecContext(t.Context(), entryQueryCountedFixture); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name      string
+		configure func(*EntryQueryBuilder)
+	}{
+		{"all", func(b *EntryQueryBuilder) {}},
+		{"visible_unread", func(b *EntryQueryBuilder) { b.WithGloballyVisible().WithStatus(model.EntryStatusUnread) }},
+		{"saved", func(b *EntryQueryBuilder) { b.WithSavedForLater(true) }},
+		{"starred", func(b *EntryQueryBuilder) { b.WithStarred(true) }},
+		{"search", func(b *EntryQueryBuilder) { b.WithSearchQuery("needle") }},
+		{"review", func(b *EntryQueryBuilder) { b.WithRawRelevanceDistanceSorting(25).WithVote(0) }},
+		{"tags", func(b *EntryQueryBuilder) { b.WithUserTagID(17) }},
+		{"feed_tags", func(b *EntryQueryBuilder) { b.WithTags([]string{"fixture"}) }},
+		{"hidden_category", func(b *EntryQueryBuilder) { b.WithCategoryID(8) }},
+		{"feed", func(b *EntryQueryBuilder) { b.WithFeedID(9) }},
+		{"shared", func(b *EntryQueryBuilder) { b.WithShareCodeNotEmpty() }},
+		{"missing", func(b *EntryQueryBuilder) { b.WithEntryID(99999) }},
+		{"text_and_enclosures", func(b *EntryQueryBuilder) { b.WithEnclosures() }},
+		{"without_text", func(b *EntryQueryBuilder) { b.WithoutContent().WithoutSummary() }},
+	} {
+		for _, direction := range []string{"asc", "desc"} {
+			t.Run(tc.name+"/"+direction, func(t *testing.T) {
+				makeBuilder := func() *EntryQueryBuilder {
+					builder := NewEntryQueryBuilder(t.Context(), store, 42)
+					tc.configure(builder)
+					builder.WithSorting("e.published_at", direction).WithSorting("e.id", direction)
+					return builder
+				}
+				all, err := makeBuilder().GetEntries()
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, page := range []struct{ limit, offset int }{{0, 0}, {2, 0}, {2, 1}, {2, 100}} {
+					builder := makeBuilder().WithLimit(page.limit).WithOffset(page.offset)
+					got, count, err := builder.GetEntriesWithCount()
+					if err != nil {
+						t.Fatal(err)
+					}
+					start := min(page.offset, len(all))
+					end := len(all)
+					if page.limit > 0 {
+						end = min(start+page.limit, end)
+					}
+					wantCount := len(all)
+					if start == end {
+						wantCount = 0
+					}
+					if count != wantCount || !reflect.DeepEqual(got, all[start:end]) {
+						t.Errorf("limit=%d offset=%d count=%d want=%d rows=%d want=%d", page.limit, page.offset, count, wantCount, len(got), end-start)
+					}
+				}
+			})
+		}
+	}
+}
+
+// TestCountedEntrySorts preserves every supported API sort name in both query stages.
+func TestCountedEntrySorts(t *testing.T) {
+	store := newEntryQueryFixture(t)
+	if _, err := store.db.ExecContext(t.Context(), entryQueryCountedFixture); err != nil {
+		t.Fatal(err)
+	}
+	for _, order := range []string{"id", "status", "changed_at", "published_at", "created_at", "category_title", "category_id", "title", "author", "score"} {
+		for _, direction := range []string{"asc", "desc"} {
+			t.Run(order+"/"+direction, func(t *testing.T) {
+				configure := func() *EntryQueryBuilder {
+					return NewEntryQueryBuilder(t.Context(), store, 42).WithSorting(order, direction).WithSorting("e.id", direction)
+				}
+				want, err := configure().GetEntries()
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, count, err := configure().WithLimit(2).WithOffset(1).GetEntriesWithCount()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if count != len(want) || !reflect.DeepEqual(got, want[1:3]) {
+					t.Fatal("Counted sorting changed API results")
+				}
+			})
+		}
 	}
 }
