@@ -13,13 +13,13 @@ select n, case when n = 12 then 43 else 42 end,
 from generate_series(10, 12) n;
 
 insert into entries (id, user_id, feed_id, hash, published_at, title, url,
-    changed_at, content, one_line_summary, author, comments_url, status, score,
+    changed_at, content, author, comments_url, status, score,
     raw_relevance_score, vote, starred, saved_for_later, share_code, tags, document_vectors)
 select 200 + n, case when n = 20 then 43 else 42 end,
     case when n = 20 then 12 when n % 7 = 0 then 10 when n % 6 = 0 then 11 else 9 end,
     md5(n::text), now() - (n / 2) * interval '1 hour', 'Counted fixture article ' || n,
     'https://example.test/counted/' || n, now() - n * interval '1 minute',
-    'Counted fixture body', 'Retained fixture summary', '', '',
+    'Counted fixture body', '', '',
     case when n % 3 = 0 then 'read'::entry_status else 'unread'::entry_status end,
     n % 4, case when n % 5 = 0 then null else n * 2.5 end,
     n % 3 - 1, n % 2 = 0, n % 3 = 1,

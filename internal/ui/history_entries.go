@@ -25,7 +25,7 @@ func (h *handler) showHistoryPage(w http.ResponseWriter, r *http.Request) {
 	builder.WithStatus(model.EntryStatusRead)
 	builder.WithSorting("changed_at", "DESC")
 	builder.WithSorting("published_at", "DESC")
-	builder.WithoutContent().WithoutSummary()
+	builder.WithoutContent()
 	builder.WithOffset(offset)
 	builder.WithLimit(user.EntriesPerPage)
 

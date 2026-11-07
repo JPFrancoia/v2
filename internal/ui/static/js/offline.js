@@ -664,11 +664,11 @@ async function cacheOfflineListPages(startURL, allowedEntryIDs, pageCache) {
         if (!response.ok || response.redirected) return false;
         const parsed = new DOMParser().parseFromString(trustedOfflineHTML(await response.text()), "text/html");
         parsed.body.dataset.offlineSnapshot = "true";
-        parsed.querySelectorAll("article[data-id]").forEach((entry) => {
+        for (const entry of parsed.querySelectorAll("article[data-id]")) {
             const entryID = parseInt(entry.dataset.id, 10);
             if (allowedEntryIDs.has(entryID)) remaining.delete(entryID);
             else entry.remove();
-        });
+        }
         const next = parsed.querySelector('a[rel="next"]');
         if (remaining.size === 0) parsed.querySelectorAll('a[rel="next"]').forEach((link) => link.remove());
         const headers = new Headers(response.headers);
@@ -1082,11 +1082,8 @@ function updateOfflineProgress() {
     if (!progress) return;
     progress.hidden = !offlineRefreshProgress;
     if (offlineRefreshProgress) {
-        const label = offlineRefreshPhase === "media"
-            ? status.dataset.labelCachingMedia
-            : offlineRefreshPhase === "lists"
-                ? status.dataset.labelCachingLists
-                : status.dataset.labelArticlesCached;
+        const label = offlineRefreshPhase === "media" ? status.dataset.labelCachingMedia :
+            offlineRefreshPhase === "lists" ? status.dataset.labelCachingLists : status.dataset.labelArticlesCached;
         progress.textContent = offlineProgressText(offlineRefreshProgress.completed, offlineRefreshProgress.total, label);
     }
 }

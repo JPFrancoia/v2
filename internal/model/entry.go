@@ -29,7 +29,6 @@ type Entry struct {
 	CreatedAt         time.Time     `json:"created_at"`
 	ChangedAt         time.Time     `json:"changed_at"`
 	Content           string        `json:"content"`
-	OneLineSummary    string        `json:"one_line_summary"`
 	Author            string        `json:"author"`
 	ShareCode         string        `json:"share_code"`
 	Starred           bool          `json:"starred"`

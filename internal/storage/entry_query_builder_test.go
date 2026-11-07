@@ -47,12 +47,9 @@ func TestEntryQueryBuilderContentColumn(t *testing.T) {
 			name      string
 			configure func(*EntryQueryBuilder)
 			content   string
-			summary   string
 		}{
-			{"full", func(*EntryQueryBuilder) {}, strings.Repeat("Original article body. ", 400), "Stored generated summary."},
-			{"without_content", func(b *EntryQueryBuilder) { b.WithoutContent() }, "", "Stored generated summary."},
-			{"without_summary", func(b *EntryQueryBuilder) { b.WithoutSummary() }, strings.Repeat("Original article body. ", 400), ""},
-			{"list", func(b *EntryQueryBuilder) { b.WithoutContent().WithoutSummary() }, "", ""},
+			{"full", func(*EntryQueryBuilder) {}, strings.Repeat("Original article body. ", 400)},
+			{"without_content", func(b *EntryQueryBuilder) { b.WithoutContent() }, ""},
 		} {
 			for _, counted := range []bool{false, true} {
 				name := tc.name + "/plain"
@@ -84,8 +81,8 @@ func TestEntryQueryBuilderContentColumn(t *testing.T) {
 						if entry.ID != int64(102+i) || entry.Title != "Fixture article" || entry.Score != 55 {
 							t.Fatalf("Changed list metadata: id=%d title=%q score=%d", entry.ID, entry.Title, entry.Score)
 						}
-						if entry.Content != tc.content || entry.OneLineSummary != tc.summary {
-							t.Errorf("Unexpected text: content length=%d, summary=%q", len(entry.Content), entry.OneLineSummary)
+						if entry.Content != tc.content {
+							t.Errorf("Unexpected content length: %d", len(entry.Content))
 						}
 					}
 				})
@@ -94,7 +91,7 @@ func TestEntryQueryBuilderContentColumn(t *testing.T) {
 
 		t.Run("narrow_count_stage", func(t *testing.T) {
 			builder := NewEntryQueryBuilder(t.Context(), store, 42)
-			builder.WithoutContent().WithoutSummary().WithSorting("e.score", "desc").WithSorting("e.id", "desc").WithLimit(2)
+			builder.WithoutContent().WithSorting("e.score", "desc").WithSorting("e.id", "desc").WithLimit(2)
 			var raw []byte
 			if err := db.QueryRowContext(t.Context(), "explain (format json) "+builder.entryQuery(true), builder.args...).Scan(&raw); err != nil {
 				t.Fatal(err)
@@ -124,11 +121,11 @@ func TestEntryQueryBuilderContentColumn(t *testing.T) {
 				t.Fatalf("Unexpected count stages: %d", windows)
 			}
 		})
-		var content, summary string
-		if err := db.QueryRowContext(t.Context(), entryQueryStoredText, 101).Scan(&content, &summary); err != nil {
+		var content string
+		if err := db.QueryRowContext(t.Context(), entryQueryStoredText, 101).Scan(&content); err != nil {
 			t.Fatal(err)
 		}
-		if content != strings.Repeat("Original article body. ", 400) || summary != "Stored generated summary." {
+		if content != strings.Repeat("Original article body. ", 400) {
 			t.Fatal("Stored article text changed")
 		}
 	})
@@ -246,7 +243,7 @@ func TestCountedEntryPages(t *testing.T) {
 		{"shared", func(b *EntryQueryBuilder) { b.WithShareCodeNotEmpty() }},
 		{"missing", func(b *EntryQueryBuilder) { b.WithEntryID(99999) }},
 		{"text_and_enclosures", func(b *EntryQueryBuilder) { b.WithEnclosures() }},
-		{"without_text", func(b *EntryQueryBuilder) { b.WithoutContent().WithoutSummary() }},
+		{"without_text", func(b *EntryQueryBuilder) { b.WithoutContent() }},
 	} {
 		for _, direction := range []string{"asc", "desc"} {
 			t.Run(tc.name+"/"+direction, func(t *testing.T) {

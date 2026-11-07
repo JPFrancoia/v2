@@ -5,9 +5,13 @@ package database // import "miniflux.app/v2/internal/database"
 
 import (
 	"database/sql"
+	_ "embed"
 
 	"miniflux.app/v2/internal/crypto"
 )
+
+//go:embed migrations/drop_article_summary.sql
+var dropArticleSummary string
 
 var schemaVersion = len(migrations)
 
@@ -1694,6 +1698,10 @@ var migrations = [...]func(tx *sql.Tx) error{
 	},
 	func(tx *sql.Tx) (err error) {
 		_, err = tx.Exec(`ALTER TABLE entries ADD COLUMN raw_relevance_score double precision`)
+		return err
+	},
+	func(tx *sql.Tx) (err error) {
+		_, err = tx.Exec(dropArticleSummary)
 		return err
 	},
 }
