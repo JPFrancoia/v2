@@ -12,7 +12,8 @@ Module: `miniflux.app/v2` | Go >= 1.24 | License: Apache-2.0
 - Check the current branch, worktree status, and intended base before editing.
 - Read the relevant workspace `docs/reference/` documents, accepted decisions, and plan when the task crosses repository boundaries.
 - Read nearby code before adding a helper, type, dependency, or new pattern.
-- Use a dedicated Git worktree for substantial code changes. Give each concurrent writer a separate worktree.
+- Use a dedicated Git worktree for substantial code changes. Place it at the Feedoscope workspace root under `.worktrees/miniflux-<task>/`.
+- Give each concurrent writer a separate worktree. Do not create a sibling directory outside the workspace.
 - Make small, focused documentation or configuration edits in the current checkout when safe.
 - If a worktree is blocked by existing changes or an unclear base, ask before stashing, resetting, or moving anything.
 - Treat an approved plan slice as a hard boundary. Check `git diff --name-only` before review.
@@ -31,6 +32,8 @@ make linux-amd64       # Build for a specific platform (also: darwin-arm64, etc.
 make docker-image      # Build Alpine-based Docker image
 make clean             # Remove build artifacts
 ```
+
+For CrossPoint API work, build the current Miniflux feature worktree into a local Docker image after backend edits. Run it with a dedicated local PostgreSQL Docker database and Miniflux's built-in HTTPS listener. Test the X4 Pro host simulator against that local image before any remote account or device check. See the workspace [local development loop](../docs/reference/miniflux-offline-sync.md#local-miniflux-and-simulator-development). Use local-only credentials. Do not push the image or deploy Miniflux without explicit approval.
 
 ## Test Commands
 
